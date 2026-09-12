@@ -125,7 +125,11 @@ async function loadResolutionData() {
         const priorityData =
             await priorityResponse.json();
 
-        console.log("Priority data:", priorityData.data);
+        displayResolutionData(
+            "priority-chart",
+            priorityData.data,
+            "priority"
+        );
 
 
         const typeResponse =
@@ -134,7 +138,11 @@ async function loadResolutionData() {
         const typeData =
             await typeResponse.json();
 
-        console.log("Ticket type data:", typeData.data);
+        displayResolutionData(
+            "type-chart",
+            typeData.data,
+            "ticket_type"
+        );
 
 
         const channelResponse =
@@ -143,7 +151,11 @@ async function loadResolutionData() {
         const channelData =
             await channelResponse.json();
 
-        console.log("Channel data:", channelData.data);
+        displayResolutionData(
+            "channel-chart",
+            channelData.data,
+            "channel"
+        );
 
     } catch (error) {
 
@@ -153,4 +165,28 @@ async function loadResolutionData() {
         );
 
     }
+}
+
+
+function displayResolutionData(containerId, data, labelKey) {
+
+    const container = document.getElementById(containerId);
+
+    let html = "";
+
+    data.forEach(function (item) {
+
+        const label = item[labelKey];
+        const hours = item.average_resolution_hours;
+
+        html += `
+            <div class="resolution-row">
+                <span>${label}</span>
+                <strong>${hours} hrs</strong>
+            </div>
+        `;
+
+    });
+
+    container.innerHTML = html;
 });
