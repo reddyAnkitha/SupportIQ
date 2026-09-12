@@ -1,0 +1,8 @@
+{
+  "total_closed_tickets": 2769,
+  "low_satisfaction_tickets": 1102,
+  "satisfied_tickets": 1667,
+  "low_satisfaction_percentage": 39.8,
+  "satisfied_percentage": 60.2,
+  "model_accuracy": 59.75
+}
