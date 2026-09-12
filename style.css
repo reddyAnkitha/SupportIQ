@@ -108,3 +108,29 @@ footer {
         grid-template-columns: 1fr;
     }
 }
+.segment-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: white;
+}
+
+.segment-table th,
+.segment-table td {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+}
+
+.segment-table th {
+    background: #172554;
+    color: white;
+}
+
+.segment-table tr:hover {
+    background: #f4f7fb;
+}
+
+.segment-table td {
+    font-size: 14px;
+}
