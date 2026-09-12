@@ -3,10 +3,13 @@ console.log("SupportIQ dashboard loaded");
 document.addEventListener("DOMContentLoaded", function () {
     loadDashboardMetrics();
     loadSegments();
+    loadSatisfactionData();
     loadResolutionData();
 });
 
+
 async function loadDashboardMetrics() {
+
     try {
         const response = await fetch("data/dashboard_metrics.csv");
         const text = await response.text();
@@ -36,7 +39,9 @@ async function loadDashboardMetrics() {
     }
 }
 
+
 async function loadSegments() {
+
     try {
         const response = await fetch("data/segment_dashboard.json");
         const data = await response.json();
@@ -58,6 +63,7 @@ async function loadSegments() {
         `;
 
         data.segments.forEach(function (segment) {
+
             table += `
                 <tr>
                     <td>${segment.segment}</td>
@@ -67,6 +73,7 @@ async function loadSegments() {
                     <td>${segment.avg_resolution_hours} hrs</td>
                 </tr>
             `;
+
         });
 
         table += `
@@ -81,8 +88,37 @@ async function loadSegments() {
     }
 }
 
-async function loadResolutionData() {
+
+async function loadSatisfactionData() {
+
     try {
+        const response =
+            await fetch("data/satisfaction_dashboard.json");
+
+        const data = await response.json();
+
+        document.getElementById("low-satisfaction").textContent =
+            Number(data.low_satisfaction_tickets).toLocaleString();
+
+        document.getElementById("satisfied-customers").textContent =
+            Number(data.satisfied_tickets).toLocaleString();
+
+        document.getElementById("low-satisfaction-rate").textContent =
+            data.low_satisfaction_percentage + "%";
+
+        document.getElementById("model-accuracy").textContent =
+            data.model_accuracy + "%";
+
+    } catch (error) {
+        console.error("Could not load satisfaction data:", error);
+    }
+}
+
+
+async function loadResolutionData() {
+
+    try {
+
         const priorityResponse =
             await fetch("data/resolution_by_priority.json");
 
@@ -110,6 +146,11 @@ async function loadResolutionData() {
         console.log("Channel data:", channelData.data);
 
     } catch (error) {
-        console.error("Could not load resolution analytics:", error);
+
+        console.error(
+            "Could not load resolution analytics:",
+            error
+        );
+
     }
 });
