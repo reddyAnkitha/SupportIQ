@@ -189,4 +189,4 @@ function displayResolutionData(containerId, data, labelKey) {
     });
 
     container.innerHTML = html;
-});
+}
