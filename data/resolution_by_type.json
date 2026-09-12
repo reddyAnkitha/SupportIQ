@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "ticket_type": "Technical Issue",
+      "average_resolution_hours": 11.45
+    },
+    {
+      "ticket_type": "Cancellation Request",
+      "average_resolution_hours": 11.51
+    },
+    {
+      "ticket_type": "Billing Inquiry",
+      "average_resolution_hours": 11.75
+    },
+    {
+      "ticket_type": "Refund Request",
+      "average_resolution_hours": 11.98
+    },
+    {
+      "ticket_type": "Product Inquiry",
+      "average_resolution_hours": 12.18
+    }
+  ]
+}
