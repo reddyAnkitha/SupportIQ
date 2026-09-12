@@ -14,7 +14,7 @@ https://reddyankitha.github.io/SupportIQ/
 
 The complete data analysis, machine learning workflow, model evaluation, and customer segmentation are available in the Kaggle notebook:
 
-https://www.kaggle.com/code/hanumathureddygari/notebook5c2068c982/edit
+https://www.kaggle.com/code/hanumathureddygari/notebook5c2068c982
 
 ## Project Objectives
 
@@ -210,13 +210,3 @@ The deployed GitHub Pages application uses exported analytics data for the front
 Software Development Engineer | Java Full Stack | Cloud & Machine Learning
 
 
-### What I corrected
-
-- ✅ Kaggle URL changed from `/edit` to the normal notebook URL.
-- ✅ Improved a few sentences for professional English.
-- ✅ Removed the unnecessary blank line inside the project structure.
-- ✅ Kept your actual model limitations instead of overstating the ML results.
-- ✅ Kept all your important metrics and technical details.
-- ✅ Kept the README suitable for a hackathon judge reviewing both the **ML work and deployed frontend**.
-
-**Now replace the whole README with this version and click `Commit changes`.**
