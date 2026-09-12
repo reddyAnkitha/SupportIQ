@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,10 +12,15 @@
 
 <body>
 
+    <!-- Header -->
+
     <header>
         <h1>SupportIQ</h1>
         <p>Customer Support Intelligence Platform</p>
     </header>
+
+
+    <!-- Navigation -->
 
     <nav>
         <a href="#dashboard">Dashboard</a>
@@ -24,48 +30,68 @@
         <a href="#about">About</a>
     </nav>
 
+
     <main>
 
         <!-- Dashboard -->
 
         <div class="welcome" id="dashboard">
+
             <h2>Customer Support Dashboard</h2>
 
             <p>
                 Monitor customer satisfaction, ticket resolution,
                 and customer segments.
             </p>
+
         </div>
 
+
+        <!-- Dashboard Cards -->
 
         <div class="cards">
 
             <div class="card">
+
                 <h3>Total Tickets</h3>
+
                 <div class="value" id="total-tickets">
                     Loading...
                 </div>
+
             </div>
 
+
             <div class="card">
+
                 <h3>Average Satisfaction</h3>
+
                 <div class="value" id="average-satisfaction">
                     Loading...
                 </div>
+
             </div>
 
+
             <div class="card">
+
                 <h3>Avg Resolution Time</h3>
+
                 <div class="value" id="average-resolution">
                     Loading...
                 </div>
+
             </div>
 
+
             <div class="card">
+
                 <h3>Customer Segments</h3>
+
                 <div class="value" id="customer-segments">
                     Loading...
                 </div>
+
             </div>
 
         </div>
@@ -83,8 +109,11 @@
                 and average resolution time.
             </p>
 
+
             <div id="segment-container">
+
                 Loading customer segments...
+
             </div>
 
         </section>
@@ -106,38 +135,46 @@
             <div class="cards">
 
                 <div class="card">
+
                     <h3>Low Satisfaction</h3>
 
                     <div class="value" id="low-satisfaction">
                         Loading...
                     </div>
+
                 </div>
 
 
                 <div class="card">
+
                     <h3>Satisfied Customers</h3>
 
                     <div class="value" id="satisfied-customers">
                         Loading...
                     </div>
+
                 </div>
 
 
                 <div class="card">
+
                     <h3>Low Satisfaction Rate</h3>
 
                     <div class="value" id="low-satisfaction-rate">
                         Loading...
                     </div>
+
                 </div>
 
 
                 <div class="card">
+
                     <h3>Model Accuracy</h3>
 
                     <div class="value" id="model-accuracy">
                         Loading...
                     </div>
+
                 </div>
 
             </div>
@@ -161,6 +198,9 @@
 
             <div class="analytics-grid">
 
+
+                <!-- Priority Chart -->
+
                 <div class="chart-card">
 
                     <h3>Resolution by Priority</h3>
@@ -172,6 +212,8 @@
                 </div>
 
 
+                <!-- Ticket Type Chart -->
+
                 <div class="chart-card">
 
                     <h3>Resolution by Ticket Type</h3>
@@ -182,6 +224,8 @@
 
                 </div>
 
+
+                <!-- Channel Chart -->
 
                 <div class="chart-card">
 
@@ -221,12 +265,23 @@
     </main>
 
 
+    <!-- Footer -->
+
     <footer>
+
         SupportIQ | Customer Support Analytics & Machine Learning
+
     </footer>
 
+
+    <!-- Chart.js -->
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- SupportIQ JavaScript -->
 
     <script src="script.js"></script>
 
 </body>
+
 </html>
