@@ -1,0 +1,46 @@
+{
+  "segments": [
+    {
+      "segment": "Middle Age - Highly Satisfied and Fast",
+      "customers": 466,
+      "avg_age": 39.90,
+      "avg_satisfaction": 4.44,
+      "avg_resolution_hours": 5.04
+    },
+    {
+      "segment": "Older - At Risk and Fast",
+      "customers": 439,
+      "avg_age": 58.72,
+      "avg_satisfaction": 2.16,
+      "avg_resolution_hours": 5.64
+    },
+    {
+      "segment": "Older - At Risk and Slow",
+      "customers": 460,
+      "avg_age": 49.05,
+      "avg_satisfaction": 1.52,
+      "avg_resolution_hours": 18.81
+    },
+    {
+      "segment": "Older - Satisfied but Slow",
+      "customers": 479,
+      "avg_age": 59.01,
+      "avg_satisfaction": 4.11,
+      "avg_resolution_hours": 16.02
+    },
+    {
+      "segment": "Young - At Risk and Fast",
+      "customers": 462,
+      "avg_age": 29.71,
+      "avg_satisfaction": 1.84,
+      "avg_resolution_hours": 6.93
+    },
+    {
+      "segment": "Young - Satisfied but Slow",
+      "customers": 463,
+      "avg_age": 29.87,
+      "avg_satisfaction": 3.77,
+      "avg_resolution_hours": 17.81
+    }
+  ]
+}
