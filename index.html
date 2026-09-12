@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>SupportIQ - Customer Support Intelligence</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+
+        header {
+            background: #111827;
+            color: white;
+            padding: 25px 40px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        header p {
+            margin: 8px 0 0;
+            color: #d1d5db;
+        }
+
+        nav {
+            background: white;
+            padding: 15px 40px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        nav a {
+            margin-right: 25px;
+            text-decoration: none;
+            color: #374151;
+            font-weight: bold;
+        }
+
+        main {
+            padding: 35px 40px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .welcome {
+            margin-bottom: 30px;
+        }
+
+        .welcome h2 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: #6b7280;
+            font-size: 15px;
+        }
+
+        .card .value {
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        section {
+            margin-top: 40px;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        section h2 {
+            margin-top: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #6b7280;
+        }
+
+        @media (max-width: 900px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 20px;
+            }
+
+            nav {
+                padding: 15px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>SupportIQ</h1>
+        <p>Customer Support Intelligence Platform</p>
+    </header>
+
+    <nav>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#segments">Customer Segmentation</a>
+        <a href="#satisfaction">Satisfaction Risk</a>
+        <a href="#resolution">Resolution Analytics</a>
+        <a href="#about">About</a>
+    </nav>
+
+    <main>
+
+        <div class="welcome" id="dashboard">
+            <h2>Customer Support Dashboard</h2>
+            <p>Monitor customer satisfaction, ticket resolution, and customer segments.</p>
+        </div>
+
+        <div class="cards">
+
+            <div class="card">
+                <h3>Total Tickets</h3>
+                <div class="value">8,469</div>
+            </div>
+
+            <div class="card">
+                <h3>Average Satisfaction</h3>
+                <div class="value">2.99 / 5</div>
+            </div>
+
+            <div class="card">
+                <h3>Avg Resolution Time</h3>
+                <div class="value">11.77 hrs</div>
+            </div>
+
+            <div class="card">
+                <h3>Customer Segments</h3>
+                <div class="value">6</div>
+            </div>
+
+        </div>
+
+        <section id="segments">
+            <h2>Customer Segmentation</h2>
+            <p>Six customer segments were identified using K-Means clustering.</p>
+        </section>
+
+        <section id="satisfaction">
+            <h2>Satisfaction Risk</h2>
+            <p>1,102 closed tickets were classified as low satisfaction based on ratings of 1 or 2.</p>
+        </section>
+
+        <section id="resolution">
+            <h2>Resolution Analytics</h2>
+            <p>Average resolution time across closed tickets is 11.77 hours.</p>
+        </section>
+
+        <section id="about">
+            <h2>About SupportIQ</h2>
+            <p>
+                SupportIQ uses machine learning and customer support analytics
+                to identify customer segments and understand support performance.
+            </p>
+        </section>
+
+    </main>
+
+    <footer>
+        SupportIQ | Customer Support Analytics & Machine Learning
+    </footer>
+
+</body>
+</html>
