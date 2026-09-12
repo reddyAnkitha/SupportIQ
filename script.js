@@ -41,7 +41,40 @@ async function loadSegments() {
         const response = await fetch("data/segment_dashboard.json");
         const data = await response.json();
 
-        console.log("Customer segments loaded:", data.segments);
+        const container = document.getElementById("segment-container");
+
+        let table = `
+            <table class="segment-table">
+                <thead>
+                    <tr>
+                        <th>Customer Segment</th>
+                        <th>Customers</th>
+                        <th>Avg Age</th>
+                        <th>Avg Satisfaction</th>
+                        <th>Avg Resolution</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        data.segments.forEach(function (segment) {
+            table += `
+                <tr>
+                    <td>${segment.segment}</td>
+                    <td>${segment.customers}</td>
+                    <td>${segment.avg_age}</td>
+                    <td>${segment.avg_satisfaction} / 5</td>
+                    <td>${segment.avg_resolution_hours} hrs</td>
+                </tr>
+            `;
+        });
+
+        table += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = table;
 
     } catch (error) {
         console.error("Could not load customer segments:", error);
