@@ -145,3 +145,62 @@ SupportIQ/
     ├── resolution_by_priority.json
     ├── resolution_by_type.json
     └── resolution_by_channel.json
+
+```
+
+## Key Business Insights
+
+### Customer Segmentation
+
+The analysis identified clear differences in customer support experiences.
+
+The highest-performing segment had:
+
+- Average satisfaction: **4.44 / 5**
+- Average resolution time: **5.04 hours**
+
+The highest-risk slow segment had:
+
+- Average satisfaction: **1.52 / 5**
+- Average resolution time: **18.81 hours**
+
+This suggests that customers experiencing both low satisfaction and slower resolution should receive greater attention.
+
+### Satisfaction
+
+39.8% of closed tickets were classified as low satisfaction.
+
+This highlights an opportunity to identify and address customer support experiences that may lead to dissatisfaction.
+
+### Resolution
+
+Average resolution time was approximately **11.77 hours**.
+
+Differences between priority, ticket type, and channel were relatively small in this dataset.
+
+## Limitations
+
+The satisfaction model achieved **59.75% accuracy** and showed limited ability to identify low-satisfaction tickets.
+
+The resolution-time features also showed limited predictive power.
+
+Therefore, the project focuses on transparent analytics and customer segmentation rather than claiming production-level prediction accuracy.
+
+The deployed GitHub Pages application uses exported analytics data for the frontend. The Python machine-learning models are developed and evaluated separately in the Kaggle notebook.
+
+## Future Improvements
+
+- Real-time ticket prediction
+- Better NLP features from ticket descriptions
+- Advanced customer-level historical features
+- Explainable AI for satisfaction risk
+- Real-time backend API
+- Automated support recommendations
+- Production database integration
+- Live model monitoring
+
+## Author
+
+**Ankitha Reddy**
+
+Software Development Engineer | Java Full Stack | Cloud & Machine Learning
