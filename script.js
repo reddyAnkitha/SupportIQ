@@ -11,15 +11,25 @@ document.addEventListener("DOMContentLoaded", function () {
 async function loadDashboardMetrics() {
 
     try {
-        const response = await fetch("data/dashboard_metrics.csv");
+        const response = await fetch("./data/dashboard_metrics.csv");
+
+        if (!response.ok) {
+            throw new Error("dashboard_metrics.csv not found");
+        }
+
         const text = await response.text();
 
-        const lines = text.trim().split("\n");
+        const lines = text.trim().split(/\r?\n/);
         const metrics = {};
 
         lines.slice(1).forEach(function (line) {
+
             const parts = line.split(",");
-            metrics[parts[0]] = parts[1];
+
+            if (parts.length >= 2) {
+                metrics[parts[0].trim()] = parts[1].trim();
+            }
+
         });
 
         document.getElementById("total-tickets").textContent =
@@ -35,7 +45,9 @@ async function loadDashboardMetrics() {
             metrics.customer_segments;
 
     } catch (error) {
+
         console.error("Could not load dashboard metrics:", error);
+
     }
 }
 
@@ -43,13 +55,22 @@ async function loadDashboardMetrics() {
 async function loadSegments() {
 
     try {
-        const response = await fetch("data/segment_dashboard.json");
+
+        const response =
+            await fetch("./data/segment_dashboard.json");
+
+        if (!response.ok) {
+            throw new Error("segment_dashboard.json not found");
+        }
+
         const data = await response.json();
 
-        const container = document.getElementById("segment-container");
+        const container =
+            document.getElementById("segment-container");
 
         let table = `
             <table class="segment-table">
+
                 <thead>
                     <tr>
                         <th>Customer Segment</th>
@@ -59,6 +80,7 @@ async function loadSegments() {
                         <th>Avg Resolution</th>
                     </tr>
                 </thead>
+
                 <tbody>
         `;
 
@@ -84,7 +106,12 @@ async function loadSegments() {
         container.innerHTML = table;
 
     } catch (error) {
-        console.error("Could not load customer segments:", error);
+
+        console.error(
+            "Could not load customer segments:",
+            error
+        );
+
     }
 }
 
@@ -92,8 +119,13 @@ async function loadSegments() {
 async function loadSatisfactionData() {
 
     try {
+
         const response =
-            await fetch("data/satisfaction_dashboard.json");
+            await fetch("./data/satisfaction_dashboard.json");
+
+        if (!response.ok) {
+            throw new Error("satisfaction_dashboard.json not found");
+        }
 
         const data = await response.json();
 
@@ -110,7 +142,12 @@ async function loadSatisfactionData() {
             data.model_accuracy + "%";
 
     } catch (error) {
-        console.error("Could not load satisfaction data:", error);
+
+        console.error(
+            "Could not load satisfaction data:",
+            error
+        );
+
     }
 }
 
@@ -120,7 +157,11 @@ async function loadResolutionData() {
     try {
 
         const priorityResponse =
-            await fetch("data/resolution_by_priority.json");
+            await fetch("./data/resolution_by_priority.json");
+
+        if (!priorityResponse.ok) {
+            throw new Error("resolution_by_priority.json not found");
+        }
 
         const priorityData =
             await priorityResponse.json();
@@ -133,7 +174,11 @@ async function loadResolutionData() {
 
 
         const typeResponse =
-            await fetch("data/resolution_by_type.json");
+            await fetch("./data/resolution_by_type.json");
+
+        if (!typeResponse.ok) {
+            throw new Error("resolution_by_type.json not found");
+        }
 
         const typeData =
             await typeResponse.json();
@@ -146,7 +191,11 @@ async function loadResolutionData() {
 
 
         const channelResponse =
-            await fetch("data/resolution_by_channel.json");
+            await fetch("./data/resolution_by_channel.json");
+
+        if (!channelResponse.ok) {
+            throw new Error("resolution_by_channel.json not found");
+        }
 
         const channelData =
             await channelResponse.json();
@@ -168,21 +217,31 @@ async function loadResolutionData() {
 }
 
 
-function displayResolutionData(containerId, data, labelKey) {
+function displayResolutionData(
+    containerId,
+    data,
+    labelKey
+) {
 
-    const container = document.getElementById(containerId);
+    const container =
+        document.getElementById(containerId);
 
     let html = "";
 
     data.forEach(function (item) {
 
         const label = item[labelKey];
-        const hours = item.average_resolution_hours;
+
+        const hours =
+            item.average_resolution_hours;
 
         html += `
             <div class="resolution-row">
+
                 <span>${label}</span>
+
                 <strong>${hours} hrs</strong>
+
             </div>
         `;
 
