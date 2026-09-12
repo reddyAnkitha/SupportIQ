@@ -26,38 +26,52 @@
 
     <main>
 
+        <!-- Dashboard -->
+
         <div class="welcome" id="dashboard">
             <h2>Customer Support Dashboard</h2>
+
             <p>
                 Monitor customer satisfaction, ticket resolution,
                 and customer segments.
             </p>
         </div>
 
+
         <div class="cards">
 
             <div class="card">
                 <h3>Total Tickets</h3>
-                <div class="value" id="total-tickets">Loading...</div>
+                <div class="value" id="total-tickets">
+                    Loading...
+                </div>
             </div>
 
             <div class="card">
                 <h3>Average Satisfaction</h3>
-                <div class="value" id="average-satisfaction">Loading...</div>
+                <div class="value" id="average-satisfaction">
+                    Loading...
+                </div>
             </div>
 
             <div class="card">
                 <h3>Avg Resolution Time</h3>
-                <div class="value" id="average-resolution">Loading...</div>
+                <div class="value" id="average-resolution">
+                    Loading...
+                </div>
             </div>
 
             <div class="card">
                 <h3>Customer Segments</h3>
-                <div class="value" id="customer-segments">Loading...</div>
+                <div class="value" id="customer-segments">
+                    Loading...
+                </div>
             </div>
 
         </div>
 
+
+        <!-- Customer Segmentation -->
 
         <section id="segments">
 
@@ -76,6 +90,8 @@
         </section>
 
 
+        <!-- Satisfaction Risk -->
+
         <section id="satisfaction">
 
             <h2>Satisfaction Risk</h2>
@@ -86,31 +102,39 @@
                 as low satisfaction.
             </p>
 
+
             <div class="cards">
 
                 <div class="card">
                     <h3>Low Satisfaction</h3>
+
                     <div class="value" id="low-satisfaction">
                         Loading...
                     </div>
                 </div>
 
+
                 <div class="card">
                     <h3>Satisfied Customers</h3>
+
                     <div class="value" id="satisfied-customers">
                         Loading...
                     </div>
                 </div>
 
+
                 <div class="card">
                     <h3>Low Satisfaction Rate</h3>
+
                     <div class="value" id="low-satisfaction-rate">
                         Loading...
                     </div>
                 </div>
 
+
                 <div class="card">
                     <h3>Model Accuracy</h3>
+
                     <div class="value" id="model-accuracy">
                         Loading...
                     </div>
@@ -121,17 +145,60 @@
         </section>
 
 
+        <!-- Resolution Analytics -->
+
         <section id="resolution">
 
             <h2>Resolution Analytics</h2>
 
             <p>
                 Average resolution time across closed tickets is
-                11.77 hours.
+                11.77 hours. The following views compare resolution
+                performance across priority, ticket type, and
+                support channel.
             </p>
+
+
+            <div class="analytics-grid">
+
+                <div class="chart-card">
+
+                    <h3>Resolution by Priority</h3>
+
+                    <div id="priority-chart">
+                        Loading data...
+                    </div>
+
+                </div>
+
+
+                <div class="chart-card">
+
+                    <h3>Resolution by Ticket Type</h3>
+
+                    <div id="type-chart">
+                        Loading data...
+                    </div>
+
+                </div>
+
+
+                <div class="chart-card">
+
+                    <h3>Resolution by Channel</h3>
+
+                    <div id="channel-chart">
+                        Loading data...
+                    </div>
+
+                </div>
+
+            </div>
 
         </section>
 
+
+        <!-- About -->
 
         <section id="about">
 
