@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "channel": "Email",
+      "average_resolution_hours": 11.55
+    },
+    {
+      "channel": "Chat",
+      "average_resolution_hours": 11.55
+    },
+    {
+      "channel": "Social Media",
+      "average_resolution_hours": 11.91
+    },
+    {
+      "channel": "Phone",
+      "average_resolution_hours": 12.09
+    }
+  ]
+}
