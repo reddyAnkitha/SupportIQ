@@ -1,21 +1,35 @@
 console.log("SupportIQ dashboard loaded");
 
 document.addEventListener("DOMContentLoaded", function () {
-
     loadDashboardMetrics();
     loadSegments();
     loadResolutionData();
-
 });
 
 async function loadDashboardMetrics() {
-
     try {
         const response = await fetch("data/dashboard_metrics.csv");
         const text = await response.text();
 
-        console.log("Dashboard metrics loaded");
-        console.log(text);
+        const lines = text.trim().split("\n");
+        const metrics = {};
+
+        lines.slice(1).forEach(function (line) {
+            const parts = line.split(",");
+            metrics[parts[0]] = parts[1];
+        });
+
+        document.getElementById("total-tickets").textContent =
+            Number(metrics.total_tickets).toLocaleString();
+
+        document.getElementById("average-satisfaction").textContent =
+            metrics.average_satisfaction + " / 5";
+
+        document.getElementById("average-resolution").textContent =
+            metrics.average_resolution_hours + " hrs";
+
+        document.getElementById("customer-segments").textContent =
+            metrics.customer_segments;
 
     } catch (error) {
         console.error("Could not load dashboard metrics:", error);
@@ -23,13 +37,11 @@ async function loadDashboardMetrics() {
 }
 
 async function loadSegments() {
-
     try {
         const response = await fetch("data/segment_dashboard.json");
         const data = await response.json();
 
-        console.log("Customer segments loaded");
-        console.log(data.segments);
+        console.log("Customer segments loaded:", data.segments);
 
     } catch (error) {
         console.error("Could not load customer segments:", error);
@@ -37,17 +49,14 @@ async function loadSegments() {
 }
 
 async function loadResolutionData() {
-
     try {
-
         const priorityResponse =
             await fetch("data/resolution_by_priority.json");
 
         const priorityData =
             await priorityResponse.json();
 
-        console.log("Priority resolution data loaded");
-        console.log(priorityData.data);
+        console.log("Priority data:", priorityData.data);
 
 
         const typeResponse =
@@ -56,8 +65,7 @@ async function loadResolutionData() {
         const typeData =
             await typeResponse.json();
 
-        console.log("Ticket type resolution data loaded");
-        console.log(typeData.data);
+        console.log("Ticket type data:", typeData.data);
 
 
         const channelResponse =
@@ -66,15 +74,9 @@ async function loadResolutionData() {
         const channelData =
             await channelResponse.json();
 
-        console.log("Channel resolution data loaded");
-        console.log(channelData.data);
+        console.log("Channel data:", channelData.data);
 
     } catch (error) {
-
-        console.error(
-            "Could not load resolution analytics:",
-            error
-        );
-
+        console.error("Could not load resolution analytics:", error);
     }
 });
