@@ -134,3 +134,44 @@ footer {
 .segment-table td {
     font-size: 14px;
 }
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.chart-card {
+    background: #f8fafc;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.chart-card h3 {
+    margin-top: 0;
+    color: #172554;
+}
+
+.resolution-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+}
+
+.resolution-row:last-child {
+    border-bottom: none;
+}
+
+.resolution-row strong {
+    color: #172554;
+}
+
+@media (max-width: 800px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+}
