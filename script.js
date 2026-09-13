@@ -10,6 +10,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 
+/* =========================================================
+   DASHBOARD METRICS
+========================================================= */
+
 async function loadDashboardMetrics() {
 
     try {
@@ -64,10 +68,34 @@ async function loadDashboardMetrics() {
             error
         );
 
+        showError(
+            "total-tickets",
+            "Unable to load"
+        );
+
+        showError(
+            "average-satisfaction",
+            "Unable to load"
+        );
+
+        showError(
+            "average-resolution",
+            "Unable to load"
+        );
+
+        showError(
+            "customer-segments",
+            "Unable to load"
+        );
+
     }
 
 }
 
+
+/* =========================================================
+   CUSTOMER SEGMENTATION
+========================================================= */
 
 async function loadSegments() {
 
@@ -77,7 +105,9 @@ async function loadSegments() {
             await fetch("./data/segment_dashboard.json");
 
         if (!response.ok) {
-            throw new Error("segment_dashboard.json not found");
+            throw new Error(
+                "segment_dashboard.json not found"
+            );
         }
 
         const data =
@@ -87,69 +117,98 @@ async function loadSegments() {
             document.getElementById("segment-container");
 
 
-        let table = `
+        /*
+         * Add interactive segment filter
+         */
 
-            <table class="segment-table">
+        const filterContainer =
+            document.createElement("div");
 
-                <thead>
+        filterContainer.className =
+            "segment-filter";
 
-                    <tr>
+        filterContainer.innerHTML = `
 
-                        <th>Customer Segment</th>
-                        <th>Customers</th>
-                        <th>Avg Age</th>
-                        <th>Avg Satisfaction</th>
-                        <th>Avg Resolution</th>
+            <label for="segment-filter">
+                View Customer Segment:
+            </label>
 
-                    </tr>
+            <select id="segment-filter">
 
-                </thead>
+                <option value="all">
+                    All Segments
+                </option>
 
-                <tbody>
+                ${data.segments.map(function (segment) {
 
-        `;
+                    return `
+                        <option value="${escapeHtml(segment.segment)}">
+                            ${escapeHtml(segment.segment)}
+                        </option>
+                    `;
 
+                }).join("")}
 
-        data.segments.forEach(function (segment) {
-
-            table += `
-
-                <tr>
-
-                    <td>${segment.segment}</td>
-
-                    <td>${segment.customers}</td>
-
-                    <td>${segment.avg_age}</td>
-
-                    <td>
-                        ${segment.avg_satisfaction} / 5
-                    </td>
-
-                    <td>
-                        ${segment.avg_resolution_hours} hrs
-                    </td>
-
-                </tr>
-
-            `;
-
-        });
-
-
-        table += `
-
-                </tbody>
-
-            </table>
+            </select>
 
         `;
 
 
-        container.innerHTML = table;
+        container.innerHTML = "";
+
+        container.appendChild(filterContainer);
 
 
-        createSegmentationChart(data.segments);
+        /*
+         * Create table container
+         */
+
+        const tableContainer =
+            document.createElement("div");
+
+        tableContainer.id =
+            "segment-table-container";
+
+        container.appendChild(tableContainer);
+
+
+        /*
+         * Create chart container
+         */
+
+        const chartContainer =
+            document.createElement("div");
+
+        chartContainer.id =
+            "segment-chart-container";
+
+        container.appendChild(chartContainer);
+
+
+        /*
+         * Initial display
+         */
+
+        renderSegments(
+            data.segments,
+            "all"
+        );
+
+
+        /*
+         * Filter change event
+         */
+
+        document
+            .getElementById("segment-filter")
+            .addEventListener("change", function () {
+
+                renderSegments(
+                    data.segments,
+                    this.value
+                );
+
+            });
 
 
     } catch (error) {
@@ -159,22 +218,309 @@ async function loadSegments() {
             error
         );
 
+        const container =
+            document.getElementById(
+                "segment-container"
+            );
+
+        container.innerHTML = `
+            <p class="error-message">
+                Unable to load customer segmentation data.
+            </p>
+        `;
+
     }
 
 }
 
+
+/* =========================================================
+   RENDER CUSTOMER SEGMENTS
+========================================================= */
+
+function renderSegments(
+    segments,
+    selectedSegment
+) {
+
+    let filteredSegments;
+
+
+    if (selectedSegment === "all") {
+
+        filteredSegments =
+            segments;
+
+    } else {
+
+        filteredSegments =
+            segments.filter(function (segment) {
+
+                return segment.segment ===
+                    selectedSegment;
+
+            });
+
+    }
+
+
+    renderSegmentTable(
+        filteredSegments
+    );
+
+
+    renderSegmentChart(
+        filteredSegments
+    );
+
+}
+
+
+/* =========================================================
+   SEGMENT TABLE
+========================================================= */
+
+function renderSegmentTable(
+    segments
+) {
+
+    const container =
+        document.getElementById(
+            "segment-table-container"
+        );
+
+
+    if (!segments.length) {
+
+        container.innerHTML = `
+            <p class="error-message">
+                No segment data available.
+            </p>
+        `;
+
+        return;
+
+    }
+
+
+    let table = `
+
+        <table class="segment-table">
+
+            <thead>
+
+                <tr>
+
+                    <th>Customer Segment</th>
+                    <th>Customers</th>
+                    <th>Avg Age</th>
+                    <th>Avg Satisfaction</th>
+                    <th>Avg Resolution</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+    `;
+
+
+    segments.forEach(function (segment) {
+
+        table += `
+
+            <tr>
+
+                <td>
+                    ${escapeHtml(segment.segment)}
+                </td>
+
+                <td>
+                    ${Number(segment.customers).toLocaleString()}
+                </td>
+
+                <td>
+                    ${segment.avg_age}
+                </td>
+
+                <td>
+                    ${segment.avg_satisfaction} / 5
+                </td>
+
+                <td>
+                    ${segment.avg_resolution_hours} hrs
+                </td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    table += `
+
+            </tbody>
+
+        </table>
+
+    `;
+
+
+    container.innerHTML =
+        table;
+
+}
+
+
+/* =========================================================
+   SEGMENT CHART
+========================================================= */
+
+let segmentChart = null;
+
+
+function renderSegmentChart(
+    segments
+) {
+
+    const container =
+        document.getElementById(
+            "segment-chart-container"
+        );
+
+
+    container.innerHTML = `
+
+        <div class="segment-chart">
+
+            <h3>
+                Customer Satisfaction by Segment
+            </h3>
+
+            <div class="chart-wrapper">
+
+                <canvas id="segment-canvas"></canvas>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    const canvas =
+        document.getElementById(
+            "segment-canvas"
+        );
+
+
+    /*
+     * Destroy previous chart
+     */
+
+    if (segmentChart) {
+
+        segmentChart.destroy();
+
+    }
+
+
+    segmentChart =
+        new Chart(canvas, {
+
+            type: "bar",
+
+            data: {
+
+                labels: segments.map(
+                    function (segment) {
+
+                        return segment.segment;
+
+                    }
+                ),
+
+                datasets: [
+
+                    {
+
+                        label:
+                            "Average Satisfaction",
+
+                        data:
+                            segments.map(
+                                function (segment) {
+
+                                    return Number(
+                                        segment.avg_satisfaction
+                                    );
+
+                                }
+                            ),
+
+                        borderWidth: 1
+
+                    }
+
+                ]
+
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                scales: {
+
+                    y: {
+
+                        beginAtZero: true,
+
+                        max: 5,
+
+                        title: {
+
+                            display: true,
+
+                            text:
+                                "Satisfaction Score"
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        });
+
+}
+
+
+/* =========================================================
+   SATISFACTION DATA
+========================================================= */
 
 async function loadSatisfactionData() {
 
     try {
 
         const response =
-            await fetch("./data/satisfaction_dashboard.json");
+            await fetch(
+                "./data/satisfaction_dashboard.json"
+            );
 
         if (!response.ok) {
+
             throw new Error(
                 "satisfaction_dashboard.json not found"
             );
+
         }
 
         const data =
@@ -216,10 +562,38 @@ async function loadSatisfactionData() {
             error
         );
 
+
+        document.getElementById(
+            "low-satisfaction"
+        ).textContent =
+            "Unavailable";
+
+
+        document.getElementById(
+            "satisfied-customers"
+        ).textContent =
+            "Unavailable";
+
+
+        document.getElementById(
+            "low-satisfaction-rate"
+        ).textContent =
+            "Unavailable";
+
+
+        document.getElementById(
+            "model-accuracy"
+        ).textContent =
+            "Unavailable";
+
     }
 
 }
 
+
+/* =========================================================
+   RESOLUTION ANALYTICS
+========================================================= */
 
 async function loadResolutionData() {
 
@@ -230,6 +604,14 @@ async function loadResolutionData() {
                 "./data/resolution_by_priority.json"
             );
 
+        if (!priorityResponse.ok) {
+
+            throw new Error(
+                "resolution_by_priority.json not found"
+            );
+
+        }
+
         const priorityData =
             await priorityResponse.json();
 
@@ -239,6 +621,14 @@ async function loadResolutionData() {
                 "./data/resolution_by_type.json"
             );
 
+        if (!typeResponse.ok) {
+
+            throw new Error(
+                "resolution_by_type.json not found"
+            );
+
+        }
+
         const typeData =
             await typeResponse.json();
 
@@ -247,6 +637,14 @@ async function loadResolutionData() {
             await fetch(
                 "./data/resolution_by_channel.json"
             );
+
+        if (!channelResponse.ok) {
+
+            throw new Error(
+                "resolution_by_channel.json not found"
+            );
+
+        }
 
         const channelData =
             await channelResponse.json();
@@ -283,10 +681,27 @@ async function loadResolutionData() {
             error
         );
 
+
+        showChartError(
+            "priority-chart"
+        );
+
+        showChartError(
+            "type-chart"
+        );
+
+        showChartError(
+            "channel-chart"
+        );
+
     }
 
 }
 
+
+/* =========================================================
+   RESOLUTION CHART
+========================================================= */
 
 function createResolutionChart(
     containerId,
@@ -296,18 +711,26 @@ function createResolutionChart(
 ) {
 
     const container =
-        document.getElementById(containerId);
+        document.getElementById(
+            containerId
+        );
 
 
     container.innerHTML = `
+
         <div class="chart-wrapper">
+
             <canvas></canvas>
+
         </div>
+
     `;
 
 
     const canvas =
-        container.querySelector("canvas");
+        container.querySelector(
+            "canvas"
+        );
 
 
     new Chart(canvas, {
@@ -316,20 +739,31 @@ function createResolutionChart(
 
         data: {
 
-            labels: data.map(function (item) {
-                return item[labelKey];
-            }),
+            labels:
+                data.map(function (item) {
+
+                    return item[labelKey];
+
+                }),
 
             datasets: [
 
                 {
-                    label: "Average Resolution Time (hours)",
 
-                    data: data.map(function (item) {
-                        return item.average_resolution_hours;
-                    }),
+                    label:
+                        "Average Resolution Time (hours)",
+
+                    data:
+                        data.map(function (item) {
+
+                            return Number(
+                                item.average_resolution_hours
+                            );
+
+                        }),
 
                     borderWidth: 1
+
                 }
 
             ]
@@ -340,15 +774,22 @@ function createResolutionChart(
 
             responsive: true,
 
+            maintainAspectRatio: false,
+
             plugins: {
 
                 legend: {
+
                     display: false
+
                 },
 
                 title: {
+
                     display: false,
+
                     text: chartTitle
+
                 }
 
             },
@@ -360,8 +801,11 @@ function createResolutionChart(
                     beginAtZero: true,
 
                     title: {
+
                         display: true,
+
                         text: "Hours"
+
                     }
 
                 }
@@ -375,82 +819,68 @@ function createResolutionChart(
 }
 
 
-function createSegmentationChart(segments) {
+/* =========================================================
+   ERROR HANDLING
+========================================================= */
+
+function showError(
+    elementId,
+    message
+) {
+
+    const element =
+        document.getElementById(
+            elementId
+        );
+
+    if (element) {
+
+        element.textContent =
+            message;
+
+    }
+
+}
+
+
+function showChartError(
+    containerId
+) {
 
     const container =
-        document.getElementById("segment-container");
+        document.getElementById(
+            containerId
+        );
+
+    if (container) {
+
+        container.innerHTML = `
+
+            <p class="error-message">
+                Unable to load analytics data.
+                Please try again later.
+            </p>
+
+        `;
+
+    }
+
+}
 
 
-    const chartDiv =
-        document.createElement("div");
+/* =========================================================
+   SECURITY / HTML ESCAPING
+========================================================= */
 
+function escapeHtml(
+    value
+) {
 
-    chartDiv.className =
-        "segment-chart";
-
-
-    chartDiv.innerHTML = `
-        <h3>Customer Satisfaction by Segment</h3>
-        <canvas></canvas>
-    `;
-
-
-    container.appendChild(chartDiv);
-
-
-    const canvas =
-        chartDiv.querySelector("canvas");
-
-
-    new Chart(canvas, {
-
-        type: "bar",
-
-        data: {
-
-            labels: segments.map(function (segment) {
-                return segment.segment;
-            }),
-
-            datasets: [
-
-                {
-                    label: "Average Satisfaction",
-
-                    data: segments.map(function (segment) {
-                        return segment.avg_satisfaction;
-                    }),
-
-                    borderWidth: 1
-                }
-
-            ]
-
-        },
-
-        options: {
-
-            responsive: true,
-
-            scales: {
-
-                y: {
-
-                    beginAtZero: true,
-
-                    max: 5,
-
-                    title: {
-                        display: true,
-                        text: "Satisfaction Score"
-                    }
-
-                }
-
-            }
-
-        }
-
-    });
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
 }
