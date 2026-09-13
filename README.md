@@ -142,10 +142,9 @@ Exported Analytics
 Interactive Dashboard
           ↓
 GitHub Pages
-
 Customer segment results are connected to ticket records using:
-ticket_segment_mapping.json
 
+ticket_segment_mapping.json
 🛠️ Technology Stack
 Machine Learning
 Python
@@ -183,7 +182,7 @@ SupportIQ/
     └── resolution_by_channel.json
 🚀 Run Locally
 1. Clone the repository
-git clone https://github.com/reddyAnkitha/SupportIQ.git
+git clone https://github.com/reddyankitha/SupportIQ.git
 2. Open the project
 cd SupportIQ
 3. Start a local server
@@ -201,3 +200,9 @@ https://github.com/reddyAnkitha
 
 Kaggle:
 https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
+
+**Important:** In your current GitHub version, the missing line is:
+
+```markdown
+
+right after `GitHub Pages` in the workflow. That single missing closing fence caused the rest of the README to break.
