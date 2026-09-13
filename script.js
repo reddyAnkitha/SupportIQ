@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", function () {
    ========================================================= */
 
 function getElement(id) {
+
     return document.getElementById(id);
 }
 
@@ -109,7 +110,11 @@ function escapeHTML(value) {
 
 function toNumber(value, fallback = 0) {
 
-    if (value === null || value === undefined || value === "") {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
         return fallback;
     }
 
@@ -136,7 +141,10 @@ function formatNumber(value, decimals = 0) {
 
 function formatHours(value) {
 
-    if (value === null || value === undefined) {
+    if (
+        value === null ||
+        value === undefined
+    ) {
         return "N/A";
     }
 
@@ -151,7 +159,7 @@ function formatHours(value) {
 
 
 /* =========================================================
-   FETCH HELPER
+   FETCH HELPERS
    ========================================================= */
 
 async function fetchJSON(url) {
@@ -161,8 +169,13 @@ async function fetchJSON(url) {
     });
 
     if (!response.ok) {
+
         throw new Error(
-            "Unable to load " + url + " (" + response.status + ")"
+            "Unable to load " +
+            url +
+            " (" +
+            response.status +
+            ")"
         );
     }
 
@@ -177,8 +190,13 @@ async function fetchText(url) {
     });
 
     if (!response.ok) {
+
         throw new Error(
-            "Unable to load " + url + " (" + response.status + ")"
+            "Unable to load " +
+            url +
+            " (" +
+            response.status +
+            ")"
         );
     }
 
@@ -205,17 +223,28 @@ function parseCSV(text) {
 
         if (character === '"') {
 
-            if (insideQuotes && nextCharacter === '"') {
+            if (
+                insideQuotes &&
+                nextCharacter === '"'
+            ) {
+
                 cell += '"';
                 i++;
+
             } else {
-                insideQuotes = !insideQuotes;
+
+                insideQuotes =
+                    !insideQuotes;
             }
 
             continue;
         }
 
-        if (character === "," && !insideQuotes) {
+
+        if (
+            character === "," &&
+            !insideQuotes
+        ) {
 
             row.push(cell.trim());
             cell = "";
@@ -223,22 +252,34 @@ function parseCSV(text) {
             continue;
         }
 
+
         if (
-            (character === "\n" || character === "\r") &&
+            (
+                character === "\n" ||
+                character === "\r"
+            ) &&
             !insideQuotes
         ) {
 
-            if (character === "\r" && nextCharacter === "\n") {
+            if (
+                character === "\r" &&
+                nextCharacter === "\n"
+            ) {
                 i++;
             }
 
+
             row.push(cell.trim());
 
-            if (row.some(function (value) {
-                return value !== "";
-            })) {
+
+            if (
+                row.some(function (value) {
+                    return value !== "";
+                })
+            ) {
                 rows.push(row);
             }
+
 
             row = [];
             cell = "";
@@ -246,36 +287,54 @@ function parseCSV(text) {
             continue;
         }
 
+
         cell += character;
     }
 
-    if (cell !== "" || row.length > 0) {
+
+    if (
+        cell !== "" ||
+        row.length > 0
+    ) {
 
         row.push(cell.trim());
 
-        if (row.some(function (value) {
-            return value !== "";
-        })) {
+
+        if (
+            row.some(function (value) {
+                return value !== "";
+            })
+        ) {
+
             rows.push(row);
         }
     }
+
 
     if (rows.length === 0) {
         return [];
     }
 
+
     const headers = rows[0];
 
-    return rows.slice(1).map(function (values) {
 
-        const object = {};
+    return rows.slice(1).map(
+        function (values) {
 
-        headers.forEach(function (header, index) {
-            object[header] = values[index] || "";
-        });
+            const object = {};
 
-        return object;
-    });
+            headers.forEach(
+                function (header, index) {
+
+                    object[header] =
+                        values[index] || "";
+                }
+            );
+
+            return object;
+        }
+    );
 }
 
 
@@ -287,27 +346,45 @@ async function loadDashboardMetrics() {
 
     try {
 
-        console.log("Loading dashboard metrics...");
-
-        const csvText = await fetchText(
-            FILES.dashboardMetrics
+        console.log(
+            "Loading dashboard metrics..."
         );
 
-        const metrics = parseCSV(csvText);
+
+        const csvText =
+            await fetchText(
+                FILES.dashboardMetrics
+            );
+
+
+        const metrics =
+            parseCSV(csvText);
+
 
         const metricMap = {};
 
-        metrics.forEach(function (item) {
 
-            const key = String(
-                item.metric || item.Metric || ""
-            )
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, "_");
+        metrics.forEach(
+            function (item) {
 
-            metricMap[key] = item.value;
-        });
+                const key =
+                    String(
+                        item.metric ||
+                        item.Metric ||
+                        ""
+                    )
+                        .trim()
+                        .toLowerCase()
+                        .replace(
+                            /\s+/g,
+                            "_"
+                        );
+
+
+                metricMap[key] =
+                    item.value;
+            }
+        );
 
 
         const totalTickets =
@@ -365,23 +442,36 @@ async function loadDashboardMetrics() {
             formatNumber(totalTickets)
         );
 
+
         setText(
             "average-satisfaction",
-            formatNumber(averageSatisfaction, 2) + " / 5"
+            formatNumber(
+                averageSatisfaction,
+                2
+            ) +
+            " / 5"
         );
+
 
         setText(
             "average-resolution",
-            formatHours(averageResolution)
+            formatHours(
+                averageResolution
+            )
         );
+
 
         setText(
             "customer-segments",
-            formatNumber(customerSegments)
+            formatNumber(
+                customerSegments
+            )
         );
 
 
-        console.log("Dashboard metrics loaded");
+        console.log(
+            "Dashboard metrics loaded"
+        );
 
     } catch (error) {
 
@@ -391,17 +481,23 @@ async function loadDashboardMetrics() {
         );
 
 
-        setText("total-tickets", "8,469");
+        setText(
+            "total-tickets",
+            "8,469"
+        );
+
 
         setText(
             "average-satisfaction",
             "2.99 / 5"
         );
 
+
         setText(
             "average-resolution",
             "11.77 hrs"
         );
+
 
         setText(
             "customer-segments",
@@ -411,11 +507,21 @@ async function loadDashboardMetrics() {
 }
 
 
-function findMetric(map, possibleNames, fallback) {
+function findMetric(
+    map,
+    possibleNames,
+    fallback
+) {
 
-    for (let i = 0; i < possibleNames.length; i++) {
+    for (
+        let i = 0;
+        i < possibleNames.length;
+        i++
+    ) {
 
-        const key = possibleNames[i];
+        const key =
+            possibleNames[i];
+
 
         if (
             Object.prototype.hasOwnProperty.call(
@@ -424,13 +530,19 @@ function findMetric(map, possibleNames, fallback) {
             )
         ) {
 
-            const value = Number(map[key]);
+            const value =
+                Number(map[key]);
 
-            if (Number.isFinite(value)) {
+
+            if (
+                Number.isFinite(value)
+            ) {
+
                 return value;
             }
         }
     }
+
 
     return fallback;
 }
@@ -444,16 +556,22 @@ async function loadSegments() {
 
     try {
 
-        console.log("Loading customer segments...");
-
-        const data = await fetchJSON(
-            FILES.segments
+        console.log(
+            "Loading customer segments..."
         );
+
+
+        const data =
+            await fetchJSON(
+                FILES.segments
+            );
 
 
         if (
             !data ||
-            !Array.isArray(data.segments)
+            !Array.isArray(
+                data.segments
+            )
         ) {
 
             throw new Error(
@@ -462,7 +580,8 @@ async function loadSegments() {
         }
 
 
-        segmentData = data.segments;
+        segmentData =
+            data.segments;
 
 
         renderSegments(
@@ -487,7 +606,10 @@ async function loadSegments() {
 
 
         const container =
-            getElement("segment-container");
+            getElement(
+                "segment-container"
+            );
+
 
         if (container) {
 
@@ -510,10 +632,15 @@ async function loadSegments() {
    RENDER SEGMENTS
    ========================================================= */
 
-function renderSegments(segments) {
+function renderSegments(
+    segments
+) {
 
     const container =
-        getElement("segment-container");
+        getElement(
+            "segment-container"
+        );
+
 
     if (!container) {
         return;
@@ -531,72 +658,107 @@ function renderSegments(segments) {
 
     let html = "";
 
-    html += '<div class="segment-table-wrapper">';
+
+    html +=
+        '<div class="segment-table-wrapper">';
+
 
     html += "<table>";
 
+
     html += "<thead>";
+
 
     html += "<tr>";
 
-    html += "<th>Customer Segment</th>";
 
-    html += "<th>Customers</th>";
+    html +=
+        "<th>Customer Segment</th>";
 
-    html += "<th>Avg Age</th>";
 
-    html += "<th>Avg Satisfaction</th>";
+    html +=
+        "<th>Customers</th>";
 
-    html += "<th>Avg Resolution</th>";
+
+    html +=
+        "<th>Avg Age</th>";
+
+
+    html +=
+        "<th>Avg Satisfaction</th>";
+
+
+    html +=
+        "<th>Avg Resolution</th>";
+
 
     html += "</tr>";
 
+
     html += "</thead>";
+
 
     html += "<tbody>";
 
 
-    segments.forEach(function (segment) {
+    segments.forEach(
+        function (segment) {
 
-        html += "<tr>";
+            html += "<tr>";
 
-        html +=
-            "<td>" +
-            escapeHTML(segment.segment) +
-            "</td>";
 
-        html +=
-            "<td>" +
-            formatNumber(segment.customers) +
-            "</td>";
+            html +=
+                "<td>" +
+                escapeHTML(
+                    segment.segment
+                ) +
+                "</td>";
 
-        html +=
-            "<td>" +
-            formatNumber(segment.avg_age, 1) +
-            "</td>";
 
-        html +=
-            "<td>" +
-            formatNumber(
-                segment.avg_satisfaction,
-                2
-            ) +
-            " / 5</td>";
+            html +=
+                "<td>" +
+                formatNumber(
+                    segment.customers
+                ) +
+                "</td>";
 
-        html +=
-            "<td>" +
-            formatHours(
-                segment.avg_resolution_hours
-            ) +
-            "</td>";
 
-        html += "</tr>";
-    });
+            html +=
+                "<td>" +
+                formatNumber(
+                    segment.avg_age,
+                    1
+                ) +
+                "</td>";
+
+
+            html +=
+                "<td>" +
+                formatNumber(
+                    segment.avg_satisfaction,
+                    2
+                ) +
+                " / 5</td>";
+
+
+            html +=
+                "<td>" +
+                formatHours(
+                    segment.avg_resolution_hours
+                ) +
+                "</td>";
+
+
+            html += "</tr>";
+        }
+    );
 
 
     html += "</tbody>";
 
+
     html += "</table>";
+
 
     html += "</div>";
 
@@ -604,13 +766,16 @@ function renderSegments(segments) {
     html +=
         '<div class="chart-wrapper segment-chart-wrapper">';
 
+
     html +=
         '<canvas id="segment-chart"></canvas>';
+
 
     html += "</div>";
 
 
-    container.innerHTML = html;
+    container.innerHTML =
+        html;
 
 
     renderSegmentChart(
@@ -623,10 +788,15 @@ function renderSegments(segments) {
    SEGMENT CHART
    ========================================================= */
 
-function renderSegmentChart(segments) {
+function renderSegmentChart(
+    segments
+) {
 
     const canvas =
-        getElement("segment-chart");
+        getElement(
+            "segment-chart"
+        );
+
 
     if (!canvas) {
         return;
@@ -636,104 +806,123 @@ function renderSegmentChart(segments) {
     if (
         typeof Chart === "undefined"
     ) {
-
         return;
     }
 
 
     if (segmentChart) {
+
         segmentChart.destroy();
+
+        segmentChart = null;
     }
 
 
-    segmentChart = new Chart(
-        canvas,
-        {
-            type: "bar",
+    segmentChart =
+        new Chart(
+            canvas,
+            {
+                type: "bar",
 
-            data: {
+                data: {
 
-                labels: segments.map(
-                    function (segment) {
-                        return segment.segment;
-                    }
-                ),
+                    labels:
+                        segments.map(
+                            function (
+                                segment
+                            ) {
 
-                datasets: [
-                    {
-                        label:
-                            "Average Satisfaction",
+                                return segment.segment;
+                            }
+                        ),
 
-                        data:
-                            segments.map(
-                                function (segment) {
-                                    return toNumber(
-                                        segment.avg_satisfaction
-                                    );
-                                }
-                            ),
-
-                        borderWidth: 1
-                    }
-                ]
-            },
-
-            options: {
-
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                plugins: {
-
-                    legend: {
-                        display: false
-                    },
-
-                    tooltip: {
-
-                        callbacks: {
-
+                    datasets: [
+                        {
                             label:
-                                function (context) {
+                                "Average Satisfaction",
 
-                                    return (
-                                        " Satisfaction: " +
-                                        Number(
-                                            context.raw
-                                        ).toFixed(2) +
-                                        " / 5"
-                                    );
-                                }
+                            data:
+                                segments.map(
+                                    function (
+                                        segment
+                                    ) {
+
+                                        return toNumber(
+                                            segment.avg_satisfaction
+                                        );
+                                    }
+                                ),
+
+                            borderWidth: 1
                         }
-                    }
+                    ]
                 },
 
-                scales: {
+                options: {
 
-                    y: {
+                    responsive: true,
 
-                        beginAtZero: true,
+                    maintainAspectRatio:
+                        false,
 
-                        max: 5,
+                    plugins: {
 
-                        title: {
-                            display: true,
-                            text:
-                                "Average Satisfaction"
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+                                    function (
+                                        context
+                                    ) {
+
+                                        return (
+                                            " Satisfaction: " +
+                                            Number(
+                                                context.raw
+                                            ).toFixed(2) +
+                                            " / 5"
+                                        );
+                                    }
+                            }
                         }
                     },
 
-                    x: {
+                    scales: {
 
-                        ticks: {
-                            autoSkip: false
+                        y: {
+
+                            beginAtZero:
+                                true,
+
+                            max: 5,
+
+                            title: {
+
+                                display:
+                                    true,
+
+                                text:
+                                    "Average Satisfaction"
+                            }
+                        },
+
+                        x: {
+
+                            ticks: {
+
+                                autoSkip:
+                                    false
+                            }
                         }
                     }
                 }
             }
-        }
-    );
+        );
 }
 
 
@@ -748,6 +937,7 @@ function populateMainSegmentFilter() {
             "segment-filter-main"
         );
 
+
     if (!filter) {
         return;
     }
@@ -759,21 +949,28 @@ function populateMainSegmentFilter() {
         "</option>";
 
 
-    segmentData.forEach(function (segment) {
+    segmentData.forEach(
+        function (segment) {
 
-        const option =
-            document.createElement(
-                "option"
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                segment.segment;
+
+
+            option.textContent =
+                segment.segment;
+
+
+            filter.appendChild(
+                option
             );
-
-        option.value =
-            segment.segment;
-
-        option.textContent =
-            segment.segment;
-
-        filter.appendChild(option);
-    });
+        }
+    );
 }
 
 
@@ -817,7 +1014,8 @@ async function loadSatisfactionData() {
             formatNumber(
                 data.low_satisfaction_percentage,
                 1
-            ) + "%"
+            ) +
+            "%"
         );
 
 
@@ -826,7 +1024,8 @@ async function loadSatisfactionData() {
             formatNumber(
                 data.model_accuracy,
                 2
-            ) + "%"
+            ) +
+            "%"
         );
 
 
@@ -847,15 +1046,18 @@ async function loadSatisfactionData() {
             "1,102"
         );
 
+
         setText(
             "satisfied-customers",
             "1,667"
         );
 
+
         setText(
             "low-satisfaction-rate",
             "39.8%"
         );
+
 
         setText(
             "model-accuracy",
@@ -911,6 +1113,7 @@ async function loadResolutionData() {
                 priorityData.data
             )
         ) {
+
             throw new Error(
                 "Invalid priority data"
             );
@@ -923,6 +1126,7 @@ async function loadResolutionData() {
                 typeData.data
             )
         ) {
+
             throw new Error(
                 "Invalid type data"
             );
@@ -935,6 +1139,7 @@ async function loadResolutionData() {
                 channelData.data
             )
         ) {
+
             throw new Error(
                 "Invalid channel data"
             );
@@ -944,8 +1149,10 @@ async function loadResolutionData() {
         resolutionData.priority =
             priorityData.data;
 
+
         resolutionData.type =
             typeData.data;
+
 
         resolutionData.channel =
             channelData.data;
@@ -1009,9 +1216,11 @@ async function loadResolutionData() {
             "priority-chart"
         );
 
+
         showChartError(
             "type-chart"
         );
+
 
         showChartError(
             "channel-chart"
@@ -1034,6 +1243,7 @@ function populateFilter(
     const filter =
         getElement(id);
 
+
     if (!filter) {
         return;
     }
@@ -1041,51 +1251,73 @@ function populateFilter(
 
     filter.innerHTML =
         '<option value="all">' +
-        escapeHTML(defaultLabel) +
+        escapeHTML(
+            defaultLabel
+        ) +
         "</option>";
 
 
     const values = [];
 
 
-    data.forEach(function (item) {
+    data.forEach(
+        function (item) {
 
-        const value =
-            item[property];
+            const value =
+                item[property];
 
-        if (
-            value !== undefined &&
-            value !== null &&
-            String(value).trim() !== ""
-        ) {
 
-            values.push(
-                String(value)
-            );
+            if (
+                value !== undefined &&
+                value !== null &&
+                String(value).trim() !== ""
+            ) {
+
+                values.push(
+                    String(value)
+                );
+            }
         }
-    });
+    );
 
 
     values
         .filter(
-            function (value, index, array) {
-                return array.indexOf(value) === index;
+            function (
+                value,
+                index,
+                array
+            ) {
+
+                return (
+                    array.indexOf(value) ===
+                    index
+                );
             }
         )
         .sort()
-        .forEach(function (value) {
+        .forEach(
+            function (value) {
 
-            const option =
-                document.createElement(
-                    "option"
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+
+                option.value =
+                    value;
+
+
+                option.textContent =
+                    value;
+
+
+                filter.appendChild(
+                    option
                 );
-
-            option.value = value;
-
-            option.textContent = value;
-
-            filter.appendChild(option);
-        });
+            }
+        );
 }
 
 
@@ -1093,10 +1325,15 @@ function populateFilter(
    PRIORITY CHART
    ========================================================= */
 
-function renderPriorityChart(data) {
+function renderPriorityChart(
+    data
+) {
 
     const container =
-        getElement("priority-chart");
+        getElement(
+            "priority-chart"
+        );
+
 
     if (!container) {
         return;
@@ -1116,7 +1353,7 @@ function renderPriorityChart(data) {
 
 
     container.innerHTML =
-        '<canvas></canvas>';
+        "<canvas></canvas>";
 
 
     const canvas =
@@ -1126,46 +1363,54 @@ function renderPriorityChart(data) {
 
 
     if (priorityChart) {
+
         priorityChart.destroy();
+
+        priorityChart = null;
     }
 
 
-    priorityChart = new Chart(
-        canvas,
-        {
-            type: "bar",
+    priorityChart =
+        new Chart(
+            canvas,
+            {
+                type: "bar",
 
-            data: {
+                data: {
 
-                labels: data.map(
-                    function (item) {
-                        return item.priority;
-                    }
-                ),
-
-                datasets: [
-                    {
-                        label:
-                            "Average Resolution",
-
-                        data: data.map(
+                    labels:
+                        data.map(
                             function (item) {
-                                return toNumber(
-                                    item.average_resolution_hours
-                                );
+                                return item.priority;
                             }
                         ),
 
-                        borderWidth: 1
-                    }
-                ]
-            },
+                    datasets: [
+                        {
+                            label:
+                                "Average Resolution",
 
-            options: chartOptions(
-                "Average Resolution Time (Hours)"
-            )
-        }
-    );
+                            data:
+                                data.map(
+                                    function (item) {
+
+                                        return toNumber(
+                                            item.average_resolution_hours
+                                        );
+                                    }
+                                ),
+
+                            borderWidth: 1
+                        }
+                    ]
+                },
+
+                options:
+                    chartOptions(
+                        "Average Resolution Time (Hours)"
+                    )
+            }
+        );
 }
 
 
@@ -1173,10 +1418,15 @@ function renderPriorityChart(data) {
    TICKET TYPE CHART
    ========================================================= */
 
-function renderTypeChart(data) {
+function renderTypeChart(
+    data
+) {
 
     const container =
-        getElement("type-chart");
+        getElement(
+            "type-chart"
+        );
+
 
     if (!container) {
         return;
@@ -1196,7 +1446,7 @@ function renderTypeChart(data) {
 
 
     container.innerHTML =
-        '<canvas></canvas>';
+        "<canvas></canvas>";
 
 
     const canvas =
@@ -1206,46 +1456,54 @@ function renderTypeChart(data) {
 
 
     if (typeChart) {
+
         typeChart.destroy();
+
+        typeChart = null;
     }
 
 
-    typeChart = new Chart(
-        canvas,
-        {
-            type: "bar",
+    typeChart =
+        new Chart(
+            canvas,
+            {
+                type: "bar",
 
-            data: {
+                data: {
 
-                labels: data.map(
-                    function (item) {
-                        return item.ticket_type;
-                    }
-                ),
-
-                datasets: [
-                    {
-                        label:
-                            "Average Resolution",
-
-                        data: data.map(
+                    labels:
+                        data.map(
                             function (item) {
-                                return toNumber(
-                                    item.average_resolution_hours
-                                );
+                                return item.ticket_type;
                             }
                         ),
 
-                        borderWidth: 1
-                    }
-                ]
-            },
+                    datasets: [
+                        {
+                            label:
+                                "Average Resolution",
 
-            options: chartOptions(
-                "Average Resolution Time (Hours)"
-            )
-        }
-    );
+                            data:
+                                data.map(
+                                    function (item) {
+
+                                        return toNumber(
+                                            item.average_resolution_hours
+                                        );
+                                    }
+                                ),
+
+                            borderWidth: 1
+                        }
+                    ]
+                },
+
+                options:
+                    chartOptions(
+                        "Average Resolution Time (Hours)"
+                    )
+            }
+        );
 }
 
 
@@ -1253,10 +1511,15 @@ function renderTypeChart(data) {
    CHANNEL CHART
    ========================================================= */
 
-function renderChannelChart(data) {
+function renderChannelChart(
+    data
+) {
 
     const container =
-        getElement("channel-chart");
+        getElement(
+            "channel-chart"
+        );
+
 
     if (!container) {
         return;
@@ -1276,7 +1539,7 @@ function renderChannelChart(data) {
 
 
     container.innerHTML =
-        '<canvas></canvas>';
+        "<canvas></canvas>";
 
 
     const canvas =
@@ -1286,46 +1549,54 @@ function renderChannelChart(data) {
 
 
     if (channelChart) {
+
         channelChart.destroy();
+
+        channelChart = null;
     }
 
 
-    channelChart = new Chart(
-        canvas,
-        {
-            type: "bar",
+    channelChart =
+        new Chart(
+            canvas,
+            {
+                type: "bar",
 
-            data: {
+                data: {
 
-                labels: data.map(
-                    function (item) {
-                        return item.channel;
-                    }
-                ),
-
-                datasets: [
-                    {
-                        label:
-                            "Average Resolution",
-
-                        data: data.map(
+                    labels:
+                        data.map(
                             function (item) {
-                                return toNumber(
-                                    item.average_resolution_hours
-                                );
+                                return item.channel;
                             }
                         ),
 
-                        borderWidth: 1
-                    }
-                ]
-            },
+                    datasets: [
+                        {
+                            label:
+                                "Average Resolution",
 
-            options: chartOptions(
-                "Average Resolution Time (Hours)"
-            )
-        }
-    );
+                            data:
+                                data.map(
+                                    function (item) {
+
+                                        return toNumber(
+                                            item.average_resolution_hours
+                                        );
+                                    }
+                                ),
+
+                            borderWidth: 1
+                        }
+                    ]
+                },
+
+                options:
+                    chartOptions(
+                        "Average Resolution Time (Hours)"
+                    )
+            }
+        );
 }
 
 
@@ -1333,13 +1604,16 @@ function renderChannelChart(data) {
    COMMON CHART OPTIONS
    ========================================================= */
 
-function chartOptions(yAxisTitle) {
+function chartOptions(
+    yAxisTitle
+) {
 
     return {
 
         responsive: true,
 
-        maintainAspectRatio: false,
+        maintainAspectRatio:
+            false,
 
         plugins: {
 
@@ -1376,7 +1650,8 @@ function chartOptions(yAxisTitle) {
 
                     display: true,
 
-                    text: yAxisTitle
+                    text:
+                        yAxisTitle
                 }
             },
 
@@ -1400,10 +1675,13 @@ function chartOptions(yAxisTitle) {
    CHART ERROR
    ========================================================= */
 
-function showChartError(id) {
+function showChartError(
+    id
+) {
 
     const container =
         getElement(id);
+
 
     if (!container) {
         return;
@@ -1453,11 +1731,8 @@ async function loadTicketData() {
 
 
         /*
-         * The original exported JSON may contain
-         * JavaScript-style NaN or Infinity values.
-         *
-         * Replace them with valid JSON null values
-         * before parsing.
+         * Convert non-standard JSON values
+         * into valid JSON values.
          */
 
         text = text
@@ -1487,7 +1762,10 @@ async function loadTicketData() {
         }
 
 
-        ticketData = data;
+        ticketData =
+            data.filter(
+                validateTicketRecord
+            );
 
 
         console.log(
@@ -1500,6 +1778,7 @@ async function loadTicketData() {
             getElement(
                 "ticket-data-status"
             );
+
 
         if (loadingMessage) {
 
@@ -1514,7 +1793,6 @@ async function loadTicketData() {
 
         initializeFilters();
 
-
     } catch (error) {
 
         console.error(
@@ -1528,6 +1806,7 @@ async function loadTicketData() {
                 "filter-result-status"
             );
 
+
         if (status) {
 
             status.textContent =
@@ -1535,20 +1814,17 @@ async function loadTicketData() {
         }
 
 
-        /*
-         * The main dashboard still works even if
-         * ticket-level data cannot be loaded.
-         */
-
         setText(
             "filtered-ticket-count",
             "0"
         );
 
+
         setText(
             "filtered-average-satisfaction",
             "N/A"
         );
+
 
         setText(
             "filtered-average-resolution",
@@ -1574,20 +1850,24 @@ function initializeFilters() {
             "priority-filter"
         );
 
+
     const typeFilter =
         getElement(
             "type-filter"
         );
+
 
     const channelFilter =
         getElement(
             "channel-filter"
         );
 
+
     const segmentFilter =
         getElement(
             "segment-filter-main"
         );
+
 
     const resetButton =
         getElement(
@@ -1687,17 +1967,25 @@ function updateFilteredDashboard() {
 
                 const ticketPriority =
                     normalize(
-                        ticket["Ticket Priority"]
+                        ticket[
+                            "Ticket Priority"
+                        ]
                     );
+
 
                 const ticketType =
                     normalize(
-                        ticket["Ticket Type"]
+                        ticket[
+                            "Ticket Type"
+                        ]
                     );
+
 
                 const ticketChannel =
                     normalize(
-                        ticket["Ticket Channel"]
+                        ticket[
+                            "Ticket Channel"
+                        ]
                     );
 
 
@@ -1706,6 +1994,7 @@ function updateFilteredDashboard() {
                     ticketPriority !==
                     normalize(priority)
                 ) {
+
                     return false;
                 }
 
@@ -1715,6 +2004,7 @@ function updateFilteredDashboard() {
                     ticketType !==
                     normalize(type)
                 ) {
+
                     return false;
                 }
 
@@ -1724,6 +2014,7 @@ function updateFilteredDashboard() {
                     ticketChannel !==
                     normalize(channel)
                 ) {
+
                     return false;
                 }
 
@@ -1733,6 +2024,7 @@ function updateFilteredDashboard() {
                     getTicketSegment(ticket) !==
                     segment
                 ) {
+
                     return false;
                 }
 
@@ -1758,16 +2050,23 @@ function updateFilteredDashboard() {
    GET FILTER VALUE
    ========================================================= */
 
-function getFilterValue(id) {
+function getFilterValue(
+    id
+) {
 
     const element =
         getElement(id);
+
 
     if (!element) {
         return "all";
     }
 
-    return element.value || "all";
+
+    return (
+        element.value ||
+        "all"
+    );
 }
 
 
@@ -1796,6 +2095,7 @@ function updateFilteredStatistics(
             "N/A"
         );
 
+
         setText(
             "filtered-average-resolution",
             "N/A"
@@ -1806,51 +2106,51 @@ function updateFilteredStatistics(
 
 
     let satisfactionTotal = 0;
-
     let satisfactionCount = 0;
 
     let resolutionTotal = 0;
-
     let resolutionCount = 0;
 
 
-    records.forEach(function (ticket) {
+    records.forEach(
+        function (ticket) {
 
-        const satisfaction =
-            getSatisfaction(
-                ticket
-            );
+            const satisfaction =
+                getSatisfaction(
+                    ticket
+                );
 
 
-        if (
-            satisfaction !== null
-        ) {
+            if (
+                satisfaction !== null
+            ) {
 
-            satisfactionTotal +=
-                satisfaction;
+                satisfactionTotal +=
+                    satisfaction;
 
-            satisfactionCount++;
+                satisfactionCount++;
+            }
+
+
+            const resolution =
+                getResolutionHours(
+                    ticket[
+                        "Time to Resolution"
+                    ]
+                );
+
+
+            if (
+                resolution !== null
+            ) {
+
+                resolutionTotal +=
+                    resolution;
+
+                resolutionCount++;
+            }
         }
-
-
-        const resolution =
-            getResolutionHours(
-                ticket[
-                    "Time to Resolution"
-                ]
-            );
-
-
-        if (
-            resolution !== null
-        ) {
-
-            resolutionTotal +=
-                resolution;
-
-            resolutionCount++;
-        }
-    });
+    );
 
 
     const averageSatisfaction =
@@ -1867,42 +2167,22 @@ function updateFilteredStatistics(
             : null;
 
 
-    if (
+    setText(
+        "filtered-average-satisfaction",
         averageSatisfaction !== null
-    ) {
-
-        setText(
-            "filtered-average-satisfaction",
-            averageSatisfaction.toFixed(2) +
-            " / 5"
-        );
-
-    } else {
-
-        setText(
-            "filtered-average-satisfaction",
-            "N/A"
-        );
-    }
+            ? averageSatisfaction.toFixed(2) +
+              " / 5"
+            : "N/A"
+    );
 
 
-    if (
+    setText(
+        "filtered-average-resolution",
         averageResolution !== null
-    ) {
-
-        setText(
-            "filtered-average-resolution",
-            averageResolution.toFixed(2) +
-            " hrs"
-        );
-
-    } else {
-
-        setText(
-            "filtered-average-resolution",
-            "N/A"
-        );
-    }
+            ? averageResolution.toFixed(2) +
+              " hrs"
+            : "N/A"
+    );
 }
 
 
@@ -1919,6 +2199,7 @@ function updateFilterStatus(
         getElement(
             "filter-result-status"
         );
+
 
     if (!status) {
         return;
@@ -1961,15 +2242,18 @@ function resetFilters() {
     ];
 
 
-    filters.forEach(function (id) {
+    filters.forEach(
+        function (id) {
 
-        const element =
-            getElement(id);
+            const element =
+                getElement(id);
 
-        if (element) {
-            element.value = "all";
+
+            if (element) {
+                element.value = "all";
+            }
         }
-    });
+    );
 
 
     updateFilteredDashboard();
@@ -1985,7 +2269,9 @@ function resetFilters() {
    NORMALIZATION
    ========================================================= */
 
-function normalize(value) {
+function normalize(
+    value
+) {
 
     if (
         value === null ||
@@ -2005,7 +2291,9 @@ function normalize(value) {
    SATISFACTION PARSER
    ========================================================= */
 
-function getSatisfaction(ticket) {
+function getSatisfaction(
+    ticket
+) {
 
     const value =
         ticket[
@@ -2043,7 +2331,9 @@ function getSatisfaction(ticket) {
    RESOLUTION TIME PARSER
    ========================================================= */
 
-function getResolutionHours(value) {
+function getResolutionHours(
+    value
+) {
 
     if (
         value === null ||
@@ -2055,10 +2345,9 @@ function getResolutionHours(value) {
     }
 
 
-    /*
-     * Case 1:
-     * Direct numeric hours
-     */
+    /* -----------------------------------------
+       Case 1: numeric value
+       ----------------------------------------- */
 
     if (
         typeof value === "number"
@@ -2079,38 +2368,35 @@ function getResolutionHours(value) {
     }
 
 
-    /*
-     * Case 2:
-     * Plain numeric string
-     */
+    /* -----------------------------------------
+       Case 2: numeric string
+       ----------------------------------------- */
 
-    const directNumber =
+    const numericValue =
         Number(text);
 
 
     if (
-        Number.isFinite(directNumber)
+        Number.isFinite(numericValue)
     ) {
 
-        return directNumber;
+        return numericValue;
     }
 
 
-    /*
-     * Case 3:
-     * Values such as:
-     *
-     * 1 days 04:30:00
-     * 04:30:00
-     * 12:45
-     */
+    /* -----------------------------------------
+       Case 3: pandas Timedelta
+       
+       Examples:
+       0 days 11:46:32
+       1 days 04:30:00
+       11:46:32
+       04:30:00
+       ----------------------------------------- */
 
     let days = 0;
-
     let hours = 0;
-
     let minutes = 0;
-
     let seconds = 0;
 
 
@@ -2131,7 +2417,7 @@ function getResolutionHours(value) {
 
     const timeMatch =
         text.match(
-            /(\d{1,3}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?/
+            /(\d{1,4}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?/
         );
 
 
@@ -2142,14 +2428,18 @@ function getResolutionHours(value) {
                 timeMatch[1]
             );
 
+
         minutes =
             Number(
                 timeMatch[2]
             );
 
+
         seconds =
             timeMatch[3]
-                ? Number(timeMatch[3])
+                ? Number(
+                    timeMatch[3]
+                )
                 : 0;
     }
 
@@ -2159,31 +2449,114 @@ function getResolutionHours(value) {
         timeMatch
     ) {
 
-        return (
-            days * 24 +
+        const totalHours =
+            (
+                days * 24
+            ) +
             hours +
-            minutes / 60 +
-            seconds / 3600
-        );
+            (
+                minutes / 60
+            ) +
+            (
+                seconds / 3600
+            );
+
+
+        return Number.isFinite(
+            totalHours
+        )
+            ? totalHours
+            : null;
     }
 
 
-    /*
-     * Case 4:
-     * Strings containing hours.
-     */
+    /* -----------------------------------------
+       Case 4: hours
+       
+       Examples:
+       11 hours
+       11.5 hours
+       11 hrs
+       ----------------------------------------- */
 
     const hourMatch =
         text.match(
-            /(\d+(?:\.\d+)?)\s*hours?/i
+            /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/i
         );
 
 
     if (hourMatch) {
 
-        return Number(
-            hourMatch[1]
+        const hoursValue =
+            Number(
+                hourMatch[1]
+            );
+
+
+        return Number.isFinite(
+            hoursValue
+        )
+            ? hoursValue
+            : null;
+    }
+
+
+    /* -----------------------------------------
+       Case 5: minutes
+       
+       Examples:
+       120 minutes
+       90 mins
+       ----------------------------------------- */
+
+    const minuteMatch =
+        text.match(
+            /(\d+(?:\.\d+)?)\s*(?:minutes?|mins?)/i
         );
+
+
+    if (minuteMatch) {
+
+        const minutesValue =
+            Number(
+                minuteMatch[1]
+            );
+
+
+        return Number.isFinite(
+            minutesValue
+        )
+            ? minutesValue / 60
+            : null;
+    }
+
+
+    /* -----------------------------------------
+       Case 6: seconds
+       
+       Examples:
+       3600 seconds
+       ----------------------------------------- */
+
+    const secondMatch =
+        text.match(
+            /(\d+(?:\.\d+)?)\s*(?:seconds?|secs?)/i
+        );
+
+
+    if (secondMatch) {
+
+        const secondsValue =
+            Number(
+                secondMatch[1]
+            );
+
+
+        return Number.isFinite(
+            secondsValue
+        )
+            ? secondsValue / 3600
+            : null;
     }
 
 
@@ -2193,22 +2566,11 @@ function getResolutionHours(value) {
 
 /* =========================================================
    CUSTOMER SEGMENT CALCULATION
-   =========================================================
-
-   The ticket_data.json file contains:
-   - Customer Age
-   - Customer Satisfaction Rating
-   - Time to Resolution
-
-   The segment dashboard contains the six cluster
-   profiles. We assign each ticket to the closest
-   segment profile using normalized distance.
-
-   This makes the Segment filter work without adding
-   another backend service.
    ========================================================= */
 
-function getTicketSegment(ticket) {
+function getTicketSegment(
+    ticket
+) {
 
     if (
         !segmentData ||
@@ -2220,9 +2582,10 @@ function getTicketSegment(ticket) {
 
 
     const age =
-        toNumber(
-            ticket["Customer Age"],
-            null
+        getNumericOrNull(
+            ticket[
+                "Customer Age"
+            ]
         );
 
 
@@ -2250,12 +2613,6 @@ function getTicketSegment(ticket) {
     }
 
 
-    /*
-     * Reference ranges prevent age,
-     * satisfaction and resolution from
-     * dominating one another.
-     */
-
     const AGE_SCALE = 40;
 
     const SATISFACTION_SCALE = 4;
@@ -2279,22 +2636,40 @@ function getTicketSegment(ticket) {
             let dimensions = 0;
 
 
+            const segmentAge =
+                Number(
+                    segment.avg_age
+                );
+
+
+            const segmentSatisfaction =
+                Number(
+                    segment.avg_satisfaction
+                );
+
+
+            const segmentResolution =
+                Number(
+                    segment.avg_resolution_hours
+                );
+
+
             if (
                 age !== null &&
                 Number.isFinite(
-                    Number(segment.avg_age)
+                    segmentAge
                 )
             ) {
 
-                distance += Math.pow(
-                    (
-                        age -
-                        Number(
-                            segment.avg_age
-                        )
-                    ) / AGE_SCALE,
-                    2
-                );
+                distance +=
+                    Math.pow(
+                        (
+                            age -
+                            segmentAge
+                        ) /
+                        AGE_SCALE,
+                        2
+                    );
 
                 dimensions++;
             }
@@ -2303,21 +2678,19 @@ function getTicketSegment(ticket) {
             if (
                 satisfaction !== null &&
                 Number.isFinite(
-                    Number(
-                        segment.avg_satisfaction
-                    )
+                    segmentSatisfaction
                 )
             ) {
 
-                distance += Math.pow(
-                    (
-                        satisfaction -
-                        Number(
-                            segment.avg_satisfaction
-                        )
-                    ) / SATISFACTION_SCALE,
-                    2
-                );
+                distance +=
+                    Math.pow(
+                        (
+                            satisfaction -
+                            segmentSatisfaction
+                        ) /
+                        SATISFACTION_SCALE,
+                        2
+                    );
 
                 dimensions++;
             }
@@ -2326,27 +2699,27 @@ function getTicketSegment(ticket) {
             if (
                 resolution !== null &&
                 Number.isFinite(
-                    Number(
-                        segment.avg_resolution_hours
-                    )
+                    segmentResolution
                 )
             ) {
 
-                distance += Math.pow(
-                    (
-                        resolution -
-                        Number(
-                            segment.avg_resolution_hours
-                        )
-                    ) / RESOLUTION_SCALE,
-                    2
-                );
+                distance +=
+                    Math.pow(
+                        (
+                            resolution -
+                            segmentResolution
+                        ) /
+                        RESOLUTION_SCALE,
+                        2
+                    );
 
                 dimensions++;
             }
 
 
-            if (dimensions > 0) {
+            if (
+                dimensions > 0
+            ) {
 
                 distance =
                     distance /
@@ -2374,21 +2747,40 @@ function getTicketSegment(ticket) {
 
 
 /* =========================================================
-   OPTIONAL FILTERED CHART REFRESH
+   SAFE NUMERIC VALUE
+   ========================================================= */
+
+function getNumericOrNull(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return null;
+    }
+
+
+    const number =
+        Number(value);
+
+
+    return Number.isFinite(number)
+        ? number
+        : null;
+}
+
+
+/* =========================================================
+   OPTIONAL FILTERED CHART DATA
    ========================================================= */
 
 function updateFilteredCharts(
     records
 ) {
-
-    /*
-     * This function is intentionally kept separate
-     * from the main statistics logic.
-     *
-     * It allows the dashboard to calculate
-     * filtered resolution analytics without
-     * replacing the original ML-generated charts.
-     */
 
     if (!records.length) {
         return;
@@ -2396,75 +2788,62 @@ function updateFilteredCharts(
 
 
     const priorityMap = {};
-
     const typeMap = {};
-
     const channelMap = {};
 
 
-    records.forEach(function (ticket) {
+    records.forEach(
+        function (ticket) {
 
-        const hours =
-            getResolutionHours(
+            const hours =
+                getResolutionHours(
+                    ticket[
+                        "Time to Resolution"
+                    ]
+                );
+
+
+            if (
+                hours === null
+            ) {
+                return;
+            }
+
+
+            addGroupedValue(
+                priorityMap,
                 ticket[
-                    "Time to Resolution"
-                ]
+                    "Ticket Priority"
+                ],
+                hours
             );
 
 
-        if (hours === null) {
-            return;
+            addGroupedValue(
+                typeMap,
+                ticket[
+                    "Ticket Type"
+                ],
+                hours
+            );
+
+
+            addGroupedValue(
+                channelMap,
+                ticket[
+                    "Ticket Channel"
+                ],
+                hours
+            );
         }
+    );
 
 
-        const priority =
-            ticket[
-                "Ticket Priority"
-            ];
-
-
-        const type =
-            ticket[
-                "Ticket Type"
-            ];
-
-
-        const channel =
-            ticket[
-                "Ticket Channel"
-            ];
-
-
-        addGroupedValue(
-            priorityMap,
-            priority,
-            hours
-        );
-
-
-        addGroupedValue(
-            typeMap,
-            type,
-            hours
-        );
-
-
-        addGroupedValue(
-            channelMap,
-            channel,
-            hours
-        );
-    });
-
-
-    /*
-     * The original resolution charts use the
-     * ML-generated aggregate JSON files.
-     *
-     * We don't automatically replace them here,
-     * because those files represent the official
-     * analysis used by the project README.
-     */
+    return {
+        priority: priorityMap,
+        type: typeMap,
+        channel: channelMap
+    };
 }
 
 
@@ -2506,7 +2885,9 @@ function addGroupedValue(
    DATA VALIDATION
    ========================================================= */
 
-function validateTicketRecord(ticket) {
+function validateTicketRecord(
+    ticket
+) {
 
     if (
         !ticket ||
@@ -2634,7 +3015,23 @@ function runHealthCheck() {
             segmentData.length > 0,
 
         filters:
-            filtersReady
+            filtersReady,
+
+        resolutionParser:
+            ticketData.length > 0
+                ? ticketData.some(
+                    function (ticket) {
+
+                        return (
+                            getResolutionHours(
+                                ticket[
+                                    "Time to Resolution"
+                                ]
+                            ) !== null
+                        );
+                    }
+                )
+                : false
     };
 
 
@@ -2659,20 +3056,36 @@ window.SupportIQ = {
             return ticketData;
         },
 
+
     getSegments:
         function () {
             return segmentData;
         },
+
 
     getFilters:
         function () {
             return getActiveFilters();
         },
 
+
     getHealth:
         function () {
             return runHealthCheck();
         },
+
+
+    getDataQuality:
+        function () {
+            return getDataQualitySummary();
+        },
+
+
+    getResolutionHours:
+        function (value) {
+            return getResolutionHours(value);
+        },
+
 
     reset:
         function () {
