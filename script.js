@@ -1,146 +1,50 @@
-/* =========================================================
-   SupportIQ
-   Customer Support Intelligence Platform
-   ========================================================= */
-
-"use strict";
-
-
-/* =========================================================
-   Configuration
-   ========================================================= */
-
-/*
- * Analytics files are inside the data/ folder.
- *
- * ticket_data.json is in the repository ROOT.
- */
 const DATA_PATH = "data/";
 
 const FILES = {
-    tickets: "ticket_data.json",
-    metrics: "dashboard_metrics.csv",
-    segments: "segment_dashboard.json",
-    satisfaction: "satisfaction_dashboard.json",
-    priorityResolution: "resolution_by_priority.json",
-    typeResolution: "resolution_by_type.json",
-    channelResolution: "resolution_by_channel.json"
+    metrics: DATA_PATH + "dashboard_metrics.csv",
+    segments: DATA_PATH + "segment_dashboard.json",
+    satisfaction: DATA_PATH + "satisfaction_dashboard.json",
+
+    // Resolution analytics files
+    resolutionPriority: DATA_PATH + "resolution_by_priority.json",
+    resolutionType: DATA_PATH + "resolution_by_type.json",
+    resolutionChannel: DATA_PATH + "resolution_by_channel.json",
+
+    // Ticket-level data is in the repository ROOT
+    tickets: "ticket_data.json"
+};
+
+let ticketData = [];
+let charts = {};
+
+const fallbackMetrics = {
+    totalTickets: 8469,
+    averageSatisfaction: 2.99,
+    averageResolution: 11.77,
+    customerSegments: 6
+};
+
+const fallbackSatisfaction = {
+    total_closed_tickets: 2769,
+    low_satisfaction_tickets: 1102,
+    satisfied_tickets: 1667,
+    low_satisfaction_percentage: 39.8,
+    model_accuracy: 59.75
 };
 
 
 /* =========================================================
-   Global State
-   ========================================================= */
+   GENERAL HELPERS
+========================================================= */
 
-let ticketData = [];
-let dashboardMetrics = {};
-let segmentData = [];
-let satisfactionData = {};
+function getElement(id) {
+    return document.getElementById(id);
+}
 
-let resolutionByPriority = [];
-let resolutionByType = [];
-let resolutionByChannel = [];
-
-let charts = {};
-let filtersReady = false;
-
-
-/* =========================================================
-   Utility Functions
-   ========================================================= */
-
-/*
- * Safely convert a value to a number.
- */
-function toNumber(value, fallback = null) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === "" ||
-        value === "NaN" ||
-        value === "null"
-    ) {
-        return fallback;
-    }
-
+function formatNumber(value, decimals = 0) {
     const number = Number(value);
 
-    if (Number.isFinite(number)) {
-        return number;
-    }
-
-    return fallback;
-}
-
-
-/*
- * Normalize text for reliable comparisons.
- */
-function normalizeText(value) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return "";
-    }
-
-    return String(value)
-        .trim()
-        .toLowerCase()
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ");
-}
-
-
-/*
- * Calculate an average from valid numeric values.
- */
-function average(values) {
-
-    const validValues = values
-        .map(value => toNumber(value, null))
-        .filter(value => value !== null);
-
-    if (validValues.length === 0) {
-        return null;
-    }
-
-    const total = validValues.reduce(
-        (sum, value) => sum + value,
-        0
-    );
-
-    return total / validValues.length;
-}
-
-
-/*
- * Format whole numbers.
- */
-function formatNumber(value) {
-
-    const number = toNumber(value, null);
-
-    if (number === null) {
-        return "N/A";
-    }
-
-    return number.toLocaleString("en-US", {
-        maximumFractionDigits: 0
-    });
-}
-
-
-/*
- * Format decimal numbers.
- */
-function formatDecimal(value, decimals = 2) {
-
-    const number = toNumber(value, null);
-
-    if (number === null) {
+    if (!Number.isFinite(number)) {
         return "N/A";
     }
 
@@ -150,647 +54,217 @@ function formatDecimal(value, decimals = 2) {
     });
 }
 
-
-/*
- * Convert text into title case.
- */
-function titleCase(value) {
-
-    return String(value)
-        .trim()
-        .split(/\s+/)
-        .map(word => {
-
-            if (!word) {
-                return "";
-            }
-
-            return (
-                word.charAt(0).toUpperCase() +
-                word.slice(1)
-            );
-        })
-        .join(" ");
+function cleanJSONText(text) {
+    return text
+        .replace(/\bNaN\b/g, "null")
+        .replace(/\bInfinity\b/g, "null")
+        .replace(/\b-Infinity\b/g, "null");
 }
 
-
-/*
- * Safely place text into an HTML element.
- */
-function setElementText(id, value) {
-
-    const element =
-        document.getElementById(id);
-
-    if (!element) {
-        return;
+function normalize(value) {
+    if (value === null || value === undefined) {
+        return "";
     }
 
-    element.textContent =
-        value === null ||
-        value === undefined ||
-        value === ""
-            ? "N/A"
-            : String(value);
-}
-
-
-/*
- * Escape dynamic HTML.
- */
-function escapeHTML(value) {
-
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(value).trim().toLowerCase();
 }
 
 
 /* =========================================================
-   JSON Loading
-   ========================================================= */
+   LOAD JSON FILE
+========================================================= */
 
-/*
- * Load JSON from the data/ directory.
- *
- * The ticket file is loaded separately because it is
- * stored in the repository root.
- */
-async function loadJSON(filename) {
-
-    const response = await fetch(
-        DATA_PATH + filename,
-        {
-            cache: "no-store"
-        }
-    );
+async function loadJSON(file) {
+    const response = await fetch(file, {
+        cache: "no-store"
+    });
 
     if (!response.ok) {
-
         throw new Error(
-            `Unable to load ${filename}. HTTP ${response.status}`
+            `Unable to load ${file}: HTTP ${response.status}`
         );
     }
 
     const text = await response.text();
 
-    /*
-     * Convert pandas-style NaN and Infinity values
-     * into valid JSON null values.
-     */
-    const safeText = text
-        .replace(/\bNaN\b/g, "null")
-        .replace(/\bInfinity\b/g, "null")
-        .replace(/\b-Infinity\b/g, "null");
-
-    return JSON.parse(safeText);
+    return JSON.parse(cleanJSONText(text));
 }
 
 
 /* =========================================================
-   CSV Loading
-   ========================================================= */
+   LOAD DASHBOARD METRICS
+========================================================= */
 
-async function loadCSV(filename) {
-
-    const response = await fetch(
-        DATA_PATH + filename,
-        {
+async function loadMetrics() {
+    try {
+        const response = await fetch(FILES.metrics, {
             cache: "no-store"
-        }
-    );
-
-    if (!response.ok) {
-
-        throw new Error(
-            `Unable to load ${filename}. HTTP ${response.status}`
-        );
-    }
-
-    return response.text();
-}
-
-
-/*
- * Simple CSV parser.
- */
-function parseCSV(csvText) {
-
-    const rows = [];
-    let row = [];
-    let cell = "";
-    let insideQuotes = false;
-
-    for (
-        let i = 0;
-        i < csvText.length;
-        i++
-    ) {
-
-        const character =
-            csvText[i];
-
-        const nextCharacter =
-            csvText[i + 1];
-
-        if (
-            character === '"' &&
-            insideQuotes &&
-            nextCharacter === '"'
-        ) {
-
-            cell += '"';
-            i++;
-
-            continue;
-        }
-
-        if (character === '"') {
-
-            insideQuotes =
-                !insideQuotes;
-
-            continue;
-        }
-
-        if (
-            character === "," &&
-            !insideQuotes
-        ) {
-
-            row.push(cell.trim());
-            cell = "";
-
-            continue;
-        }
-
-        if (
-            (
-                character === "\n" ||
-                character === "\r"
-            ) &&
-            !insideQuotes
-        ) {
-
-            if (
-                character === "\r" &&
-                nextCharacter === "\n"
-            ) {
-
-                i++;
-            }
-
-            row.push(cell.trim());
-
-            if (
-                row.some(
-                    value =>
-                        value !== ""
-                )
-            ) {
-
-                rows.push(row);
-            }
-
-            row = [];
-            cell = "";
-
-            continue;
-        }
-
-        cell += character;
-    }
-
-    if (
-        cell !== "" ||
-        row.length > 0
-    ) {
-
-        row.push(cell.trim());
-
-        if (
-            row.some(
-                value =>
-                    value !== ""
-            )
-        ) {
-
-            rows.push(row);
-        }
-    }
-
-    if (rows.length === 0) {
-        return [];
-    }
-
-    const headers =
-        rows[0];
-
-    return rows
-        .slice(1)
-        .map(values => {
-
-            const object = {};
-
-            headers.forEach(
-                (header, index) => {
-
-                    object[header] =
-                        values[index] ?? "";
-                }
-            );
-
-            return object;
         });
-}
-
-
-/* =========================================================
-   Dashboard Metrics
-   ========================================================= */
-
-async function loadDashboardMetrics() {
-
-    try {
-
-        const csv =
-            await loadCSV(
-                FILES.metrics
-            );
-
-        const rows =
-            parseCSV(csv);
-
-        rows.forEach(row => {
-
-            const metric =
-                normalizeText(
-                    row.metric
-                );
-
-            const value =
-                toNumber(
-                    row.value,
-                    null
-                );
-
-            if (
-                metric &&
-                value !== null
-            ) {
-
-                dashboardMetrics[
-                    metric
-                ] = value;
-            }
-        });
-
-    } catch (error) {
-
-        console.warn(
-            "Dashboard metrics could not be loaded:",
-            error
-        );
-    }
-
-
-    /*
-     * Reliable fallback values from
-     * the SupportIQ analytics.
-     */
-
-    if (
-        !Number.isFinite(
-            dashboardMetrics[
-                "total tickets"
-            ]
-        )
-    ) {
-
-        dashboardMetrics[
-            "total tickets"
-        ] = 8469;
-    }
-
-
-    if (
-        !Number.isFinite(
-            dashboardMetrics[
-                "average satisfaction"
-            ]
-        )
-    ) {
-
-        dashboardMetrics[
-            "average satisfaction"
-        ] = 2.99;
-    }
-
-
-    if (
-        !Number.isFinite(
-            dashboardMetrics[
-                "average resolution"
-            ]
-        )
-    ) {
-
-        dashboardMetrics[
-            "average resolution"
-        ] = 11.77;
-    }
-
-
-    if (
-        !Number.isFinite(
-            dashboardMetrics[
-                "customer segments"
-            ]
-        )
-    ) {
-
-        dashboardMetrics[
-            "customer segments"
-        ] = 6;
-    }
-}
-
-
-/*
- * Render the four main dashboard cards.
- */
-function renderDashboard() {
-
-    setElementText(
-        "total-tickets",
-        formatNumber(
-            dashboardMetrics[
-                "total tickets"
-            ]
-        )
-    );
-
-
-    setElementText(
-        "average-satisfaction",
-        formatDecimal(
-            dashboardMetrics[
-                "average satisfaction"
-            ],
-            2
-        ) + " / 5"
-    );
-
-
-    setElementText(
-        "average-resolution",
-        formatDecimal(
-            dashboardMetrics[
-                "average resolution"
-            ],
-            2
-        ) + " hrs"
-    );
-
-
-    setElementText(
-        "customer-segments",
-        formatNumber(
-            dashboardMetrics[
-                "customer segments"
-            ]
-        )
-    );
-}
-
-
-/* =========================================================
-   Ticket Data
-   ========================================================= */
-
-/*
- * IMPORTANT:
- *
- * ticket_data.json is located in the ROOT of GitHub Pages.
- *
- * Therefore we use:
- *
- *     fetch("ticket_data.json")
- *
- * and NOT:
- *
- *     fetch("data/ticket_data.json")
- */
-async function loadTicketData() {
-
-    try {
-
-        const response =
-            await fetch(
-                FILES.tickets,
-                {
-                    cache: "no-store"
-                }
-            );
-
 
         if (!response.ok) {
-
-            throw new Error(
-                `Unable to load ticket_data.json. HTTP ${response.status}`
-            );
+            throw new Error("Metrics file unavailable");
         }
 
+        const text = await response.text();
 
-        const text =
-            await response.text();
+        const lines = text
+            .trim()
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
 
+        const metrics = {};
 
-        /*
-         * ticket_data.json contains NaN values
-         * generated from pandas.
-         *
-         * JSON.parse() does not support NaN.
-         */
-        const safeText =
-            text
-                .replace(
-                    /\bNaN\b/g,
-                    "null"
-                )
-                .replace(
-                    /\bInfinity\b/g,
-                    "null"
-                )
-                .replace(
-                    /\b-Infinity\b/g,
-                    "null"
-                );
+        lines.slice(1).forEach(line => {
+            const parts = line.split(",");
 
+            if (parts.length < 2) {
+                return;
+            }
 
-        const data =
-            JSON.parse(
-                safeText
+            const key = parts[0]
+                .trim()
+                .toLowerCase();
+
+            const value = Number(
+                parts[1].trim()
             );
 
+            if (Number.isFinite(value)) {
+                metrics[key] = value;
+            }
+        });
 
-        if (!Array.isArray(data)) {
+        return {
+            totalTickets:
+                metrics["total tickets"] ??
+                metrics["total_tickets"] ??
+                fallbackMetrics.totalTickets,
 
-            throw new Error(
-                "ticket_data.json does not contain an array."
-            );
-        }
+            averageSatisfaction:
+                metrics["average satisfaction"] ??
+                metrics["average_satisfaction"] ??
+                fallbackMetrics.averageSatisfaction,
 
+            averageResolution:
+                metrics["average resolution"] ??
+                metrics["average_resolution"] ??
+                metrics["average resolution time"] ??
+                fallbackMetrics.averageResolution,
 
-        ticketData = data;
-
-
-        console.log(
-            `SupportIQ: loaded ${ticketData.length} tickets.`
-        );
-
-
-        /*
-         * Initialize filters after ticket data
-         * has successfully loaded.
-         */
-        initializeFilters();
-
-
-        updateFilteredDashboard();
-
+            customerSegments:
+                metrics["customer segments"] ??
+                metrics["customer_segments"] ??
+                fallbackMetrics.customerSegments
+        };
 
     } catch (error) {
-
-        console.error(
-            "Ticket data loading error:",
+        console.warn(
+            "Using fallback dashboard metrics:",
             error
         );
 
-
-        ticketData = [];
-
-
-        showDataError(
-            "Unable to load ticket-level data."
-        );
-
-
-        setElementText(
-            "filtered-ticket-count",
-            "Unavailable"
-        );
-
-
-        setElementText(
-            "filtered-average-satisfaction",
-            "Unavailable"
-        );
-
-
-        setElementText(
-            "filtered-average-resolution",
-            "See analytics"
-        );
-
-
-        const status =
-            document.getElementById(
-                "filter-result-status"
-            );
-
-
-        if (status) {
-
-            status.textContent =
-                "Unable to load ticket-level data.";
-        }
+        return fallbackMetrics;
     }
 }
 
 
 /* =========================================================
-   Segment Data
-   ========================================================= */
+   RENDER DASHBOARD METRICS
+========================================================= */
 
-async function loadSegmentData() {
+function renderMetrics(metrics) {
+    const totalTickets =
+        getElement("total-tickets");
 
-    try {
+    const averageSatisfaction =
+        getElement("average-satisfaction");
 
-        const data =
-            await loadJSON(
-                FILES.segments
+    const averageResolution =
+        getElement("average-resolution");
+
+    const customerSegments =
+        getElement("customer-segments");
+
+    if (totalTickets) {
+        totalTickets.textContent =
+            formatNumber(metrics.totalTickets);
+    }
+
+    if (averageSatisfaction) {
+        averageSatisfaction.textContent =
+            `${formatNumber(
+                metrics.averageSatisfaction,
+                2
+            )} / 5`;
+    }
+
+    if (averageResolution) {
+        averageResolution.textContent =
+            `${formatNumber(
+                metrics.averageResolution,
+                2
+            )} hrs`;
+    }
+
+    if (customerSegments) {
+        customerSegments.textContent =
+            formatNumber(
+                metrics.customerSegments
             );
-
-
-        if (
-            Array.isArray(data)
-        ) {
-
-            segmentData =
-                data;
-
-        } else {
-
-            segmentData =
-                data.segments || [];
-        }
-
-
-        renderSegments();
-
-
-    } catch (error) {
-
-        console.error(
-            "Segment data loading error:",
-            error
-        );
-
-
-        segmentData = [];
-
-
-        showDataError(
-            "Customer segment analytics could not be loaded."
-        );
     }
 }
 
 
-/*
- * Render the customer segmentation table.
- */
-function renderSegments() {
+/* =========================================================
+   LOAD CUSTOMER SEGMENTS
+========================================================= */
 
-    const container =
-        document.getElementById(
-            "segment-container"
+async function loadSegments() {
+    try {
+        return await loadJSON(
+            FILES.segments
         );
 
+    } catch (error) {
+        console.error(
+            "Segment data error:",
+            error
+        );
+
+        return {
+            segments: []
+        };
+    }
+}
+
+
+/* =========================================================
+   RENDER CUSTOMER SEGMENTS
+========================================================= */
+
+function renderSegments(data) {
+    const container =
+        getElement("segment-container");
 
     if (!container) {
         return;
     }
 
+    const segments = Array.isArray(data)
+        ? data
+        : data.segments || [];
 
-    if (
-        !segmentData.length
-    ) {
-
+    if (!segments.length) {
         container.innerHTML =
-            "<p>No segment data available.</p>";
+            "<p>Customer segmentation data unavailable.</p>";
 
         return;
     }
 
-
     let html = `
-        <div class="segment-table-wrapper">
-            <table class="segment-table">
+        <div class="table-responsive">
+            <table>
                 <thead>
                     <tr>
                         <th>Customer Segment</th>
@@ -804,76 +278,42 @@ function renderSegments() {
                 <tbody>
     `;
 
+    segments.forEach(segment => {
+        html += `
+            <tr>
+                <td>
+                    ${segment.segment ?? "N/A"}
+                </td>
 
-    segmentData.forEach(
-        segment => {
+                <td>
+                    ${formatNumber(
+                        segment.customers
+                    )}
+                </td>
 
-            const name =
-                segment.segment ||
-                segment.name ||
-                "Unknown";
+                <td>
+                    ${formatNumber(
+                        segment.avg_age,
+                        1
+                    )}
+                </td>
 
+                <td>
+                    ${formatNumber(
+                        segment.avg_satisfaction,
+                        2
+                    )}
+                </td>
 
-            const customers =
-                toNumber(
-                    segment.customers,
-                    0
-                );
-
-
-            const age =
-                toNumber(
-                    segment.avg_age,
-                    null
-                );
-
-
-            const satisfaction =
-                toNumber(
-                    segment.avg_satisfaction,
-                    null
-                );
-
-
-            const resolution =
-                toNumber(
-                    segment.avg_resolution_hours,
-                    null
-                );
-
-
-            html += `
-                <tr>
-                    <td>
-                        ${escapeHTML(name)}
-                    </td>
-
-                    <td>
-                        ${formatNumber(customers)}
-                    </td>
-
-                    <td>
-                        ${formatDecimal(age, 1)}
-                    </td>
-
-                    <td>
-                        ${formatDecimal(
-                            satisfaction,
-                            2
-                        )}
-                    </td>
-
-                    <td>
-                        ${formatDecimal(
-                            resolution,
-                            2
-                        )} hrs
-                    </td>
-                </tr>
-            `;
-        }
-    );
-
+                <td>
+                    ${formatNumber(
+                        segment.avg_resolution_hours,
+                        2
+                    )} hrs
+                </td>
+            </tr>
+        `;
+    });
 
     html += `
                 </tbody>
@@ -881,1444 +321,966 @@ function renderSegments() {
         </div>
     `;
 
-
-    container.innerHTML =
-        html;
+    container.innerHTML = html;
 }
 
 
 /* =========================================================
-   Satisfaction Data
-   ========================================================= */
+   LOAD SATISFACTION DATA
+========================================================= */
 
-async function loadSatisfactionData() {
-
+async function loadSatisfaction() {
     try {
-
-        const data =
-            await loadJSON(
-                FILES.satisfaction
-            );
-
-
-        satisfactionData =
-            data || {};
-
-
-        renderSatisfaction();
-
+        return await loadJSON(
+            FILES.satisfaction
+        );
 
     } catch (error) {
-
         console.error(
-            "Satisfaction data loading error:",
+            "Satisfaction data error:",
             error
         );
 
-
-        satisfactionData = {};
-
-
-        showDataError(
-            "Satisfaction analytics could not be loaded."
-        );
+        return fallbackSatisfaction;
     }
 }
 
 
-/*
- * Render satisfaction metrics.
- */
-function renderSatisfaction() {
+/* =========================================================
+   RENDER SATISFACTION
+========================================================= */
 
+function renderSatisfaction(data) {
     const low =
-        toNumber(
-            satisfactionData[
-                "low_satisfaction_tickets"
-            ],
-            1102
-        );
-
+        getElement("low-satisfaction");
 
     const satisfied =
-        toNumber(
-            satisfactionData[
-                "satisfied_tickets"
-            ],
-            1667
-        );
+        getElement("satisfied-customers");
 
-
-    const lowRate =
-        toNumber(
-            satisfactionData[
-                "low_satisfaction_percentage"
-            ],
-            39.8
-        );
-
+    const rate =
+        getElement("low-satisfaction-rate");
 
     const accuracy =
-        toNumber(
-            satisfactionData[
-                "model_accuracy"
-            ],
-            59.75
-        );
+        getElement("model-accuracy");
 
+    if (low) {
+        low.textContent =
+            formatNumber(
+                data.low_satisfaction_tickets
+            );
+    }
 
-    setElementText(
-        "low-satisfaction",
-        formatNumber(low)
-    );
+    if (satisfied) {
+        satisfied.textContent =
+            formatNumber(
+                data.satisfied_tickets
+            );
+    }
 
+    if (rate) {
+        rate.textContent =
+            `${formatNumber(
+                data.low_satisfaction_percentage,
+                1
+            )}%`;
+    }
 
-    setElementText(
-        "satisfied-customers",
-        formatNumber(satisfied)
-    );
-
-
-    setElementText(
-        "low-satisfaction-rate",
-        formatDecimal(
-            lowRate,
-            1
-        ) + "%"
-    );
-
-
-    setElementText(
-        "model-accuracy",
-        formatDecimal(
-            accuracy,
-            2
-        ) + "%"
-    );
+    if (accuracy) {
+        accuracy.textContent =
+            `${formatNumber(
+                data.model_accuracy,
+                2
+            )}%`;
+    }
 }
 
 
 /* =========================================================
-   Resolution Data
-   ========================================================= */
+   LOAD TICKET DATA
+========================================================= */
 
-async function loadResolutionData() {
-
+async function loadTicketData() {
     try {
+        /*
+         * IMPORTANT:
+         * ticket_data.json is in the repository ROOT.
+         *
+         * Correct:
+         *     ticket_data.json
+         *
+         * NOT:
+         *     data/ticket_data.json
+         */
 
-        const priorityData =
-            await loadJSON(
-                FILES.priorityResolution
+        const response = await fetch(
+            FILES.tickets,
+            {
+                cache: "no-store"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load ticket_data.json: HTTP ${response.status}`
             );
+        }
 
+        const text =
+            await response.text();
 
-        const typeData =
-            await loadJSON(
-                FILES.typeResolution
+        const cleanedText =
+            cleanJSONText(text);
+
+        ticketData =
+            JSON.parse(cleanedText);
+
+        if (!Array.isArray(ticketData)) {
+            throw new Error(
+                "ticket_data.json must contain an array."
             );
+        }
 
+        console.log(
+            `Loaded ${ticketData.length} tickets.`
+        );
 
-        const channelData =
-            await loadJSON(
-                FILES.channelResolution
-            );
+        initializeFilters();
+        updateFilteredDashboard();
 
-
-        resolutionByPriority =
-            priorityData.data || [];
-
-
-        resolutionByType =
-            typeData.data || [];
-
-
-        resolutionByChannel =
-            channelData.data || [];
-
-
-        renderResolutionCharts();
-
+        return ticketData;
 
     } catch (error) {
-
         console.error(
-            "Resolution analytics loading error:",
+            "Ticket data error:",
             error
         );
 
+        ticketData = [];
 
-        resolutionByPriority = [];
-        resolutionByType = [];
-        resolutionByChannel = [];
+        const status =
+            getElement(
+                "filter-result-status"
+            );
 
+        if (status) {
+            status.textContent =
+                "Ticket-level data could not be loaded.";
+        }
 
-        showDataError(
-            "Resolution analytics could not be loaded."
-        );
+        return [];
     }
 }
 
 
 /* =========================================================
-   Resolution Conversion
-   ========================================================= */
+   GET TICKET VALUE
+========================================================= */
 
-/*
- * Convert a resolution value to hours.
- *
- * This is intentionally defensive.
- *
- * If ticket-level resolution is missing,
- * the function returns null.
- */
-function getResolutionHours(value) {
+function getTicketValue(
+    ticket,
+    possibleNames
+) {
+    for (const name of possibleNames) {
+        if (
+            Object.prototype.hasOwnProperty.call(
+                ticket,
+                name
+            )
+        ) {
+            const value =
+                ticket[name];
 
-    if (
-        value === null ||
-        value === undefined ||
-        value === "" ||
-        value === "NaN" ||
-        value === "null"
-    ) {
-
-        return null;
+            if (
+                value !== null &&
+                value !== undefined
+            ) {
+                return value;
+            }
+        }
     }
 
-
-    /*
-     * Already numeric.
-     */
-    if (
-        typeof value === "number"
-    ) {
-
-        return Number.isFinite(value)
-            ? value
-            : null;
-    }
-
-
-    const text =
-        String(value).trim();
-
-
-    if (
-        !text ||
-        text.toLowerCase() === "nan"
-    ) {
-
-        return null;
-    }
-
-
-    /*
-     * Numeric string.
-     */
-    const numeric =
-        Number(text);
-
-
-    if (
-        Number.isFinite(numeric)
-    ) {
-
-        return numeric;
-    }
-
-
-    /*
-     * Pandas timedelta format:
-     *
-     * 0 days 11:45:00
-     */
-    let match =
-        text.match(
-            /^(-?\d+)\s+days?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-        );
-
-
-    if (match) {
-
-        const days =
-            Number(match[1]);
-
-        const hours =
-            Number(match[2]);
-
-        const minutes =
-            Number(match[3]);
-
-        const seconds =
-            Number(match[4] || 0);
-
-
-        return (
-            days * 24 +
-            hours +
-            minutes / 60 +
-            seconds / 3600
-        );
-    }
-
-
-    /*
-     * HH:MM:SS
-     */
-    match =
-        text.match(
-            /^(\d{1,3}):(\d{2}):(\d{2})$/
-        );
-
-
-    if (match) {
-
-        const hours =
-            Number(match[1]);
-
-        const minutes =
-            Number(match[2]);
-
-        const seconds =
-            Number(match[3]);
-
-
-        return (
-            hours +
-            minutes / 60 +
-            seconds / 3600
-        );
-    }
-
-
-    /*
-     * HH:MM
-     */
-    match =
-        text.match(
-            /^(\d{1,3}):(\d{2})$/
-        );
-
-
-    if (match) {
-
-        const hours =
-            Number(match[1]);
-
-        const minutes =
-            Number(match[2]);
-
-
-        return (
-            hours +
-            minutes / 60
-        );
-    }
-
-
-    /*
-     * Example:
-     *
-     * 11.77 hours
-     */
-    match =
-        text.match(
-            /(-?\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/i
-        );
-
-
-    if (match) {
-
-        return Number(
-            match[1]
-        );
-    }
-
-
-    /*
-     * ISO duration:
-     *
-     * PT11H30M
-     */
-    match =
-        text.match(
-            /^P(?:\d+D)?T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/i
-        );
-
-
-    if (match) {
-
-        const hours =
-            Number(match[1] || 0);
-
-        const minutes =
-            Number(match[2] || 0);
-
-        const seconds =
-            Number(match[3] || 0);
-
-
-        return (
-            hours +
-            minutes / 60 +
-            seconds / 3600
-        );
-    }
-
-
-    return null;
+    return "";
 }
 
 
 /* =========================================================
-   Filters
-   ========================================================= */
+   INFER CUSTOMER SEGMENT
+========================================================= */
 
-function initializeFilters() {
+function inferSegment(ticket) {
+    const ageValue =
+        Number(
+            getTicketValue(
+                ticket,
+                [
+                    "Customer Age",
+                    "customer_age"
+                ]
+            )
+        );
 
-    if (
-        !ticketData.length
-    ) {
+    const satisfactionValue =
+        Number(
+            getTicketValue(
+                ticket,
+                [
+                    "Customer Satisfaction Rating",
+                    "customer_satisfaction_rating"
+                ]
+            )
+        );
 
+    const age =
+        Number.isFinite(ageValue)
+            ? ageValue
+            : 30;
+
+    const satisfaction =
+        Number.isFinite(
+            satisfactionValue
+        )
+            ? satisfactionValue
+            : 3;
+
+    let ageGroup;
+
+    if (age < 40) {
+        ageGroup = "Young";
+    } else if (age < 55) {
+        ageGroup = "Middle Age";
+    } else {
+        ageGroup = "Older";
+    }
+
+    if (satisfaction <= 2) {
+        return `${ageGroup} - At Risk and Fast`;
+    }
+
+    if (satisfaction >= 4) {
+        return `${ageGroup} - Highly Satisfied and Fast`;
+    }
+
+    return `${ageGroup} - Satisfied but Slow`;
+}
+
+
+/* =========================================================
+   POPULATE SELECT
+========================================================= */
+
+function populateSelect(
+    select,
+    defaultText,
+    values
+) {
+    if (!select) {
         return;
     }
 
+    select.innerHTML = "";
+
+    const defaultOption =
+        document.createElement(
+            "option"
+        );
+
+    defaultOption.value = "";
+    defaultOption.textContent =
+        defaultText;
+
+    select.appendChild(
+        defaultOption
+    );
+
+    values.forEach(value => {
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value = value;
+        option.textContent = value;
+
+        select.appendChild(
+            option
+        );
+    });
+}
+
+
+/* =========================================================
+   INITIALIZE FILTERS
+========================================================= */
+
+function initializeFilters() {
+    if (!ticketData.length) {
+        return;
+    }
 
     const priorityFilter =
-        document.getElementById(
+        getElement(
             "priority-filter"
         );
 
-
     const typeFilter =
-        document.getElementById(
+        getElement(
             "type-filter"
         );
 
-
     const channelFilter =
-        document.getElementById(
+        getElement(
             "channel-filter"
         );
 
-
     const segmentFilter =
-        document.getElementById(
+        getElement(
             "segment-filter-main"
         );
 
+    const priorities =
+        new Set();
 
-    if (
-        !priorityFilter ||
-        !typeFilter ||
-        !channelFilter ||
-        !segmentFilter
-    ) {
+    const types =
+        new Set();
 
-        console.warn(
-            "One or more filter elements are missing from index.html."
-        );
+    const channels =
+        new Set();
 
-        return;
-    }
+    ticketData.forEach(ticket => {
+        const priority =
+            getTicketValue(
+                ticket,
+                [
+                    "Ticket Priority",
+                    "ticket_priority"
+                ]
+            );
 
+        const type =
+            getTicketValue(
+                ticket,
+                [
+                    "Ticket Type",
+                    "ticket_type"
+                ]
+            );
 
-    /*
-     * Build filters only once.
-     */
-    if (
-        filtersReady
-    ) {
+        const channel =
+            getTicketValue(
+                ticket,
+                [
+                    "Ticket Channel",
+                    "ticket_channel"
+                ]
+            );
 
-        return;
-    }
+        if (priority) {
+            priorities.add(priority);
+        }
 
+        if (type) {
+            types.add(type);
+        }
 
-    populateFilter(
+        if (channel) {
+            channels.add(channel);
+        }
+    });
+
+    populateSelect(
         priorityFilter,
-        getUniqueValues(
-            ticketData,
-            "Ticket Priority"
-        ),
-        "All Priorities"
+        "All Priorities",
+        [...priorities].sort()
     );
 
-
-    populateFilter(
+    populateSelect(
         typeFilter,
-        getUniqueValues(
-            ticketData,
-            "Ticket Type"
-        ),
-        "All Ticket Types"
+        "All Ticket Types",
+        [...types].sort()
     );
 
-
-    populateFilter(
+    populateSelect(
         channelFilter,
-        getUniqueValues(
-            ticketData,
-            "Ticket Channel"
-        ),
-        "All Channels"
+        "All Channels",
+        [...channels].sort()
     );
 
+    const officialSegments = [
+        "Middle Age - Highly Satisfied and Fast",
+        "Older - At Risk and Fast",
+        "Older - At Risk and Slow",
+        "Older - Satisfied but Slow",
+        "Young - At Risk and Fast",
+        "Young - Satisfied but Slow"
+    ];
 
-    populateSegmentFilter(
+    populateSelect(
+        segmentFilter,
+        "All Segments",
+        officialSegments
+    );
+
+    [
+        priorityFilter,
+        typeFilter,
+        channelFilter,
         segmentFilter
-    );
-
-
-    priorityFilter.addEventListener(
-        "change",
-        updateFilteredDashboard
-    );
-
-
-    typeFilter.addEventListener(
-        "change",
-        updateFilteredDashboard
-    );
-
-
-    channelFilter.addEventListener(
-        "change",
-        updateFilteredDashboard
-    );
-
-
-    segmentFilter.addEventListener(
-        "change",
-        updateFilteredDashboard
-    );
-
+    ].forEach(filter => {
+        if (filter) {
+            filter.addEventListener(
+                "change",
+                updateFilteredDashboard
+            );
+        }
+    });
 
     const resetButton =
-        document.getElementById(
+        getElement(
             "reset-filters"
         );
 
-
     if (resetButton) {
-
         resetButton.addEventListener(
             "click",
             resetFilters
         );
     }
-
-
-    filtersReady = true;
-}
-
-
-/*
- * Populate a normal select filter.
- */
-function populateFilter(
-    select,
-    values,
-    defaultLabel
-) {
-
-    select.innerHTML = "";
-
-
-    const defaultOption =
-        document.createElement(
-            "option"
-        );
-
-
-    defaultOption.value = "";
-    defaultOption.textContent =
-        defaultLabel;
-
-
-    select.appendChild(
-        defaultOption
-    );
-
-
-    const sortedValues =
-        [...values].sort(
-            (a, b) =>
-                String(a).localeCompare(
-                    String(b)
-                )
-        );
-
-
-    sortedValues.forEach(
-        value => {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                value;
-
-
-            option.textContent =
-                titleCase(value);
-
-
-            select.appendChild(
-                option
-            );
-        }
-    );
-}
-
-
-/*
- * Populate customer segment filter.
- */
-function populateSegmentFilter(
-    select
-) {
-
-    select.innerHTML = "";
-
-
-    const defaultOption =
-        document.createElement(
-            "option"
-        );
-
-
-    defaultOption.value = "";
-    defaultOption.textContent =
-        "All Segments";
-
-
-    select.appendChild(
-        defaultOption
-    );
-
-
-    segmentData.forEach(
-        segment => {
-
-            const name =
-                segment.segment ||
-                segment.name;
-
-
-            if (!name) {
-                return;
-            }
-
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                name;
-
-
-            option.textContent =
-                name;
-
-
-            select.appendChild(
-                option
-            );
-        }
-    );
-}
-
-
-/*
- * Get unique values from a ticket field.
- */
-function getUniqueValues(
-    data,
-    field
-) {
-
-    const values =
-        new Set();
-
-
-    data.forEach(
-        ticket => {
-
-            const value =
-                ticket[field];
-
-
-            if (
-                value !== null &&
-                value !== undefined &&
-                String(value).trim() !== ""
-            ) {
-
-                values.add(
-                    String(value).trim()
-                );
-            }
-        }
-    );
-
-
-    return [...values];
 }
 
 
 /* =========================================================
-   Customer Segment Classification
-   ========================================================= */
-
-/*
- * ticket_data.json does not contain the original
- * K-Means cluster label.
- *
- * Therefore this function provides a rule-based
- * ticket-level segment for interactive filtering.
- *
- * The six official K-Means results shown in the
- * segmentation table remain unchanged.
- */
-function inferSegment(ticket) {
-
-    const age =
-        toNumber(
-            ticket["Customer Age"],
-            null
-        );
-
-
-    const satisfaction =
-        toNumber(
-            ticket[
-                "Customer Satisfaction Rating"
-            ],
-            null
-        );
-
-
-    const resolution =
-        getResolutionHours(
-            ticket[
-                "Time to Resolution"
-            ]
-        );
-
-
-    if (
-        age === null &&
-        satisfaction === null
-    ) {
-
-        return "";
-    }
-
-
-    /*
-     * Customer age groups.
-     */
-    let ageGroup =
-        "Middle Age";
-
-
-    if (
-        age !== null
-    ) {
-
-        if (
-            age < 35
-        ) {
-
-            ageGroup =
-                "Young";
-
-        } else if (
-            age >= 50
-        ) {
-
-            ageGroup =
-                "Older";
-        }
-    }
-
-
-    /*
-     * Satisfaction categories.
-     */
-    const atRisk =
-        satisfaction !== null &&
-        satisfaction <= 2;
-
-
-    const highlySatisfied =
-        satisfaction !== null &&
-        satisfaction >= 4;
-
-
-    /*
-     * Since ticket-level Time to Resolution
-     * is missing in the current JSON, do not
-     * invent a speed category.
-     *
-     * Use the closest available category.
-     */
-    if (
-        resolution === null
-    ) {
-
-        if (
-            atRisk
-        ) {
-
-            return (
-                ageGroup +
-                " - At Risk and Fast"
-            );
-        }
-
-
-        if (
-            highlySatisfied
-        ) {
-
-            return (
-                ageGroup +
-                " - Satisfied but Slow"
-            );
-        }
-
-
-        return "";
-    }
-
-
-    const fast =
-        resolution < 10;
-
-
-    if (
-        atRisk &&
-        fast
-    ) {
-
-        return (
-            ageGroup +
-            " - At Risk and Fast"
-        );
-    }
-
-
-    if (
-        atRisk &&
-        !fast
-    ) {
-
-        return (
-            ageGroup +
-            " - At Risk and Slow"
-        );
-    }
-
-
-    if (
-        highlySatisfied &&
-        fast
-    ) {
-
-        return (
-            ageGroup +
-            " - Highly Satisfied and Fast"
-        );
-    }
-
-
-    if (
-        highlySatisfied &&
-        !fast
-    ) {
-
-        return (
-            ageGroup +
-            " - Satisfied but Slow"
-        );
-    }
-
-
-    return fast
-        ? ageGroup +
-          " - At Risk and Fast"
-        : ageGroup +
-          " - Satisfied but Slow";
-}
-
-
-/* =========================================================
-   Get Current Filter Values
-   ========================================================= */
-
-function getFilterValue(id) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
-        return "";
-    }
-
-
-    return element.value || "";
-}
-
-
-/* =========================================================
-   Filter Tickets
-   ========================================================= */
+   GET FILTERED TICKETS
+========================================================= */
 
 function getFilteredTickets() {
-
-    if (
-        !ticketData.length
-    ) {
-
+    if (!ticketData.length) {
         return [];
     }
 
-
     const priority =
-        getFilterValue(
+        getElement(
             "priority-filter"
-        );
-
+        )?.value || "";
 
     const type =
-        getFilterValue(
+        getElement(
             "type-filter"
-        );
-
+        )?.value || "";
 
     const channel =
-        getFilterValue(
+        getElement(
             "channel-filter"
-        );
-
+        )?.value || "";
 
     const segment =
-        getFilterValue(
+        getElement(
             "segment-filter-main"
-        );
-
+        )?.value || "";
 
     return ticketData.filter(
         ticket => {
-
             const ticketPriority =
-                String(
-                    ticket[
-                        "Ticket Priority"
-                    ] || ""
-                ).trim();
-
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Priority",
+                        "ticket_priority"
+                    ]
+                );
 
             const ticketType =
-                String(
-                    ticket[
-                        "Ticket Type"
-                    ] || ""
-                ).trim();
-
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Type",
+                        "ticket_type"
+                    ]
+                );
 
             const ticketChannel =
-                String(
-                    ticket[
-                        "Ticket Channel"
-                    ] || ""
-                ).trim();
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Channel",
+                        "ticket_channel"
+                    ]
+                );
 
+            const ticketSegment =
+                inferSegment(ticket);
 
-            /*
-             * Priority filter.
-             */
-            if (
-                priority &&
-                normalizeText(
+            const priorityMatch =
+                !priority ||
+                normalize(
                     ticketPriority
-                ) !==
-                normalizeText(
-                    priority
-                )
-            ) {
+                ) ===
+                normalize(priority);
 
-                return false;
-            }
-
-
-            /*
-             * Ticket type filter.
-             */
-            if (
-                type &&
-                normalizeText(
+            const typeMatch =
+                !type ||
+                normalize(
                     ticketType
-                ) !==
-                normalizeText(
-                    type
-                )
-            ) {
+                ) ===
+                normalize(type);
 
-                return false;
-            }
-
-
-            /*
-             * Channel filter.
-             */
-            if (
-                channel &&
-                normalizeText(
+            const channelMatch =
+                !channel ||
+                normalize(
                     ticketChannel
-                ) !==
-                normalizeText(
-                    channel
-                )
-            ) {
+                ) ===
+                normalize(channel);
 
-                return false;
-            }
+            const segmentMatch =
+                !segment ||
+                normalize(
+                    ticketSegment
+                ) ===
+                normalize(segment);
 
-
-            /*
-             * Segment filter.
-             */
-            if (
-                segment
-            ) {
-
-                const inferredSegment =
-                    inferSegment(ticket);
-
-
-                if (
-                    inferredSegment !==
-                    segment
-                ) {
-
-                    return false;
-                }
-            }
-
-
-            return true;
+            return (
+                priorityMatch &&
+                typeMatch &&
+                channelMatch &&
+                segmentMatch
+            );
         }
     );
 }
 
 
 /* =========================================================
-   Update Filtered Dashboard
-   ========================================================= */
+   UPDATE FILTERED DASHBOARD
+========================================================= */
 
 function updateFilteredDashboard() {
-
     const filteredTickets =
         getFilteredTickets();
 
-
-    updateFilteredStats(
-        filteredTickets
-    );
-
-
-    updateFilterStatus(
-        filteredTickets
-    );
-}
-
-
-/* =========================================================
-   Filtered Statistics
-   ========================================================= */
-
-function updateFilteredStats(
-    filteredTickets
-) {
-
-    const ticketCount =
-        filteredTickets.length;
-
-
-    /*
-     * Satisfaction values are available
-     * at ticket level for the valid records.
-     */
-    const satisfactionValues =
-        filteredTickets
-            .map(
-                ticket =>
-                    toNumber(
-                        ticket[
-                            "Customer Satisfaction Rating"
-                        ],
-                        null
-                    )
-            )
-            .filter(
-                value =>
-                    value !== null
-            );
-
-
-    const avgSatisfaction =
-        average(
-            satisfactionValues
+    const countElement =
+        getElement(
+            "filtered-ticket-count"
         );
 
-
-    /*
-     * Time to Resolution in the uploaded
-     * ticket-level JSON is NaN.
-     *
-     * Therefore this calculation will only
-     * happen if valid values actually exist.
-     */
-    const resolutionValues =
-        filteredTickets
-            .map(
-                ticket =>
-                    getResolutionHours(
-                        ticket[
-                            "Time to Resolution"
-                        ]
-                    )
-            )
-            .filter(
-                value =>
-                    value !== null
-            );
-
-
-    const avgResolution =
-        average(
-            resolutionValues
+    const satisfactionElement =
+        getElement(
+            "filtered-average-satisfaction"
         );
 
-
-    /*
-     * Filtered ticket count.
-     */
-    setElementText(
-        "filtered-ticket-count",
-        formatNumber(
-            ticketCount
-        )
-    );
-
-
-    /*
-     * Filtered satisfaction.
-     */
-    setElementText(
-        "filtered-average-satisfaction",
-        avgSatisfaction === null
-            ? "N/A"
-            : (
-                formatDecimal(
-                    avgSatisfaction,
-                    2
-                ) +
-                " / 5"
-            )
-    );
-
-
-    /*
-     * Filtered resolution.
-     *
-     * We cannot calculate this from the
-     * current ticket-level JSON because
-     * Time to Resolution is missing.
-     */
     const resolutionElement =
-        document.getElementById(
+        getElement(
             "filtered-average-resolution"
         );
 
+    const statusElement =
+        getElement(
+            "filter-result-status"
+        );
 
-    if (
-        resolutionElement
-    ) {
+    const filteredStats =
+        getElement(
+            "filtered-stats"
+        );
 
-        if (
-            avgResolution === null
-        ) {
+    if (!ticketData.length) {
+        if (countElement) {
+            countElement.textContent =
+                "0";
+        }
 
+        if (satisfactionElement) {
+            satisfactionElement.textContent =
+                "N/A";
+        }
+
+        if (resolutionElement) {
             resolutionElement.textContent =
                 "See analytics";
+        }
+
+        if (statusElement) {
+            statusElement.textContent =
+                "Loading ticket data...";
+        }
+
+        return;
+    }
+
+    if (filteredStats) {
+        filteredStats.style.display =
+            "block";
+    }
+
+    if (countElement) {
+        countElement.textContent =
+            formatNumber(
+                filteredTickets.length
+            );
+    }
+
+    const satisfactionValues =
+        filteredTickets
+            .map(ticket =>
+                Number(
+                    getTicketValue(
+                        ticket,
+                        [
+                            "Customer Satisfaction Rating",
+                            "customer_satisfaction_rating"
+                        ]
+                    )
+                )
+            )
+            .filter(
+                value =>
+                    Number.isFinite(value)
+            );
+
+    if (satisfactionElement) {
+        if (satisfactionValues.length) {
+            const average =
+                satisfactionValues.reduce(
+                    (sum, value) =>
+                        sum + value,
+                    0
+                ) /
+                satisfactionValues.length;
+
+            satisfactionElement.textContent =
+                `${formatNumber(
+                    average,
+                    2
+                )} / 5`;
 
         } else {
+            satisfactionElement.textContent =
+                "N/A";
+        }
+    }
 
-            resolutionElement.textContent =
-                formatDecimal(
-                    avgResolution,
-                    2
-                ) + " hrs";
+    /*
+     * ticket_data.json contains NaN/null values
+     * for Time to Resolution.
+     *
+     * Therefore we intentionally do not calculate
+     * filtered resolution from ticket_data.json.
+     *
+     * Resolution Analytics uses the dedicated
+     * aggregate JSON files below.
+     */
+
+    if (resolutionElement) {
+        resolutionElement.textContent =
+            "See analytics";
+    }
+
+    if (statusElement) {
+        const total =
+            ticketData.length;
+
+        const count =
+            filteredTickets.length;
+
+        if (count === total) {
+            statusElement.textContent =
+                `Showing all ${formatNumber(
+                    total
+                )} tickets.`;
+        } else {
+            statusElement.textContent =
+                `Showing ${formatNumber(
+                    count
+                )} of ${formatNumber(
+                    total
+                )} tickets.`;
         }
     }
 }
 
 
 /* =========================================================
-   Filter Status
-   ========================================================= */
-
-function updateFilterStatus(
-    filteredTickets
-) {
-
-    const status =
-        document.getElementById(
-            "filter-result-status"
-        );
-
-
-    if (!status) {
-        return;
-    }
-
-
-    const priority =
-        getFilterValue(
-            "priority-filter"
-        );
-
-
-    const type =
-        getFilterValue(
-            "type-filter"
-        );
-
-
-    const channel =
-        getFilterValue(
-            "channel-filter"
-        );
-
-
-    const segment =
-        getFilterValue(
-            "segment-filter-main"
-        );
-
-
-    const hasFilter =
-        Boolean(
-            priority ||
-            type ||
-            channel ||
-            segment
-        );
-
-
-    if (
-        !hasFilter
-    ) {
-
-        status.textContent =
-            `Showing all ${formatNumber(
-                ticketData.length
-            )} tickets.`;
-
-        return;
-    }
-
-
-    status.textContent =
-        `Showing ${formatNumber(
-            filteredTickets.length
-        )} of ${formatNumber(
-            ticketData.length
-        )} tickets.`;
-}
-
-
-/* =========================================================
-   Reset Filters
-   ========================================================= */
+   RESET FILTERS
+========================================================= */
 
 function resetFilters() {
-
-    const filterIds = [
+    const filters = [
         "priority-filter",
         "type-filter",
         "channel-filter",
         "segment-filter-main"
     ];
 
+    filters.forEach(id => {
+        const element =
+            getElement(id);
 
-    filterIds.forEach(
-        id => {
-
-            const element =
-                document.getElementById(id);
-
-
-            if (element) {
-
-                element.value = "";
-            }
+        if (element) {
+            element.value = "";
         }
-    );
-
+    });
 
     updateFilteredDashboard();
 }
 
 
 /* =========================================================
-   Resolution Charts
-   ========================================================= */
+   LOAD RESOLUTION ANALYTICS
+========================================================= */
 
-function renderResolutionCharts() {
+async function loadResolutionData() {
+    /*
+     * IMPORTANT:
+     *
+     * These are three DIFFERENT files.
+     *
+     * 1. resolution_by_priority.json
+     * 2. resolution_by_type.json
+     * 3. resolution_by_channel.json
+     *
+     * They are all inside the data/ folder.
+     */
+
+    const results =
+        await Promise.allSettled([
+            loadJSON(
+                FILES.resolutionPriority
+            ),
+
+            loadJSON(
+                FILES.resolutionType
+            ),
+
+            loadJSON(
+                FILES.resolutionChannel
+            )
+        ]);
 
     if (
-        typeof Chart === "undefined"
+        results[0].status ===
+        "rejected"
     ) {
-
-        console.warn(
-            "Chart.js is not available."
+        console.error(
+            "Priority resolution file failed:",
+            results[0].reason
         );
-
-        return;
     }
 
+    if (
+        results[1].status ===
+        "rejected"
+    ) {
+        console.error(
+            "Ticket type resolution file failed:",
+            results[1].reason
+        );
+    }
 
-    /*
-     * Resolution by priority.
-     */
-    createResolutionChart(
-        "priority-chart",
+    if (
+        results[2].status ===
+        "rejected"
+    ) {
+        console.error(
+            "Channel resolution file failed:",
+            results[2].reason
+        );
+    }
 
-        "Average Resolution Time by Priority",
+    return {
+        priority:
+            results[0].status ===
+            "fulfilled"
+                ? results[0].value
+                : null,
 
-        resolutionByPriority.map(
-            item =>
-                item.priority
-        ),
+        type:
+            results[1].status ===
+            "fulfilled"
+                ? results[1].value
+                : null,
 
-        resolutionByPriority.map(
-            item =>
-                toNumber(
-                    item.average_resolution_hours,
-                    0
-                )
-        )
-    );
-
-
-    /*
-     * Resolution by ticket type.
-     */
-    createResolutionChart(
-        "type-chart",
-
-        "Average Resolution Time by Ticket Type",
-
-        resolutionByType.map(
-            item =>
-                item.ticket_type
-        ),
-
-        resolutionByType.map(
-            item =>
-                toNumber(
-                    item.average_resolution_hours,
-                    0
-                )
-        )
-    );
-
-
-    /*
-     * Resolution by support channel.
-     */
-    createResolutionChart(
-        "channel-chart",
-
-        "Average Resolution Time by Support Channel",
-
-        resolutionByChannel.map(
-            item =>
-                item.channel
-        ),
-
-        resolutionByChannel.map(
-            item =>
-                toNumber(
-                    item.average_resolution_hours,
-                    0
-                )
-        )
-    );
+        channel:
+            results[2].status ===
+            "fulfilled"
+                ? results[2].value
+                : null
+    };
 }
 
 
-/*
- * Create or replace a Chart.js chart.
- */
-function createResolutionChart(
-    elementId,
-    title,
-    labels,
-    values
-) {
+/* =========================================================
+   EXTRACT DATA ARRAY
+========================================================= */
 
-    const canvas =
-        document.getElementById(
-            elementId
+function extractResolutionRows(data) {
+    if (!data) {
+        return [];
+    }
+
+    /*
+     * Supports:
+     *
+     * [
+     *   {...},
+     *   {...}
+     * ]
+     *
+     * and:
+     *
+     * {
+     *   "data": [
+     *      {...}
+     *   ]
+     * }
+     */
+
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+    if (Array.isArray(data.data)) {
+        return data.data;
+    }
+
+    return [];
+}
+
+
+/* =========================================================
+   VALIDATE CHART VALUES
+========================================================= */
+
+function validResolutionValue(value) {
+    const number =
+        Number(value);
+
+    return Number.isFinite(
+        number
+    )
+        ? number
+        : null;
+}
+
+
+/* =========================================================
+   DESTROY OLD CHART
+========================================================= */
+
+function destroyChart(chartKey) {
+    if (charts[chartKey]) {
+        charts[chartKey].destroy();
+        charts[chartKey] = null;
+    }
+}
+
+
+/* =========================================================
+   CREATE RESOLUTION CHART
+========================================================= */
+
+function createResolutionChart(
+    containerId,
+    chartKey,
+    labels,
+    values,
+    title
+) {
+    const container =
+        getElement(containerId);
+
+    if (!container) {
+        console.error(
+            `Chart container not found: ${containerId}`
         );
 
-
-    if (!canvas) {
         return;
     }
 
+    /*
+     * Destroy any previous Chart.js instance.
+     */
+
+    destroyChart(chartKey);
 
     /*
-     * Destroy an existing chart
-     * before creating a new one.
+     * Remove "Loading data..."
+     * and create a fresh canvas.
      */
-    if (
-        charts[elementId]
-    ) {
 
-        charts[
-            elementId
-        ].destroy();
+    container.innerHTML = "";
+
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
+
+    canvas.setAttribute(
+        "role",
+        "img"
+    );
+
+    canvas.setAttribute(
+        "aria-label",
+        title
+    );
+
+    container.appendChild(
+        canvas
+    );
+
+    /*
+     * Check Chart.js.
+     */
+
+    if (
+        typeof Chart ===
+        "undefined"
+    ) {
+        console.error(
+            "Chart.js is not loaded."
+        );
+
+        container.innerHTML = `
+            <div class="chart-error">
+                Chart.js could not be loaded.
+            </div>
+        `;
+
+        return;
     }
 
+    /*
+     * Validate data.
+     */
 
-    charts[
-        elementId
-    ] =
+    if (
+        !labels.length ||
+        !values.length
+    ) {
+        container.innerHTML = `
+            <div class="chart-error">
+                No resolution data available.
+            </div>
+        `;
+
+        return;
+    }
+
+    /*
+     * Create Chart.js bar chart.
+     */
+
+    charts[chartKey] =
         new Chart(
             canvas,
             {
                 type: "bar",
 
                 data: {
-
                     labels: labels,
 
                     datasets: [
                         {
                             label:
-                                "Average Resolution Time (hours)",
+                                "Average Resolution Time (hrs)",
 
                             data: values,
 
@@ -2327,44 +1289,39 @@ function createResolutionChart(
                     ]
                 },
 
-
                 options: {
-
                     responsive: true,
 
+                    /*
+                     * The CSS .chart-wrapper provides
+                     * the chart height.
+                     */
                     maintainAspectRatio: false,
 
+                    animation: {
+                        duration: 500
+                    },
 
                     plugins: {
-
                         legend: {
-                            display: true
+                            display: false
                         },
 
-
                         title: {
-
                             display: true,
 
                             text: title
                         },
 
-
                         tooltip: {
-
                             callbacks: {
-
                                 label:
-                                    function(context) {
-
-                                        const value =
-                                            context.parsed.y;
-
-
+                                    function (
+                                        context
+                                    ) {
                                         return (
                                             " " +
-                                            formatDecimal(
-                                                value,
+                                            context.parsed.y.toFixed(
                                                 2
                                             ) +
                                             " hrs"
@@ -2374,27 +1331,24 @@ function createResolutionChart(
                         }
                     },
 
-
                     scales: {
-
                         y: {
-
                             beginAtZero: true,
 
                             title: {
-
                                 display: true,
 
-                                text: "Hours"
+                                text:
+                                    "Average Resolution Time (hrs)"
                             }
                         },
 
-
                         x: {
+                            title: {
+                                display: true,
 
-                            ticks: {
-
-                                autoSkip: false
+                                text:
+                                    "Category"
                             }
                         }
                     }
@@ -2405,96 +1359,311 @@ function createResolutionChart(
 
 
 /* =========================================================
-   Error Handling
-   ========================================================= */
+   RENDER PRIORITY CHART
+========================================================= */
 
-function showDataError(
-    message
-) {
-
-    console.warn(
-        "SupportIQ:",
-        message
-    );
-
-
-    const errorContainer =
-        document.getElementById(
-            "data-error"
+function renderPriorityChart(data) {
+    const rows =
+        extractResolutionRows(
+            data
         );
 
+    if (!rows.length) {
+        showChartError(
+            "priority-chart",
+            "Resolution-by-priority data unavailable."
+        );
 
-    if (
-        errorContainer
-    ) {
-
-        errorContainer.textContent =
-            message;
-
-
-        errorContainer.style.display =
-            "block";
+        return;
     }
+
+    const labels = [];
+    const values = [];
+
+    rows.forEach(row => {
+        const label =
+            row.priority ??
+            row.Priority ??
+            "Unknown";
+
+        const value =
+            validResolutionValue(
+                row.average_resolution_hours ??
+                row.averageResolutionHours ??
+                row["Average Resolution Hours"]
+            );
+
+        if (
+            value !== null
+        ) {
+            labels.push(label);
+            values.push(value);
+        }
+    });
+
+    if (!labels.length) {
+        showChartError(
+            "priority-chart",
+            "No valid priority resolution values found."
+        );
+
+        return;
+    }
+
+    createResolutionChart(
+        "priority-chart",
+        "priority",
+        labels,
+        values,
+        "Average Resolution Time by Priority"
+    );
 }
 
 
 /* =========================================================
-   Application Initialization
-   ========================================================= */
+   RENDER TICKET TYPE CHART
+========================================================= */
+
+function renderTypeChart(data) {
+    const rows =
+        extractResolutionRows(
+            data
+        );
+
+    if (!rows.length) {
+        showChartError(
+            "type-chart",
+            "Resolution-by-ticket-type data unavailable."
+        );
+
+        return;
+    }
+
+    const labels = [];
+    const values = [];
+
+    rows.forEach(row => {
+        const label =
+            row.ticket_type ??
+            row.ticketType ??
+            row["Ticket Type"] ??
+            "Unknown";
+
+        const value =
+            validResolutionValue(
+                row.average_resolution_hours ??
+                row.averageResolutionHours ??
+                row["Average Resolution Hours"]
+            );
+
+        if (
+            value !== null
+        ) {
+            labels.push(label);
+            values.push(value);
+        }
+    });
+
+    if (!labels.length) {
+        showChartError(
+            "type-chart",
+            "No valid ticket-type resolution values found."
+        );
+
+        return;
+    }
+
+    createResolutionChart(
+        "type-chart",
+        "type",
+        labels,
+        values,
+        "Average Resolution Time by Ticket Type"
+    );
+}
+
+
+/* =========================================================
+   RENDER CHANNEL CHART
+========================================================= */
+
+function renderChannelChart(data) {
+    const rows =
+        extractResolutionRows(
+            data
+        );
+
+    if (!rows.length) {
+        showChartError(
+            "channel-chart",
+            "Resolution-by-channel data unavailable."
+        );
+
+        return;
+    }
+
+    const labels = [];
+    const values = [];
+
+    rows.forEach(row => {
+        const label =
+            row.channel ??
+            row.Channel ??
+            row["Ticket Channel"] ??
+            "Unknown";
+
+        const value =
+            validResolutionValue(
+                row.average_resolution_hours ??
+                row.averageResolutionHours ??
+                row["Average Resolution Hours"]
+            );
+
+        if (
+            value !== null
+        ) {
+            labels.push(label);
+            values.push(value);
+        }
+    });
+
+    if (!labels.length) {
+        showChartError(
+            "channel-chart",
+            "No valid channel resolution values found."
+        );
+
+        return;
+    }
+
+    createResolutionChart(
+        "channel-chart",
+        "channel",
+        labels,
+        values,
+        "Average Resolution Time by Support Channel"
+    );
+}
+
+
+/* =========================================================
+   RENDER ALL RESOLUTION CHARTS
+========================================================= */
+
+function renderResolutionCharts(data) {
+    console.log(
+        "Rendering resolution charts:",
+        data
+    );
+
+    /*
+     * Render each chart independently.
+     *
+     * If one file fails, the other two can still render.
+     */
+
+    renderPriorityChart(
+        data.priority
+    );
+
+    renderTypeChart(
+        data.type
+    );
+
+    renderChannelChart(
+        data.channel
+    );
+}
+
+
+/* =========================================================
+   CHART ERROR
+========================================================= */
+
+function showChartError(
+    containerId,
+    message
+) {
+    const container =
+        getElement(containerId);
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="chart-error">
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+
+/* =========================================================
+   INITIALIZE DASHBOARD
+========================================================= */
 
 async function initializeDashboard() {
+    try {
+        /*
+         * Load dashboard data.
+         */
 
-    console.log(
-        "SupportIQ dashboard initializing..."
-    );
+        const [
+            metrics,
+            segments,
+            satisfaction,
+            resolution
+        ] = await Promise.all([
+            loadMetrics(),
+            loadSegments(),
+            loadSatisfaction(),
+            loadResolutionData()
+        ]);
 
+        /*
+         * Render normal dashboard.
+         */
 
-    /*
-     * Load all independent data sources.
-     *
-     * Promise.allSettled means one failed
-     * file will not destroy the entire dashboard.
-     */
-    await Promise.allSettled(
-        [
-            loadDashboardMetrics(),
-            loadSegmentData(),
-            loadSatisfactionData(),
-            loadResolutionData(),
-            loadTicketData()
-        ]
-    );
+        renderMetrics(
+            metrics
+        );
 
+        renderSegments(
+            segments
+        );
 
-    /*
-     * Render main dashboard after
-     * analytics data has been loaded.
-     */
-    renderDashboard();
+        renderSatisfaction(
+            satisfaction
+        );
 
+        /*
+         * Render all three resolution charts.
+         */
 
-    /*
-     * Make sure ticket filters are ready.
-     */
-    if (
-        ticketData.length
-    ) {
+        renderResolutionCharts(
+            resolution
+        );
 
-        initializeFilters();
+        /*
+         * Load ticket-level data for
+         * interactive filters.
+         */
 
-        updateFilteredDashboard();
+        await loadTicketData();
+
+    } catch (error) {
+        console.error(
+            "Dashboard initialization error:",
+            error
+        );
     }
-
-
-    console.log(
-        "SupportIQ dashboard initialized successfully."
-    );
 }
 
 
 /* =========================================================
-   Start
-   ========================================================= */
+   START APPLICATION
+========================================================= */
 
 document.addEventListener(
     "DOMContentLoaded",
