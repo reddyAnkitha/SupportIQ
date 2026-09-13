@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 
@@ -189,12 +190,108 @@
             <h2>Resolution Analytics</h2>
 
             <p>
-                Average resolution time across closed tickets is
-                11.77 hours. The following views compare resolution
-                performance across priority, ticket type, and
-                support channel.
+                Analyze resolution performance interactively by
+                priority, ticket type, support channel, and
+                customer segment.
             </p>
 
+
+            <!-- Interactive Filters -->
+
+            <div class="filter-panel">
+
+                <h3>Interactive Filters</h3>
+
+                <div class="filter-grid">
+
+                    <!-- Priority Filter -->
+
+                    <div class="filter-group">
+
+                        <label for="priority-filter">
+                            Priority
+                        </label>
+
+                        <select id="priority-filter">
+
+                            <option value="all">
+                                All Priorities
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Ticket Type Filter -->
+
+                    <div class="filter-group">
+
+                        <label for="type-filter">
+                            Ticket Type
+                        </label>
+
+                        <select id="type-filter">
+
+                            <option value="all">
+                                All Ticket Types
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Channel Filter -->
+
+                    <div class="filter-group">
+
+                        <label for="channel-filter">
+                            Support Channel
+                        </label>
+
+                        <select id="channel-filter">
+
+                            <option value="all">
+                                All Channels
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Customer Segment Filter -->
+
+                    <div class="filter-group">
+
+                        <label for="segment-filter-main">
+                            Customer Segment
+                        </label>
+
+                        <select id="segment-filter-main">
+
+                            <option value="all">
+                                All Segments
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Reset Button -->
+
+                <button id="reset-filters" type="button">
+                    Reset Filters
+                </button>
+
+            </div>
+
+
+            <!-- Analytics Charts -->
 
             <div class="analytics-grid">
 
@@ -285,3 +382,4 @@
 </body>
 
 </html>
+```
