@@ -2,8 +2,12 @@ const DATA_PATH = "data/";
 
 const FILES = {
     metrics: DATA_PATH + "dashboard_metrics.csv",
-    segments: DATA_PATH + "segment_dashboard.json",
-    satisfaction: DATA_PATH + "satisfaction_dashboard.json",
+
+    segments:
+        DATA_PATH + "segment_dashboard.json",
+
+    satisfaction:
+        DATA_PATH + "satisfaction_dashboard.json",
 
     resolutionPriority:
         DATA_PATH + "resolution_by_priority.json",
@@ -14,29 +18,47 @@ const FILES = {
     resolutionChannel:
         DATA_PATH + "resolution_by_channel.json",
 
-    // ticket_data.json is in the ROOT of the repository
-    tickets: "ticket_data.json",
+    // ticket_data.json is in the ROOT
+    tickets:
+        "ticket_data.json",
 
-    // K-Means ticket-to-segment mapping
-    ticketSegmentMapping: "ticket_segment_mapping.json"
+    // Actual K-Means ticket-to-segment mapping
+    ticketSegmentMapping:
+        "ticket_segment_mapping.json"
 };
 
+
 let ticketData = [];
+
 let ticketSegmentMapping = [];
+
+let ticketSegmentMap = new Map();
+
 let charts = {};
 
+
 const fallbackMetrics = {
+
     totalTickets: 8469,
+
     averageSatisfaction: 2.99,
+
     averageResolution: 11.77,
+
     customerSegments: 6
 };
 
+
 const fallbackSatisfaction = {
+
     total_closed_tickets: 2769,
+
     low_satisfaction_tickets: 1102,
+
     satisfied_tickets: 1667,
+
     low_satisfaction_percentage: 39.8,
+
     model_accuracy: 59.75
 };
 
@@ -45,50 +67,100 @@ const fallbackSatisfaction = {
    GENERAL HELPERS
 ========================================================= */
 
+
 function getElement(id) {
+
     return document.getElementById(id);
 }
 
 
 function formatNumber(value, decimals = 0) {
+
     const number = Number(value);
 
     if (!Number.isFinite(number)) {
+
         return "N/A";
     }
 
     return number.toLocaleString("en-US", {
+
         minimumFractionDigits: decimals,
+
         maximumFractionDigits: decimals
     });
 }
 
 
 function cleanJSONText(text) {
+
     return text
+
         .replace(/\bNaN\b/g, "null")
+
         .replace(/\bInfinity\b/g, "null")
+
         .replace(/\b-Infinity\b/g, "null");
 }
 
 
 function normalize(value) {
+
     if (
         value === null ||
         value === undefined
     ) {
+
         return "";
     }
 
+
     return String(value)
+
         .trim()
+
         .toLowerCase();
+}
+
+
+/*
+ * Create a consistent key for ticket mapping.
+ *
+ * Ticket ID alone may not uniquely identify
+ * every record, so Customer Email is included.
+ */
+
+function makeTicketKey(
+    ticketId,
+    customerEmail
+) {
+
+    const normalizedTicketId =
+        normalize(ticketId);
+
+    const normalizedEmail =
+        normalize(customerEmail);
+
+
+    if (
+        !normalizedTicketId ||
+        !normalizedEmail
+    ) {
+
+        return "";
+    }
+
+
+    return (
+        `${normalizedTicketId}||${normalizedEmail}`
+    );
 }
 
 
 /* =========================================================
    LOAD JSON
 ========================================================= */
+
 
 async function loadJSON(file) {
 
@@ -123,6 +195,7 @@ async function loadJSON(file) {
    LOAD DASHBOARD METRICS
 ========================================================= */
 
+
 async function loadMetrics() {
 
     try {
@@ -150,9 +223,16 @@ async function loadMetrics() {
 
         const lines =
             text
+
                 .trim()
+
                 .split(/\r?\n/)
-                .map(line => line.trim())
+
+                .map(
+                    line =>
+                        line.trim()
+                )
+
                 .filter(Boolean);
 
 
@@ -160,7 +240,9 @@ async function loadMetrics() {
 
 
         lines
+
             .slice(1)
+
             .forEach(line => {
 
                 const parts =
@@ -170,13 +252,16 @@ async function loadMetrics() {
                 if (
                     parts.length < 2
                 ) {
+
                     return;
                 }
 
 
                 const key =
                     parts[0]
+
                         .trim()
+
                         .toLowerCase();
 
 
@@ -240,6 +325,7 @@ async function loadMetrics() {
 /* =========================================================
    RENDER DASHBOARD METRICS
 ========================================================= */
+
 
 function renderMetrics(metrics) {
 
@@ -310,6 +396,7 @@ function renderMetrics(metrics) {
    CUSTOMER SEGMENTS
 ========================================================= */
 
+
 async function loadSegments() {
 
     try {
@@ -327,6 +414,7 @@ async function loadSegments() {
 
 
         return {
+
             segments: []
         };
     }
@@ -337,6 +425,7 @@ async function loadSegments() {
    RENDER CUSTOMER SEGMENTS
 ========================================================= */
 
+
 function renderSegments(data) {
 
     const container =
@@ -346,6 +435,7 @@ function renderSegments(data) {
 
 
     if (!container) {
+
         return;
     }
 
@@ -364,7 +454,9 @@ function renderSegments(data) {
 
     const segments =
         Array.isArray(data)
+
             ? data
+
             : data?.segments || [];
 
 
@@ -378,16 +470,13 @@ function renderSegments(data) {
 
 
     /*
-     * Calculate total customers
-     * represented by the six segments.
-     *
-     * IMPORTANT:
-     * This represents segmented customers,
-     * not total tickets.
+     * Calculate total customers represented
+     * by the six K-Means segments.
      */
 
     const totalCustomers =
         segments.reduce(
+
             (sum, segment) => {
 
                 const customers =
@@ -397,16 +486,21 @@ function renderSegments(data) {
 
 
                 return (
+
                     sum +
+
                     (
                         Number.isFinite(
                             customers
                         )
+
                             ? customers
+
                             : 0
                     )
                 );
             },
+
             0
         );
 
@@ -415,228 +509,238 @@ function renderSegments(data) {
        TABLE ROWS
     ===================================================== */
 
+
     let tableRows = "";
 
 
-    segments.forEach(segment => {
+    segments.forEach(
+        segment => {
 
-        const satisfaction =
-            Number(
-                segment.avg_satisfaction
-            );
-
-
-        const resolution =
-            Number(
-                segment.avg_resolution_hours
-            );
+            const satisfaction =
+                Number(
+                    segment.avg_satisfaction
+                );
 
 
-        const customers =
-            Number(
-                segment.customers
-            );
+            const resolution =
+                Number(
+                    segment.avg_resolution_hours
+                );
 
 
-        /*
-         * Determine customer risk.
-         */
-
-        let riskClass =
-            "medium-risk";
+            const customers =
+                Number(
+                    segment.customers
+                );
 
 
-        let riskText =
-            "Medium Risk";
+            /*
+             * Determine customer risk.
+             */
+
+            let riskClass =
+                "medium-risk";
 
 
-        if (
-            Number.isFinite(
-                satisfaction
-            )
-        ) {
+            let riskText =
+                "Medium Risk";
+
 
             if (
-                satisfaction <= 2
+                Number.isFinite(
+                    satisfaction
+                )
             ) {
 
-                riskClass =
-                    "high-risk";
+                if (
+                    satisfaction <= 2
+                ) {
+
+                    riskClass =
+                        "high-risk";
 
 
-                riskText =
-                    "High Risk";
+                    riskText =
+                        "High Risk";
 
-            } else if (
-                satisfaction >= 4
-            ) {
+                } else if (
+                    satisfaction >= 4
+                ) {
 
-                riskClass =
-                    "low-risk";
+                    riskClass =
+                        "low-risk";
 
 
-                riskText =
-                    "Low Risk";
+                    riskText =
+                        "Low Risk";
+                }
             }
-        }
 
 
-        /*
-         * Determine resolution speed.
-         */
+            /*
+             * Determine resolution speed.
+             */
 
-        const isFast =
-            Number.isFinite(
-                resolution
-            ) &&
-            resolution <= 10;
-
-
-        const speedClass =
-            isFast
-                ? "fast-resolution"
-                : "slow-resolution";
+            const isFast =
+                Number.isFinite(
+                    resolution
+                ) &&
+                resolution <= 10;
 
 
-        const speedText =
-            isFast
-                ? "Fast Resolution"
-                : "Slow Resolution";
+            const speedClass =
+                isFast
+
+                    ? "fast-resolution"
+
+                    : "slow-resolution";
 
 
-        /*
-         * Satisfaction badge.
-         */
+            const speedText =
+                isFast
 
-        let satisfactionClass =
-            "satisfaction-medium";
+                    ? "Fast Resolution"
+
+                    : "Slow Resolution";
 
 
-        if (
-            Number.isFinite(
-                satisfaction
-            )
-        ) {
+            /*
+             * Satisfaction badge.
+             */
+
+            let satisfactionClass =
+                "satisfaction-medium";
+
 
             if (
-                satisfaction >= 4
+                Number.isFinite(
+                    satisfaction
+                )
             ) {
 
-                satisfactionClass =
-                    "satisfaction-good";
+                if (
+                    satisfaction >= 4
+                ) {
 
-            } else if (
-                satisfaction <= 2
-            ) {
+                    satisfactionClass =
+                        "satisfaction-good";
 
-                satisfactionClass =
-                    "satisfaction-poor";
+                } else if (
+                    satisfaction <= 2
+                ) {
+
+                    satisfactionClass =
+                        "satisfaction-poor";
+                }
             }
-        }
 
 
-        tableRows += `
+            tableRows += `
 
-            <tr>
+                <tr>
 
-                <td class="segment-name-cell">
+                    <td class="segment-name-cell">
 
-                    <div class="segment-name">
+                        <div class="segment-name">
 
-                        <span class="segment-dot"></span>
+                            <span class="segment-dot"></span>
 
-                        <div>
+                            <div>
 
-                            <strong>
-                                ${segment.segment ?? "N/A"}
-                            </strong>
+                                <strong>
+                                    ${segment.segment ?? "N/A"}
+                                </strong>
 
-                            <div class="segment-badges">
+                                <div class="segment-badges">
 
-                                <span class="
-                                    segment-badge
-                                    ${riskClass}
-                                ">
-                                    ${riskText}
-                                </span>
+                                    <span class="
+                                        segment-badge
+                                        ${riskClass}
+                                    ">
+                                        ${riskText}
+                                    </span>
 
-                                <span class="
-                                    segment-badge
-                                    ${speedClass}
-                                ">
-                                    ${speedText}
-                                </span>
+                                    <span class="
+                                        segment-badge
+                                        ${speedClass}
+                                    ">
+                                        ${speedText}
+                                    </span>
+
+                                </div>
 
                             </div>
 
                         </div>
 
-                    </div>
-
-                </td>
+                    </td>
 
 
-                <td class="number-cell">
-                    ${formatNumber(
-                        customers
-                    )}
-                </td>
-
-
-                <td class="number-cell">
-                    ${formatNumber(
-                        segment.avg_age,
-                        1
-                    )}
-                </td>
-
-
-                <td class="number-cell">
-
-                    <span class="
-                        satisfaction-value
-                        ${satisfactionClass}
-                    ">
+                    <td class="number-cell">
                         ${formatNumber(
-                            satisfaction,
-                            2
-                        )} / 5
-                    </span>
-
-                </td>
+                            customers
+                        )}
+                    </td>
 
 
-                <td class="number-cell">
-
-                    <span class="
-                        resolution-value
-                        ${speedClass}
-                    ">
+                    <td class="number-cell">
                         ${formatNumber(
-                            resolution,
-                            2
-                        )} hrs
-                    </span>
+                            segment.avg_age,
+                            1
+                        )}
+                    </td>
 
-                </td>
 
-            </tr>
-        `;
-    });
+                    <td class="number-cell">
+
+                        <span class="
+                            satisfaction-value
+                            ${satisfactionClass}
+                        ">
+
+                            ${formatNumber(
+                                satisfaction,
+                                2
+                            )} / 5
+
+                        </span>
+
+                    </td>
+
+
+                    <td class="number-cell">
+
+                        <span class="
+                            resolution-value
+                            ${speedClass}
+                        ">
+
+                            ${formatNumber(
+                                resolution,
+                                2
+                            )} hrs
+
+                        </span>
+
+                    </td>
+
+                </tr>
+            `;
+        }
+    );
 
 
     /* =====================================================
        COMPLETE SEGMENT DASHBOARD
     ===================================================== */
 
+
     container.innerHTML = `
 
         <div class="segment-dashboard">
 
 
-            <!-- =============================================
-                 LEFT: SEGMENT TABLE
-            ============================================== -->
+            <!-- LEFT: SEGMENT TABLE -->
 
             <div class="segment-table-card">
 
@@ -709,16 +813,12 @@ function renderSegments(data) {
             </div>
 
 
-            <!-- =============================================
-                 RIGHT SIDE
-            ============================================== -->
+            <!-- RIGHT SIDE -->
 
             <div class="segment-side-panel">
 
 
-                <!-- =========================================
-                     DISTRIBUTION CHART
-                ========================================== -->
+                <!-- DISTRIBUTION CHART -->
 
                 <div class="segment-chart-card">
 
@@ -759,9 +859,7 @@ function renderSegments(data) {
                 </div>
 
 
-                <!-- =========================================
-                     KEY INSIGHTS
-                ========================================== -->
+                <!-- KEY INSIGHTS -->
 
                 <div class="segment-insights-card">
 
@@ -787,56 +885,72 @@ function renderSegments(data) {
        FIND IMPORTANT SEGMENTS
     ===================================================== */
 
+
     const validSegments =
-        segments.filter(segment =>
-            Number.isFinite(
-                Number(
-                    segment.avg_satisfaction
+        segments.filter(
+            segment =>
+                Number.isFinite(
+                    Number(
+                        segment.avg_satisfaction
+                    )
                 )
-            )
         );
 
 
     const segmentsForComparison =
         validSegments.length
+
             ? validSegments
+
             : segments;
 
 
     /*
-     * Best performing segment:
-     * highest satisfaction.
+     * Best performing segment.
      */
 
     const bestSegment =
         segmentsForComparison.reduce(
+
             (best, current) =>
+
                 Number(
                     current.avg_satisfaction
-                ) >
+                )
+
+                >
+
                 Number(
                     best.avg_satisfaction
                 )
+
                     ? current
+
                     : best
         );
 
 
     /*
-     * Highest risk segment:
-     * lowest satisfaction.
+     * Highest risk segment.
      */
 
     const highestRiskSegment =
         segmentsForComparison.reduce(
+
             (worst, current) =>
+
                 Number(
                     current.avg_satisfaction
-                ) <
+                )
+
+                <
+
                 Number(
                     worst.avg_satisfaction
                 )
+
                     ? current
+
                     : worst
         );
 
@@ -847,14 +961,21 @@ function renderSegments(data) {
 
     const largestSegment =
         segments.reduce(
+
             (largest, current) =>
+
                 Number(
                     current.customers
-                ) >
+                )
+
+                >
+
                 Number(
                     largest.customers
                 )
+
                     ? current
+
                     : largest
         );
 
@@ -863,23 +984,47 @@ function renderSegments(data) {
      * Fastest resolution segment.
      */
 
-    const fastestSegment =
-        segments.reduce(
-            (fastest, current) =>
-                Number(
-                    current.avg_resolution_hours
-                ) <
-                Number(
-                    fastest.avg_resolution_hours
+    const segmentsWithResolution =
+        segments.filter(
+            segment =>
+                Number.isFinite(
+                    Number(
+                        segment.avg_resolution_hours
+                    )
                 )
-                    ? current
-                    : fastest
         );
+
+
+    const fastestSegment =
+        segmentsWithResolution.length
+
+            ? segmentsWithResolution.reduce(
+
+                (fastest, current) =>
+
+                    Number(
+                        current.avg_resolution_hours
+                    )
+
+                    <
+
+                    Number(
+                        fastest.avg_resolution_hours
+                    )
+
+                        ? current
+
+                        : fastest
+
+            )
+
+            : segments[0];
 
 
     /* =====================================================
        SEGMENT DISTRIBUTION CHART
     ===================================================== */
+
 
     const canvas =
         getElement(
@@ -893,8 +1038,7 @@ function renderSegments(data) {
     ) {
 
         /*
-         * Destroy previous chart if
-         * renderSegments is called again.
+         * Destroy previous chart.
          */
 
         if (charts.segment) {
@@ -923,22 +1067,30 @@ function renderSegments(data) {
 
         charts.segment =
             new Chart(
+
                 canvas,
+
                 {
 
-                    type: "doughnut",
+                    type:
+                        "doughnut",
 
 
                     data: {
 
-                        labels: labels,
+                        labels:
+                            labels,
 
 
                         datasets: [
-                            {
-                                data: values,
 
-                                borderWidth: 2
+                            {
+
+                                data:
+                                    values,
+
+                                borderWidth:
+                                    2
                             }
                         ]
                     },
@@ -946,17 +1098,22 @@ function renderSegments(data) {
 
                     options: {
 
-                        responsive: true,
+                        responsive:
+                            true,
 
-                        maintainAspectRatio: false,
+                        maintainAspectRatio:
+                            false,
 
-                        cutout: "62%",
+                        cutout:
+                            "62%",
 
 
                         plugins: {
 
                             legend: {
-                                display: false
+
+                                display:
+                                    false
                             },
 
 
@@ -977,17 +1134,23 @@ function renderSegments(data) {
 
                                             const percentage =
                                                 totalCustomers > 0
-                                                    ? (
+
+                                                    ?
+
+                                                    (
                                                         value /
                                                         totalCustomers
                                                     ) * 100
+
                                                     : 0;
 
 
                                             return (
+
                                                 ` ${formatNumber(
                                                     value
                                                 )} customers ` +
+
                                                 `(${percentage.toFixed(
                                                     1
                                                 )}%)`
@@ -999,15 +1162,9 @@ function renderSegments(data) {
                     }
                 }
             );
-    }
 
 
-    /*
-     * If Chart.js is unavailable,
-     * show a useful message.
-     */
-
-    else if (canvas) {
+    } else if (canvas) {
 
         const wrapper =
             canvas.parentElement;
@@ -1022,7 +1179,6 @@ function renderSegments(data) {
                     Chart.js could not be loaded.
 
                 </div>
-
             `;
         }
     }
@@ -1031,6 +1187,7 @@ function renderSegments(data) {
     /* =====================================================
        CHART LEGEND
     ===================================================== */
+
 
     const legend =
         getElement(
@@ -1041,49 +1198,58 @@ function renderSegments(data) {
     if (legend) {
 
         legend.innerHTML =
+
             segments
-                .map(segment => {
 
-                    const customers =
-                        Number(
-                            segment.customers
-                        );
+                .map(
+                    segment => {
 
-
-                    const percentage =
-                        totalCustomers > 0
-                            ? (
-                                customers /
-                                totalCustomers
-                            ) * 100
-                            : 0;
+                        const customers =
+                            Number(
+                                segment.customers
+                            );
 
 
-                    return `
+                        const percentage =
+                            totalCustomers > 0
 
-                        <div class="legend-item">
+                                ?
 
-                            <span class="legend-dot"></span>
+                                (
+                                    customers /
+                                    totalCustomers
+                                ) * 100
 
-                            <span class="legend-name">
-                                ${segment.segment}
-                            </span>
+                                : 0;
 
-                            <strong>
-                                ${formatNumber(
-                                    customers
-                                )}
-                            </strong>
 
-                            <span class="legend-percent">
-                                ${percentage.toFixed(
-                                    1
-                                )}%
-                            </span>
+                        return `
 
-                        </div>
-                    `;
-                })
+                            <div class="legend-item">
+
+                                <span class="legend-dot"></span>
+
+                                <span class="legend-name">
+                                    ${segment.segment}
+                                </span>
+
+                                <strong>
+                                    ${formatNumber(
+                                        customers
+                                    )}
+                                </strong>
+
+                                <span class="legend-percent">
+                                    ${percentage.toFixed(
+                                        1
+                                    )}%
+                                </span>
+
+                            </div>
+                        `;
+                    }
+                )
+
                 .join("");
     }
 
@@ -1092,28 +1258,39 @@ function renderSegments(data) {
        KEY INSIGHTS
     ===================================================== */
 
+
     const insights =
         getElement(
             "segment-insights"
         );
 
 
-    if (insights) {
+    if (
+        insights &&
+        bestSegment &&
+        highestRiskSegment &&
+        largestSegment &&
+        fastestSegment
+    ) {
 
         const largestPercentage =
             totalCustomers > 0
-                ? (
+
+                ?
+
+                (
                     Number(
                         largestSegment.customers
                     ) /
                     totalCustomers
                 ) * 100
+
                 : 0;
 
 
         insights.innerHTML = `
 
-            <!-- Best Performing -->
+            <!-- BEST PERFORMING -->
 
             <div class="insight-item">
 
@@ -1132,15 +1309,19 @@ function renderSegments(data) {
                     </strong>
 
                     <small>
+
                         ${formatNumber(
                             bestSegment.avg_satisfaction,
                             2
                         )} / 5 satisfaction
+
                         ·
+
                         ${formatNumber(
                             bestSegment.avg_resolution_hours,
                             2
                         )} hrs resolution
+
                     </small>
 
                 </div>
@@ -1148,7 +1329,7 @@ function renderSegments(data) {
             </div>
 
 
-            <!-- Highest Risk -->
+            <!-- HIGHEST RISK -->
 
             <div class="insight-item">
 
@@ -1167,15 +1348,19 @@ function renderSegments(data) {
                     </strong>
 
                     <small>
+
                         ${formatNumber(
                             highestRiskSegment.avg_satisfaction,
                             2
                         )} / 5 satisfaction
+
                         ·
+
                         ${formatNumber(
                             highestRiskSegment.avg_resolution_hours,
                             2
                         )} hrs resolution
+
                     </small>
 
                 </div>
@@ -1183,7 +1368,7 @@ function renderSegments(data) {
             </div>
 
 
-            <!-- Largest Segment -->
+            <!-- LARGEST SEGMENT -->
 
             <div class="insight-item">
 
@@ -1202,15 +1387,21 @@ function renderSegments(data) {
                     </strong>
 
                     <small>
+
                         ${formatNumber(
                             largestSegment.customers
                         )}
+
                         customers
+
                         ·
+
                         ${largestPercentage.toFixed(
                             1
                         )}%
+
                         of segmented customers
+
                     </small>
 
                 </div>
@@ -1218,7 +1409,7 @@ function renderSegments(data) {
             </div>
 
 
-            <!-- Fastest Resolution -->
+            <!-- FASTEST RESOLUTION -->
 
             <div class="insight-item">
 
@@ -1237,10 +1428,14 @@ function renderSegments(data) {
                     </strong>
 
                     <small>
+
                         ${formatNumber(
                             fastestSegment.avg_resolution_hours,
                             2
-                        )} hrs average resolution
+                        )}
+
+                        hrs average resolution
+
                     </small>
 
                 </div>
@@ -1255,6 +1450,7 @@ function renderSegments(data) {
 /* =========================================================
    SATISFACTION RISK
 ========================================================= */
+
 
 async function loadSatisfaction() {
 
@@ -1346,6 +1542,7 @@ function renderSatisfaction(data) {
    TICKET SEGMENT MAPPING
 ========================================================= */
 
+
 async function loadTicketSegmentMapping() {
 
     try {
@@ -1364,13 +1561,79 @@ async function loadTicketSegmentMapping() {
         }
 
 
+        if (!data.length) {
+
+            throw new Error(
+                "ticket_segment_mapping.json is empty."
+            );
+        }
+
+
         ticketSegmentMapping =
             data;
+
+
+        /*
+         * Build a Map once.
+         *
+         * This is much faster than using .find()
+         * for every ticket during filtering.
+         */
+
+        buildTicketSegmentMap();
+
+
+        /*
+         * Validate mapping content.
+         */
+
+        const segmentNames =
+            new Set();
+
+
+        ticketSegmentMapping.forEach(
+            item => {
+
+                const segment =
+                    item.segment ??
+                    item["Segment"] ??
+                    null;
+
+
+                if (segment) {
+
+                    segmentNames.add(
+                        String(segment)
+                    );
+                }
+            }
+        );
+
+
+        console.log(
+            "K-Means segment names:",
+            [...segmentNames]
+        );
 
 
         console.log(
             `Loaded ${ticketSegmentMapping.length} ticket-segment mappings.`
         );
+
+
+        console.log(
+            `Unique mapped ticket/email pairs: ${ticketSegmentMap.size}`
+        );
+
+
+        if (
+            segmentNames.size !== 6
+        ) {
+
+            console.warn(
+                `Expected 6 K-Means segments but found ${segmentNames.size}.`
+            );
+        }
 
 
         return ticketSegmentMapping;
@@ -1386,6 +1649,9 @@ async function loadTicketSegmentMapping() {
 
         ticketSegmentMapping = [];
 
+        ticketSegmentMap =
+            new Map();
+
 
         return [];
     }
@@ -1393,8 +1659,79 @@ async function loadTicketSegmentMapping() {
 
 
 /* =========================================================
+   BUILD FAST TICKET SEGMENT MAP
+========================================================= */
+
+
+function buildTicketSegmentMap() {
+
+    ticketSegmentMap =
+        new Map();
+
+
+    ticketSegmentMapping.forEach(
+        item => {
+
+            const ticketId =
+                item["Ticket ID"] ??
+                item.ticket_id;
+
+
+            const customerEmail =
+                item["Customer Email"] ??
+                item.customer_email;
+
+
+            const segment =
+                item.segment ??
+                item["Segment"] ??
+                null;
+
+
+            const key =
+                makeTicketKey(
+                    ticketId,
+                    customerEmail
+                );
+
+
+            if (
+                !key ||
+                !segment
+            ) {
+
+                return;
+            }
+
+
+            /*
+             * Keep the first valid mapping
+             * if duplicate records exist.
+             */
+
+            if (
+                !ticketSegmentMap.has(key)
+            ) {
+
+                ticketSegmentMap.set(
+                    key,
+                    segment
+                );
+            }
+        }
+    );
+
+
+    console.log(
+        `Built ${ticketSegmentMap.size} ticket-segment lookup entries.`
+    );
+}
+
+
+/* =========================================================
    GET TICKET VALUE
 ========================================================= */
+
 
 function getTicketValue(
     ticket,
@@ -1435,84 +1772,48 @@ function getTicketValue(
    GET ACTUAL K-MEANS TICKET SEGMENT
 ========================================================= */
 
+
 function getTicketSegment(ticket) {
 
     const ticketId =
-        normalize(
-            getTicketValue(
-                ticket,
-                [
-                    "Ticket ID",
-                    "ticket_id"
-                ]
-            )
+        getTicketValue(
+            ticket,
+            [
+                "Ticket ID",
+                "ticket_id"
+            ]
         );
 
 
     const customerEmail =
-        normalize(
-            getTicketValue(
-                ticket,
-                [
-                    "Customer Email",
-                    "customer_email"
-                ]
-            )
+        getTicketValue(
+            ticket,
+            [
+                "Customer Email",
+                "customer_email"
+            ]
         );
+
+
+    const key =
+        makeTicketKey(
+            ticketId,
+            customerEmail
+        );
+
+
+    if (!key) {
+
+        return null;
+    }
 
 
     /*
-     * A composite key is used because
-     * Ticket ID alone may not uniquely
-     * identify a record.
+     * O(1) Map lookup.
      */
 
-    if (
-        !ticketId ||
-        !customerEmail
-    ) {
-
-        return null;
-    }
-
-
-    const mapping =
-        ticketSegmentMapping.find(
-            item => {
-
-                const mappedTicketId =
-                    normalize(
-                        item["Ticket ID"] ??
-                        item.ticket_id
-                    );
-
-
-                const mappedEmail =
-                    normalize(
-                        item["Customer Email"] ??
-                        item.customer_email
-                    );
-
-
-                return (
-                    mappedTicketId ===
-                    ticketId &&
-                    mappedEmail ===
-                    customerEmail
-                );
-            }
-        );
-
-
-    if (!mapping) {
-
-        return null;
-    }
-
-
     return (
-        mapping.segment ??
-        mapping["Segment"] ??
+        ticketSegmentMap.get(key) ??
         null
     );
 }
@@ -1522,6 +1823,7 @@ function getTicketSegment(ticket) {
    POPULATE FILTER
 ========================================================= */
 
+
 function populateSelect(
     select,
     defaultText,
@@ -1529,6 +1831,7 @@ function populateSelect(
 ) {
 
     if (!select) {
+
         return;
     }
 
@@ -1555,26 +1858,28 @@ function populateSelect(
     );
 
 
-    values.forEach(value => {
+    values.forEach(
+        value => {
 
-        const option =
-            document.createElement(
-                "option"
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                value;
+
+
+            option.textContent =
+                value;
+
+
+            select.appendChild(
+                option
             );
-
-
-        option.value =
-            value;
-
-
-        option.textContent =
-            value;
-
-
-        select.appendChild(
-            option
-        );
-    });
+        }
+    );
 }
 
 
@@ -1582,9 +1887,11 @@ function populateSelect(
    INITIALIZE FILTERS
 ========================================================= */
 
+
 function initializeFilters() {
 
     if (!ticketData.length) {
+
         return;
     }
 
@@ -1625,78 +1932,97 @@ function initializeFilters() {
         new Set();
 
 
-    ticketData.forEach(ticket => {
+    ticketData.forEach(
+        ticket => {
 
-        const priority =
-            getTicketValue(
-                ticket,
-                [
-                    "Ticket Priority",
-                    "ticket_priority"
-                ]
-            );
-
-
-        const type =
-            getTicketValue(
-                ticket,
-                [
-                    "Ticket Type",
-                    "ticket_type"
-                ]
-            );
+            const priority =
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Priority",
+                        "ticket_priority"
+                    ]
+                );
 
 
-        const channel =
-            getTicketValue(
-                ticket,
-                [
-                    "Ticket Channel",
-                    "ticket_channel"
-                ]
-            );
+            const type =
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Type",
+                        "ticket_type"
+                    ]
+                );
 
 
-        if (priority) {
-            priorities.add(priority);
+            const channel =
+                getTicketValue(
+                    ticket,
+                    [
+                        "Ticket Channel",
+                        "ticket_channel"
+                    ]
+                );
+
+
+            if (priority) {
+
+                priorities.add(
+                    priority
+                );
+            }
+
+
+            if (type) {
+
+                types.add(
+                    type
+                );
+            }
+
+
+            if (channel) {
+
+                channels.add(
+                    channel
+                );
+            }
         }
-
-
-        if (type) {
-            types.add(type);
-        }
-
-
-        if (channel) {
-            channels.add(channel);
-        }
-    });
+    );
 
 
     populateSelect(
+
         priorityFilter,
+
         "All Priorities",
+
         [...priorities].sort()
     );
 
 
     populateSelect(
+
         typeFilter,
+
         "All Ticket Types",
+
         [...types].sort()
     );
 
 
     populateSelect(
+
         channelFilter,
+
         "All Channels",
+
         [...channels].sort()
     );
 
 
     /*
-     * These are the six official
-     * K-Means segment names.
+     * Official K-Means segment names.
      */
 
     const officialSegments = [
@@ -1717,8 +2043,11 @@ function initializeFilters() {
 
 
     populateSelect(
+
         segmentFilter,
+
         "All Segments",
+
         officialSegments
     );
 
@@ -1728,16 +2057,20 @@ function initializeFilters() {
         typeFilter,
         channelFilter,
         segmentFilter
-    ].forEach(filter => {
+    ]
 
-        if (filter) {
+        .forEach(
+            filter => {
 
-            filter.addEventListener(
-                "change",
-                updateFilteredDashboard
-            );
-        }
-    });
+                if (filter) {
+
+                    filter.addEventListener(
+                        "change",
+                        updateFilteredDashboard
+                    );
+                }
+            }
+        );
 
 
     const resetButton =
@@ -1760,9 +2093,11 @@ function initializeFilters() {
    FILTER TICKETS
 ========================================================= */
 
+
 function getFilteredTickets() {
 
     if (!ticketData.length) {
+
         return [];
     }
 
@@ -1792,6 +2127,7 @@ function getFilteredTickets() {
 
 
     return ticketData.filter(
+
         ticket => {
 
             const ticketPriority =
@@ -1825,10 +2161,7 @@ function getFilteredTickets() {
 
 
             /*
-             * IMPORTANT:
              * Use the actual K-Means mapping.
-             * Do NOT infer the segment from
-             * age and satisfaction.
              */
 
             const ticketSegment =
@@ -1838,49 +2171,80 @@ function getFilteredTickets() {
 
 
             const priorityMatch =
+
                 !priority ||
+
                 normalize(
                     ticketPriority
                 ) ===
+
                 normalize(
                     priority
                 );
 
 
             const typeMatch =
+
                 !type ||
+
                 normalize(
                     ticketType
                 ) ===
+
                 normalize(
                     type
                 );
 
 
             const channelMatch =
+
                 !channel ||
+
                 normalize(
                     ticketChannel
                 ) ===
+
                 normalize(
                     channel
                 );
 
 
+            /*
+             * If a segment is selected,
+             * a missing mapping must NOT match.
+             */
+
             const segmentMatch =
-                !segment ||
-                normalize(
-                    ticketSegment
-                ) ===
-                normalize(
-                    segment
-                );
+
+                !segment
+
+                    ?
+
+                    true
+
+                    :
+
+                    Boolean(
+                        ticketSegment
+                    ) &&
+
+                    normalize(
+                        ticketSegment
+                    ) ===
+
+                    normalize(
+                        segment
+                    );
 
 
             return (
+
                 priorityMatch &&
+
                 typeMatch &&
+
                 channelMatch &&
+
                 segmentMatch
             );
         }
@@ -1891,6 +2255,7 @@ function getFilteredTickets() {
 /* =========================================================
    FILTERED DASHBOARD
 ========================================================= */
+
 
 function updateFilteredDashboard() {
 
@@ -1963,7 +2328,7 @@ function updateFilteredDashboard() {
 
 
     /*
-     * Let CSS control the layout.
+     * Let CSS control layout.
      */
 
     if (filteredStats) {
@@ -1986,52 +2351,61 @@ function updateFilteredDashboard() {
        SATISFACTION CALCULATION
     ===================================================== */
 
+
     const satisfactionValues =
+
         filteredTickets
 
-            .map(ticket => {
+            .map(
+                ticket => {
 
-                const rawValue =
-                    getTicketValue(
-                        ticket,
-                        [
-                            "Customer Satisfaction Rating",
-                            "customer_satisfaction_rating"
-                        ]
-                    );
+                    const rawValue =
+                        getTicketValue(
+                            ticket,
+                            [
+                                "Customer Satisfaction Rating",
+                                "customer_satisfaction_rating"
+                            ]
+                        );
 
 
-                /*
-                 * Missing ratings are ignored.
-                 */
+                    /*
+                     * Ignore missing ratings.
+                     */
 
-                if (
-                    rawValue === null ||
-                    rawValue === undefined ||
-                    rawValue === ""
-                ) {
+                    if (
 
-                    return null;
+                        rawValue === null ||
+
+                        rawValue === undefined ||
+
+                        rawValue === ""
+
+                    ) {
+
+                        return null;
+                    }
+
+
+                    const value =
+                        Number(
+                            rawValue
+                        );
+
+
+                    if (
+                        !Number.isFinite(
+                            value
+                        )
+                    ) {
+
+                        return null;
+                    }
+
+
+                    return value;
                 }
-
-
-                const value =
-                    Number(
-                        rawValue
-                    );
-
-
-                if (
-                    !Number.isFinite(value)
-                ) {
-
-                    return null;
-                }
-
-
-                return value;
-            })
-
+            )
 
             .filter(
                 value =>
@@ -2047,8 +2421,10 @@ function updateFilteredDashboard() {
 
             const total =
                 satisfactionValues.reduce(
+
                     (sum, value) =>
                         sum + value,
+
                     0
                 );
 
@@ -2059,10 +2435,12 @@ function updateFilteredDashboard() {
 
 
             satisfactionElement.textContent =
+
                 `${formatNumber(
                     average,
                     2
                 )} / 5`;
+
 
         } else {
 
@@ -2076,12 +2454,13 @@ function updateFilteredDashboard() {
        FILTERED RESOLUTION
     ===================================================== */
 
+
     /*
-     * ticket_data.json currently does not contain
+     * ticket_data.json does not contain
      * usable Time to Resolution values.
      *
-     * Therefore we intentionally do not calculate
-     * a misleading filtered resolution value.
+     * Therefore do not calculate a
+     * misleading filtered resolution.
      */
 
     if (resolutionElement) {
@@ -2094,6 +2473,7 @@ function updateFilteredDashboard() {
     /* =====================================================
        FILTER STATUS
     ===================================================== */
+
 
     if (statusElement) {
 
@@ -2108,13 +2488,16 @@ function updateFilteredDashboard() {
         if (count === total) {
 
             statusElement.textContent =
+
                 `Showing all ${formatNumber(
                     total
                 )} tickets.`;
 
+
         } else {
 
             statusElement.textContent =
+
                 `Showing ${formatNumber(
                     count
                 )} of ${formatNumber(
@@ -2128,6 +2511,7 @@ function updateFilteredDashboard() {
 /* =========================================================
    RESET FILTERS
 ========================================================= */
+
 
 function resetFilters() {
 
@@ -2144,20 +2528,22 @@ function resetFilters() {
     ];
 
 
-    filterIds.forEach(id => {
+    filterIds.forEach(
+        id => {
 
-        const element =
-            getElement(
-                id
-            );
+            const element =
+                getElement(
+                    id
+                );
 
 
-        if (element) {
+            if (element) {
 
-            element.value =
-                "";
+                element.value =
+                    "";
+            }
         }
-    });
+    );
 
 
     updateFilteredDashboard();
@@ -2168,13 +2554,11 @@ function resetFilters() {
    RESOLUTION ANALYTICS
 ========================================================= */
 
+
 async function loadResolutionData() {
 
     /*
      * Load all three files independently.
-     *
-     * This prevents one failed file from
-     * stopping the other charts.
      */
 
     const results =
@@ -2198,24 +2582,45 @@ async function loadResolutionData() {
     return {
 
         priority:
+
             results[0].status ===
             "fulfilled"
-                ? results[0].value
-                : null,
+
+                ?
+
+                results[0].value
+
+                :
+
+                null,
 
 
         type:
+
             results[1].status ===
             "fulfilled"
-                ? results[1].value
-                : null,
+
+                ?
+
+                results[1].value
+
+                :
+
+                null,
 
 
         channel:
+
             results[2].status ===
             "fulfilled"
-                ? results[2].value
-                : null
+
+                ?
+
+                results[2].value
+
+                :
+
+                null
     };
 }
 
@@ -2224,14 +2629,19 @@ async function loadResolutionData() {
    EXTRACT RESOLUTION ROWS
 ========================================================= */
 
+
 function extractResolutionRows(data) {
 
     if (!data) {
+
         return [];
     }
 
 
-    if (Array.isArray(data)) {
+    if (
+        Array.isArray(data)
+    ) {
+
         return data;
     }
 
@@ -2253,6 +2663,7 @@ function extractResolutionRows(data) {
 /* =========================================================
    GET VALID RESOLUTION VALUE
 ========================================================= */
+
 
 function getResolutionValue(row) {
 
@@ -2276,9 +2687,13 @@ function getResolutionValue(row) {
     ) {
 
         if (
+
             rawValue === null ||
+
             rawValue === undefined ||
+
             rawValue === ""
+
         ) {
 
             continue;
@@ -2292,7 +2707,9 @@ function getResolutionValue(row) {
 
 
         if (
-            Number.isFinite(value)
+            Number.isFinite(
+                value
+            )
         ) {
 
             return value;
@@ -2307,6 +2724,7 @@ function getResolutionValue(row) {
 /* =========================================================
    DESTROY EXISTING CHART
 ========================================================= */
+
 
 function destroyChart(chartKey) {
 
@@ -2326,12 +2744,19 @@ function destroyChart(chartKey) {
    CREATE RESOLUTION CHART
 ========================================================= */
 
+
 function createResolutionChart(
+
     containerId,
+
     chartKey,
+
     labels,
+
     values,
+
     title
+
 ) {
 
     const container =
@@ -2355,17 +2780,9 @@ function createResolutionChart(
     );
 
 
-    /*
-     * Remove loading text.
-     */
-
     container.innerHTML =
         "";
 
-
-    /*
-     * Create canvas.
-     */
 
     const canvas =
         document.createElement(
@@ -2389,10 +2806,6 @@ function createResolutionChart(
         canvas
     );
 
-
-    /*
-     * Check Chart.js.
-     */
 
     if (
         typeof Chart ===
@@ -2418,39 +2831,42 @@ function createResolutionChart(
     }
 
 
-    /*
-     * Validate chart data.
-     */
-
     if (
+
         labels.length === 0 ||
+
         values.length === 0
+
     ) {
 
         showChartError(
+
             containerId,
+
             "No resolution data available."
+
         );
 
         return;
     }
 
 
-    /*
-     * Create Chart.js chart.
-     */
-
     charts[chartKey] =
+
         new Chart(
+
             canvas,
+
             {
 
-                type: "bar",
+                type:
+                    "bar",
 
 
                 data: {
 
-                    labels: labels,
+                    labels:
+                        labels,
 
 
                     datasets: [
@@ -2460,9 +2876,11 @@ function createResolutionChart(
                             label:
                                 "Average Resolution Time (hrs)",
 
-                            data: values,
+                            data:
+                                values,
 
-                            borderWidth: 1
+                            borderWidth:
+                                1
 
                         }
 
@@ -2472,7 +2890,8 @@ function createResolutionChart(
 
                 options: {
 
-                    responsive: true,
+                    responsive:
+                        true,
 
                     maintainAspectRatio:
                         false,
@@ -2480,7 +2899,8 @@ function createResolutionChart(
 
                     animation: {
 
-                        duration: 500
+                        duration:
+                            500
 
                     },
 
@@ -2489,17 +2909,18 @@ function createResolutionChart(
 
                         legend: {
 
-                            display: false
-
+                            display:
+                                false
                         },
 
 
                         title: {
 
-                            display: true,
+                            display:
+                                true,
 
-                            text: title
-
+                            text:
+                                title
                         },
 
 
@@ -2517,12 +2938,15 @@ function createResolutionChart(
 
 
                                         return (
+
                                             " " +
+
                                             Number(
                                                 value
                                             ).toFixed(
                                                 2
                                             ) +
+
                                             " hrs"
                                         );
                                     }
@@ -2535,12 +2959,14 @@ function createResolutionChart(
 
                         y: {
 
-                            beginAtZero: true,
+                            beginAtZero:
+                                true,
 
 
                             title: {
 
-                                display: true,
+                                display:
+                                    true,
 
                                 text:
                                     "Average Resolution Time (hrs)"
@@ -2552,7 +2978,8 @@ function createResolutionChart(
 
                             title: {
 
-                                display: true,
+                                display:
+                                    true,
 
                                 text:
                                     "Category"
@@ -2569,6 +2996,7 @@ function createResolutionChart(
    PRIORITY CHART
 ========================================================= */
 
+
 function renderPriorityChart(data) {
 
     const rows =
@@ -2580,8 +3008,11 @@ function renderPriorityChart(data) {
     if (!rows.length) {
 
         showChartError(
+
             "priority-chart",
+
             "Resolution-by-priority data unavailable."
+
         );
 
         return;
@@ -2593,41 +3024,49 @@ function renderPriorityChart(data) {
     const values = [];
 
 
-    rows.forEach(row => {
+    rows.forEach(
+        row => {
 
-        const label =
-            row.priority ??
-            row.Priority ??
-            "Unknown";
+            const label =
 
+                row.priority ??
 
-        const value =
-            getResolutionValue(
-                row
-            );
+                row.Priority ??
+
+                "Unknown";
 
 
-        if (
-            value !== null
-        ) {
-
-            labels.push(
-                label
-            );
+            const value =
+                getResolutionValue(
+                    row
+                );
 
 
-            values.push(
-                value
-            );
+            if (
+                value !== null
+            ) {
+
+                labels.push(
+                    label
+                );
+
+
+                values.push(
+                    value
+                );
+            }
         }
-    });
+    );
 
 
     if (!labels.length) {
 
         showChartError(
+
             "priority-chart",
+
             "No valid priority resolution values found."
+
         );
 
         return;
@@ -2654,6 +3093,7 @@ function renderPriorityChart(data) {
    TICKET TYPE CHART
 ========================================================= */
 
+
 function renderTypeChart(data) {
 
     const rows =
@@ -2665,8 +3105,11 @@ function renderTypeChart(data) {
     if (!rows.length) {
 
         showChartError(
+
             "type-chart",
+
             "Resolution-by-ticket-type data unavailable."
+
         );
 
         return;
@@ -2678,42 +3121,51 @@ function renderTypeChart(data) {
     const values = [];
 
 
-    rows.forEach(row => {
+    rows.forEach(
+        row => {
 
-        const label =
-            row.ticket_type ??
-            row.ticketType ??
-            row["Ticket Type"] ??
-            "Unknown";
+            const label =
 
+                row.ticket_type ??
 
-        const value =
-            getResolutionValue(
-                row
-            );
+                row.ticketType ??
 
+                row["Ticket Type"] ??
 
-        if (
-            value !== null
-        ) {
-
-            labels.push(
-                label
-            );
+                "Unknown";
 
 
-            values.push(
-                value
-            );
+            const value =
+                getResolutionValue(
+                    row
+                );
+
+
+            if (
+                value !== null
+            ) {
+
+                labels.push(
+                    label
+                );
+
+
+                values.push(
+                    value
+                );
+            }
         }
-    });
+    );
 
 
     if (!labels.length) {
 
         showChartError(
+
             "type-chart",
+
             "No valid ticket-type resolution values found."
+
         );
 
         return;
@@ -2740,6 +3192,7 @@ function renderTypeChart(data) {
    CHANNEL CHART
 ========================================================= */
 
+
 function renderChannelChart(data) {
 
     const rows =
@@ -2751,8 +3204,11 @@ function renderChannelChart(data) {
     if (!rows.length) {
 
         showChartError(
+
             "channel-chart",
+
             "Resolution-by-channel data unavailable."
+
         );
 
         return;
@@ -2764,42 +3220,51 @@ function renderChannelChart(data) {
     const values = [];
 
 
-    rows.forEach(row => {
+    rows.forEach(
+        row => {
 
-        const label =
-            row.channel ??
-            row.Channel ??
-            row["Ticket Channel"] ??
-            "Unknown";
+            const label =
 
+                row.channel ??
 
-        const value =
-            getResolutionValue(
-                row
-            );
+                row.Channel ??
 
+                row["Ticket Channel"] ??
 
-        if (
-            value !== null
-        ) {
-
-            labels.push(
-                label
-            );
+                "Unknown";
 
 
-            values.push(
-                value
-            );
+            const value =
+                getResolutionValue(
+                    row
+                );
+
+
+            if (
+                value !== null
+            ) {
+
+                labels.push(
+                    label
+                );
+
+
+                values.push(
+                    value
+                );
+            }
         }
-    });
+    );
 
 
     if (!labels.length) {
 
         showChartError(
+
             "channel-chart",
+
             "No valid channel resolution values found."
+
         );
 
         return;
@@ -2825,6 +3290,7 @@ function renderChannelChart(data) {
 /* =========================================================
    RENDER ALL RESOLUTION CHARTS
 ========================================================= */
+
 
 function renderResolutionCharts(
     resolutionData
@@ -2856,6 +3322,7 @@ function renderResolutionCharts(
    CHART ERROR
 ========================================================= */
 
+
 function showChartError(
     containerId,
     message
@@ -2868,6 +3335,7 @@ function showChartError(
 
 
     if (!container) {
+
         return;
     }
 
@@ -2890,6 +3358,7 @@ function showChartError(
    TICKET DATA
 ========================================================= */
 
+
 async function loadTicketData() {
 
     try {
@@ -2901,17 +3370,23 @@ async function loadTicketData() {
 
         const response =
             await fetch(
+
                 FILES.tickets,
+
                 {
-                    cache: "no-store"
+                    cache:
+                        "no-store"
                 }
+
             );
 
 
         if (!response.ok) {
 
             throw new Error(
+
                 `Unable to load ticket_data.json: HTTP ${response.status}`
+
             );
         }
 
@@ -2921,33 +3396,46 @@ async function loadTicketData() {
 
 
         ticketData =
+
             JSON.parse(
-                cleanJSONText(text)
+
+                cleanJSONText(
+                    text
+                )
+
             );
 
 
-        if (!Array.isArray(ticketData)) {
+        if (
+            !Array.isArray(
+                ticketData
+            )
+        ) {
 
             throw new Error(
+
                 "ticket_data.json must contain an array."
+
             );
         }
 
 
         /*
-         * Load the actual K-Means
-         * ticket-to-segment mapping.
+         * Load actual K-Means mapping.
          */
 
         await loadTicketSegmentMapping();
 
 
         console.log(
+
             `Loaded ${ticketData.length} tickets.`
+
         );
 
 
         initializeFilters();
+
 
         updateFilteredDashboard();
 
@@ -2958,12 +3446,22 @@ async function loadTicketData() {
     } catch (error) {
 
         console.error(
+
             "Ticket data error:",
+
             error
+
         );
 
 
         ticketData = [];
+
+
+        ticketSegmentMapping = [];
+
+
+        ticketSegmentMap =
+            new Map();
 
 
         const status =
@@ -2975,6 +3473,7 @@ async function loadTicketData() {
         if (status) {
 
             status.textContent =
+
                 "Ticket-level data could not be loaded.";
         }
 
@@ -2987,6 +3486,7 @@ async function loadTicketData() {
 /* =========================================================
    INITIALIZE DASHBOARD
 ========================================================= */
+
 
 async function initializeDashboard() {
 
@@ -3058,8 +3558,11 @@ async function initializeDashboard() {
     } catch (error) {
 
         console.error(
+
             "Dashboard initialization error:",
+
             error
+
         );
     }
 }
@@ -3069,7 +3572,11 @@ async function initializeDashboard() {
    START APPLICATION
 ========================================================= */
 
+
 document.addEventListener(
+
     "DOMContentLoaded",
+
     initializeDashboard
+
 );
