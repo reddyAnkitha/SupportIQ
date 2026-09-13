@@ -271,7 +271,12 @@ async function loadSegments() {
 }
 
 
+/* =========================================================
+   RENDER CUSTOMER SEGMENTS
+========================================================= */
+
 function renderSegments(data) {
+
     const container =
         getElement(
             "segment-container"
@@ -281,78 +286,888 @@ function renderSegments(data) {
         return;
     }
 
+
+    /*
+     * Support both:
+     *
+     * {
+     *     "segments": [...]
+     * }
+     *
+     * and:
+     *
+     * [...]
+     */
+
     const segments =
         Array.isArray(data)
             ? data
-            : data.segments || [];
+            : data?.segments || [];
+
 
     if (!segments.length) {
+
         container.innerHTML =
             "<p>Customer segmentation data unavailable.</p>";
 
         return;
     }
 
-    let html = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Customer Segment</th>
-                        <th>Customers</th>
-                        <th>Avg Age</th>
-                        <th>Avg Satisfaction</th>
-                        <th>Avg Resolution</th>
-                    </tr>
-                </thead>
 
-                <tbody>
-    `;
+    /*
+     * Calculate total customers
+     * represented by the six segments.
+     *
+     * IMPORTANT:
+     * This is 2,769 for the current
+     * segmentation dataset.
+     *
+     * It is NOT the total 8,469 tickets.
+     */
+
+    const totalCustomers =
+        segments.reduce(
+            (sum, segment) => {
+
+                const customers =
+                    Number(
+                        segment.customers
+                    );
+
+                return (
+                    sum +
+                    (
+                        Number.isFinite(
+                            customers
+                        )
+                            ? customers
+                            : 0
+                    )
+                );
+            },
+            0
+        );
+
+
+    /* =====================================================
+       TABLE ROWS
+    ===================================================== */
+
+    let tableRows = "";
+
 
     segments.forEach(segment => {
-        html += `
+
+        const satisfaction =
+            Number(
+                segment.avg_satisfaction
+            );
+
+        const resolution =
+            Number(
+                segment.avg_resolution_hours
+            );
+
+        const customers =
+            Number(
+                segment.customers
+            );
+
+
+        /*
+         * Determine customer risk.
+         */
+
+        let riskClass =
+            "medium-risk";
+
+        let riskText =
+            "Medium Risk";
+
+
+        if (
+            Number.isFinite(
+                satisfaction
+            )
+        ) {
+
+            if (
+                satisfaction <= 2
+            ) {
+                riskClass =
+                    "high-risk";
+
+                riskText =
+                    "High Risk";
+
+            } else if (
+                satisfaction >= 4
+            ) {
+                riskClass =
+                    "low-risk";
+
+                riskText =
+                    "Low Risk";
+            }
+        }
+
+
+        /*
+         * Determine resolution speed.
+         */
+
+        const isFast =
+            Number.isFinite(
+                resolution
+            ) &&
+            resolution <= 10;
+
+
+        const speedClass =
+            isFast
+                ? "fast-resolution"
+                : "slow-resolution";
+
+
+        const speedText =
+            isFast
+                ? "Fast Resolution"
+                : "Slow Resolution";
+
+
+        /*
+         * Satisfaction badge.
+         */
+
+        let satisfactionClass =
+            "satisfaction-medium";
+
+
+        if (
+            Number.isFinite(
+                satisfaction
+            )
+        ) {
+
+            if (
+                satisfaction >= 4
+            ) {
+                satisfactionClass =
+                    "satisfaction-good";
+
+            } else if (
+                satisfaction <= 2
+            ) {
+                satisfactionClass =
+                    "satisfaction-poor";
+            }
+        }
+
+
+        tableRows += `
+
             <tr>
-                <td>
-                    ${segment.segment ?? "N/A"}
+
+                <td class="segment-name-cell">
+
+                    <div class="segment-name">
+
+                        <span class="segment-dot"></span>
+
+                        <div>
+
+                            <strong>
+                                ${segment.segment ?? "N/A"}
+                            </strong>
+
+                            <div class="segment-badges">
+
+                                <span class="
+                                    segment-badge
+                                    ${riskClass}
+                                ">
+                                    ${riskText}
+                                </span>
+
+                                <span class="
+                                    segment-badge
+                                    ${speedClass}
+                                ">
+                                    ${speedText}
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
                 </td>
 
-                <td>
+
+                <td class="number-cell">
                     ${formatNumber(
-                        segment.customers
+                        customers
                     )}
                 </td>
 
-                <td>
+
+                <td class="number-cell">
                     ${formatNumber(
                         segment.avg_age,
                         1
                     )}
                 </td>
 
-                <td>
-                    ${formatNumber(
-                        segment.avg_satisfaction,
-                        2
-                    )}
+
+                <td class="number-cell">
+
+                    <span class="
+                        satisfaction-value
+                        ${satisfactionClass}
+                    ">
+                        ${formatNumber(
+                            satisfaction,
+                            2
+                        )} / 5
+                    </span>
+
                 </td>
 
-                <td>
-                    ${formatNumber(
-                        segment.avg_resolution_hours,
-                        2
-                    )} hrs
+
+                <td class="number-cell">
+
+                    <span class="
+                        resolution-value
+                        ${speedClass}
+                    ">
+                        ${formatNumber(
+                            resolution,
+                            2
+                        )} hrs
+                    </span>
+
                 </td>
+
             </tr>
         `;
     });
 
-    html += `
-                </tbody>
-            </table>
+
+    /* =====================================================
+       COMPLETE SEGMENT DASHBOARD
+    ===================================================== */
+
+    container.innerHTML = `
+
+        <div class="segment-dashboard">
+
+
+            <!-- =============================================
+                 LEFT: SEGMENT TABLE
+            ============================================== -->
+
+            <div class="segment-table-card">
+
+                <div class="segment-card-header">
+
+                    <div>
+
+                        <h3>
+                            Customer Segments
+                        </h3>
+
+                        <p>
+                            Six customer groups identified
+                            using K-Means clustering.
+                        </p>
+
+                    </div>
+
+
+                    <span class="ml-badge">
+                        K-Means
+                    </span>
+
+                </div>
+
+
+                <div class="segment-table-wrapper">
+
+                    <table class="segment-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Customer Segment
+                                </th>
+
+                                <th>
+                                    Customers
+                                </th>
+
+                                <th>
+                                    Avg Age
+                                </th>
+
+                                <th>
+                                    Avg Satisfaction
+                                </th>
+
+                                <th>
+                                    Avg Resolution
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            ${tableRows}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <!-- =============================================
+                 RIGHT SIDE
+            ============================================== -->
+
+            <div class="segment-side-panel">
+
+
+                <!-- =========================================
+                     DISTRIBUTION CHART
+                ========================================== -->
+
+                <div class="segment-chart-card">
+
+                    <div class="segment-card-header">
+
+                        <div>
+
+                            <h3>
+                                Segment Distribution
+                            </h3>
+
+                            <p>
+                                Customer distribution across
+                                the six segments.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="segment-chart-wrapper">
+
+                        <canvas
+                            id="segment-distribution-chart"
+                            aria-label="Customer segment distribution chart"
+                            role="img">
+                        </canvas>
+
+                    </div>
+
+
+                    <div
+                        id="segment-chart-legend"
+                        class="segment-chart-legend">
+                    </div>
+
+                </div>
+
+
+                <!-- =========================================
+                     KEY INSIGHTS
+                ========================================== -->
+
+                <div class="segment-insights-card">
+
+                    <h3>
+                        Key Insights
+                    </h3>
+
+                    <div
+                        id="segment-insights"
+                        class="segment-insights">
+                    </div>
+
+                </div>
+
+
+            </div>
+
         </div>
     `;
 
-    container.innerHTML = html;
+
+    /* =====================================================
+       FIND IMPORTANT SEGMENTS
+    ===================================================== */
+
+    const validSegments =
+        segments.filter(segment =>
+            Number.isFinite(
+                Number(
+                    segment.avg_satisfaction
+                )
+            )
+        );
+
+
+    const segmentsForComparison =
+        validSegments.length
+            ? validSegments
+            : segments;
+
+
+    /*
+     * Best performing segment:
+     * highest satisfaction.
+     */
+
+    const bestSegment =
+        segmentsForComparison.reduce(
+            (best, current) =>
+                Number(
+                    current.avg_satisfaction
+                ) >
+                Number(
+                    best.avg_satisfaction
+                )
+                    ? current
+                    : best
+        );
+
+
+    /*
+     * Highest risk segment:
+     * lowest satisfaction.
+     */
+
+    const highestRiskSegment =
+        segmentsForComparison.reduce(
+            (worst, current) =>
+                Number(
+                    current.avg_satisfaction
+                ) <
+                Number(
+                    worst.avg_satisfaction
+                )
+                    ? current
+                    : worst
+        );
+
+
+    /*
+     * Largest segment.
+     */
+
+    const largestSegment =
+        segments.reduce(
+            (largest, current) =>
+                Number(
+                    current.customers
+                ) >
+                Number(
+                    largest.customers
+                )
+                    ? current
+                    : largest
+        );
+
+
+    /*
+     * Fastest resolution segment.
+     */
+
+    const fastestSegment =
+        segments.reduce(
+            (fastest, current) =>
+                Number(
+                    current.avg_resolution_hours
+                ) <
+                Number(
+                    fastest.avg_resolution_hours
+                )
+                    ? current
+                    : fastest
+        );
+
+
+    /* =====================================================
+       SEGMENT DISTRIBUTION CHART
+    ===================================================== */
+
+    const canvas =
+        getElement(
+            "segment-distribution-chart"
+        );
+
+
+    if (
+        canvas &&
+        typeof Chart !== "undefined"
+    ) {
+
+        /*
+         * Destroy previous chart if
+         * renderSegments is called again.
+         */
+
+        if (charts.segment) {
+            charts.segment.destroy();
+            charts.segment = null;
+        }
+
+
+        const labels =
+            segments.map(
+                segment =>
+                    segment.segment
+            );
+
+
+        const values =
+            segments.map(
+                segment =>
+                    Number(
+                        segment.customers
+                    )
+            );
+
+
+        charts.segment =
+            new Chart(
+                canvas,
+                {
+                    type: "doughnut",
+
+                    data: {
+
+                        labels: labels,
+
+                        datasets: [
+                            {
+                                data: values,
+
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false,
+
+                        cutout: "62%",
+
+
+                        plugins: {
+
+                            legend: {
+                                display: false
+                            },
+
+
+                            tooltip: {
+
+                                callbacks: {
+
+                                    label:
+                                        function(
+                                            context
+                                        ) {
+
+                                            const value =
+                                                Number(
+                                                    context.raw
+                                                );
+
+
+                                            const percentage =
+                                                totalCustomers > 0
+                                                    ? (
+                                                        value /
+                                                        totalCustomers
+                                                    ) * 100
+                                                    : 0;
+
+
+                                            return (
+                                                ` ${formatNumber(
+                                                    value
+                                                )} customers ` +
+                                                `(${percentage.toFixed(
+                                                    1
+                                                )}%)`
+                                            );
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+    }
+
+
+    /*
+     * If Chart.js is unavailable,
+     * show a useful message.
+     */
+
+    else if (canvas) {
+
+        const wrapper =
+            canvas.parentElement;
+
+        if (wrapper) {
+
+            wrapper.innerHTML = `
+                <div class="chart-error">
+                    Chart.js could not be loaded.
+                </div>
+            `;
+        }
+    }
+
+
+    /* =====================================================
+       CHART LEGEND
+    ===================================================== */
+
+    const legend =
+        getElement(
+            "segment-chart-legend"
+        );
+
+
+    if (legend) {
+
+        legend.innerHTML =
+            segments
+                .map(segment => {
+
+                    const customers =
+                        Number(
+                            segment.customers
+                        );
+
+
+                    const percentage =
+                        totalCustomers > 0
+                            ? (
+                                customers /
+                                totalCustomers
+                            ) * 100
+                            : 0;
+
+
+                    return `
+
+                        <div class="legend-item">
+
+                            <span class="legend-dot"></span>
+
+                            <span class="legend-name">
+                                ${segment.segment}
+                            </span>
+
+                            <strong>
+                                ${formatNumber(
+                                    customers
+                                )}
+                            </strong>
+
+                            <span class="legend-percent">
+                                ${percentage.toFixed(
+                                    1
+                                )}%
+                            </span>
+
+                        </div>
+                    `;
+                })
+                .join("");
+    }
+
+
+    /* =====================================================
+       KEY INSIGHTS
+    ===================================================== */
+
+    const insights =
+        getElement(
+            "segment-insights"
+        );
+
+
+    if (insights) {
+
+        const largestPercentage =
+            totalCustomers > 0
+                ? (
+                    Number(
+                        largestSegment.customers
+                    ) /
+                    totalCustomers
+                ) * 100
+                : 0;
+
+
+        insights.innerHTML = `
+
+            <!-- Best Performing -->
+
+            <div class="insight-item">
+
+                <div class="insight-icon success">
+                    ★
+                </div>
+
+                <div>
+
+                    <span class="insight-label">
+                        Best Performing
+                    </span>
+
+                    <strong>
+                        ${bestSegment.segment}
+                    </strong>
+
+                    <small>
+                        ${formatNumber(
+                            bestSegment.avg_satisfaction,
+                            2
+                        )} / 5 satisfaction
+                        ·
+                        ${formatNumber(
+                            bestSegment.avg_resolution_hours,
+                            2
+                        )} hrs resolution
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <!-- Highest Risk -->
+
+            <div class="insight-item">
+
+                <div class="insight-icon danger">
+                    !
+                </div>
+
+                <div>
+
+                    <span class="insight-label">
+                        Highest Risk
+                    </span>
+
+                    <strong>
+                        ${highestRiskSegment.segment}
+                    </strong>
+
+                    <small>
+                        ${formatNumber(
+                            highestRiskSegment.avg_satisfaction,
+                            2
+                        )} / 5 satisfaction
+                        ·
+                        ${formatNumber(
+                            highestRiskSegment.avg_resolution_hours,
+                            2
+                        )} hrs resolution
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <!-- Largest Segment -->
+
+            <div class="insight-item">
+
+                <div class="insight-icon primary">
+                    👥
+                </div>
+
+                <div>
+
+                    <span class="insight-label">
+                        Largest Segment
+                    </span>
+
+                    <strong>
+                        ${largestSegment.segment}
+                    </strong>
+
+                    <small>
+                        ${formatNumber(
+                            largestSegment.customers
+                        )}
+                        customers
+                        ·
+                        ${largestPercentage.toFixed(
+                            1
+                        )}%
+                        of segmented customers
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <!-- Fastest Resolution -->
+
+            <div class="insight-item">
+
+                <div class="insight-icon speed">
+                    ⚡
+                </div>
+
+                <div>
+
+                    <span class="insight-label">
+                        Fastest Resolution
+                    </span>
+
+                    <strong>
+                        ${fastestSegment.segment}
+                    </strong>
+
+                    <small>
+                        ${formatNumber(
+                            fastestSegment.avg_resolution_hours,
+                            2
+                        )} hrs average resolution
+                    </small>
+
+                </div>
+
+            </div>
+
+        `;
+    }
 }
 
 
@@ -378,6 +1193,7 @@ async function loadSatisfaction() {
 
 
 function renderSatisfaction(data) {
+
     const low =
         getElement(
             "low-satisfaction"
@@ -398,21 +1214,27 @@ function renderSatisfaction(data) {
             "model-accuracy"
         );
 
+
     if (low) {
+
         low.textContent =
             formatNumber(
                 data.low_satisfaction_tickets
             );
     }
 
+
     if (satisfied) {
+
         satisfied.textContent =
             formatNumber(
                 data.satisfied_tickets
             );
     }
 
+
     if (rate) {
+
         rate.textContent =
             `${formatNumber(
                 data.low_satisfaction_percentage,
@@ -420,7 +1242,9 @@ function renderSatisfaction(data) {
             )}%`;
     }
 
+
     if (accuracy) {
+
         accuracy.textContent =
             `${formatNumber(
                 data.model_accuracy,
@@ -435,15 +1259,12 @@ function renderSatisfaction(data) {
 ========================================================= */
 
 async function loadTicketData() {
+
     try {
+
         /*
-         * ticket_data.json is located in the repository ROOT.
-         *
-         * Correct:
-         *     ticket_data.json
-         *
-         * Not:
-         *     data/ticket_data.json
+         * ticket_data.json is located
+         * in the repository ROOT.
          */
 
         const response =
@@ -454,53 +1275,69 @@ async function loadTicketData() {
                 }
             );
 
+
         if (!response.ok) {
+
             throw new Error(
                 `Unable to load ticket_data.json: HTTP ${response.status}`
             );
         }
 
+
         const text =
             await response.text();
+
 
         ticketData =
             JSON.parse(
                 cleanJSONText(text)
             );
 
+
         if (!Array.isArray(ticketData)) {
+
             throw new Error(
                 "ticket_data.json must contain an array."
             );
         }
 
+
         console.log(
             `Loaded ${ticketData.length} tickets.`
         );
+
 
         initializeFilters();
 
         updateFilteredDashboard();
 
+
         return ticketData;
 
+
     } catch (error) {
+
         console.error(
             "Ticket data error:",
             error
         );
 
+
         ticketData = [];
+
 
         const status =
             getElement(
                 "filter-result-status"
             );
 
+
         if (status) {
+
             status.textContent =
                 "Ticket-level data could not be loaded.";
         }
+
 
         return [];
     }
@@ -515,26 +1352,32 @@ function getTicketValue(
     ticket,
     possibleNames
 ) {
+
     for (
         const name of possibleNames
     ) {
+
         if (
             Object.prototype.hasOwnProperty.call(
                 ticket,
                 name
             )
         ) {
+
             const value =
                 ticket[name];
+
 
             if (
                 value !== null &&
                 value !== undefined
             ) {
+
                 return value;
             }
         }
     }
+
 
     return null;
 }
@@ -545,6 +1388,7 @@ function getTicketValue(
 ========================================================= */
 
 function inferSegment(ticket) {
+
     const ageRaw =
         getTicketValue(
             ticket,
@@ -553,6 +1397,7 @@ function inferSegment(ticket) {
                 "customer_age"
             ]
         );
+
 
     const satisfactionRaw =
         getTicketValue(
@@ -563,11 +1408,11 @@ function inferSegment(ticket) {
             ]
         );
 
+
     /*
-     * IMPORTANT:
+     * Missing age defaults to 30.
      *
-     * Convert only actual values.
-     * Do not convert null to 0.
+     * Missing satisfaction defaults to 3.
      */
 
     const age =
@@ -576,39 +1421,61 @@ function inferSegment(ticket) {
             ? 30
             : Number(ageRaw);
 
+
     const satisfaction =
         satisfactionRaw === null ||
         satisfactionRaw === ""
             ? 3
             : Number(satisfactionRaw);
 
+
     const safeAge =
         Number.isFinite(age)
             ? age
             : 30;
+
 
     const safeSatisfaction =
         Number.isFinite(satisfaction)
             ? satisfaction
             : 3;
 
+
     let ageGroup;
 
+
     if (safeAge < 40) {
-        ageGroup = "Young";
+
+        ageGroup =
+            "Young";
+
     } else if (safeAge < 55) {
-        ageGroup = "Middle Age";
+
+        ageGroup =
+            "Middle Age";
+
     } else {
-        ageGroup = "Older";
+
+        ageGroup =
+            "Older";
     }
 
-    if (safeSatisfaction <= 2) {
+
+    if (
+        safeSatisfaction <= 2
+    ) {
+
         return `${ageGroup} - At Risk and Fast`;
     }
 
-    if (safeSatisfaction >= 4) {
+
+    if (
+        safeSatisfaction >= 4
+    ) {
+
         return `${ageGroup} - Highly Satisfied and Fast`;
     }
+
 
     return `${ageGroup} - Satisfied but Slow`;
 }
@@ -623,34 +1490,44 @@ function populateSelect(
     defaultText,
     values
 ) {
+
     if (!select) {
         return;
     }
 
+
     select.innerHTML = "";
+
 
     const defaultOption =
         document.createElement(
             "option"
         );
 
+
     defaultOption.value = "";
 
     defaultOption.textContent =
         defaultText;
 
+
     select.appendChild(
         defaultOption
     );
 
+
     values.forEach(value => {
+
         const option =
             document.createElement(
                 "option"
             );
 
+
         option.value = value;
+
         option.textContent = value;
+
 
         select.appendChild(
             option
@@ -664,40 +1541,50 @@ function populateSelect(
 ========================================================= */
 
 function initializeFilters() {
+
     if (!ticketData.length) {
         return;
     }
+
 
     const priorityFilter =
         getElement(
             "priority-filter"
         );
 
+
     const typeFilter =
         getElement(
             "type-filter"
         );
+
 
     const channelFilter =
         getElement(
             "channel-filter"
         );
 
+
     const segmentFilter =
         getElement(
             "segment-filter-main"
         );
 
+
     const priorities =
         new Set();
+
 
     const types =
         new Set();
 
+
     const channels =
         new Set();
 
+
     ticketData.forEach(ticket => {
+
         const priority =
             getTicketValue(
                 ticket,
@@ -706,6 +1593,7 @@ function initializeFilters() {
                     "ticket_priority"
                 ]
             );
+
 
         const type =
             getTicketValue(
@@ -716,6 +1604,7 @@ function initializeFilters() {
                 ]
             );
 
+
         const channel =
             getTicketValue(
                 ticket,
@@ -725,18 +1614,22 @@ function initializeFilters() {
                 ]
             );
 
+
         if (priority) {
             priorities.add(priority);
         }
+
 
         if (type) {
             types.add(type);
         }
 
+
         if (channel) {
             channels.add(channel);
         }
     });
+
 
     populateSelect(
         priorityFilter,
@@ -744,11 +1637,13 @@ function initializeFilters() {
         [...priorities].sort()
     );
 
+
     populateSelect(
         typeFilter,
         "All Ticket Types",
         [...types].sort()
     );
+
 
     populateSelect(
         channelFilter,
@@ -756,14 +1651,23 @@ function initializeFilters() {
         [...channels].sort()
     );
 
+
     const officialSegments = [
+
         "Middle Age - Highly Satisfied and Fast",
+
         "Older - At Risk and Fast",
+
         "Older - At Risk and Slow",
+
         "Older - Satisfied but Slow",
+
         "Young - At Risk and Fast",
+
         "Young - Satisfied but Slow"
+
     ];
+
 
     populateSelect(
         segmentFilter,
@@ -771,13 +1675,16 @@ function initializeFilters() {
         officialSegments
     );
 
+
     [
         priorityFilter,
         typeFilter,
         channelFilter,
         segmentFilter
     ].forEach(filter => {
+
         if (filter) {
+
             filter.addEventListener(
                 "change",
                 updateFilteredDashboard
@@ -785,12 +1692,15 @@ function initializeFilters() {
         }
     });
 
+
     const resetButton =
         getElement(
             "reset-filters"
         );
 
+
     if (resetButton) {
+
         resetButton.addEventListener(
             "click",
             resetFilters
@@ -804,32 +1714,39 @@ function initializeFilters() {
 ========================================================= */
 
 function getFilteredTickets() {
+
     if (!ticketData.length) {
         return [];
     }
+
 
     const priority =
         getElement(
             "priority-filter"
         )?.value || "";
 
+
     const type =
         getElement(
             "type-filter"
         )?.value || "";
+
 
     const channel =
         getElement(
             "channel-filter"
         )?.value || "";
 
+
     const segment =
         getElement(
             "segment-filter-main"
         )?.value || "";
 
+
     return ticketData.filter(
         ticket => {
+
             const ticketPriority =
                 getTicketValue(
                     ticket,
@@ -838,6 +1755,7 @@ function getFilteredTickets() {
                         "ticket_priority"
                     ]
                 );
+
 
             const ticketType =
                 getTicketValue(
@@ -848,6 +1766,7 @@ function getFilteredTickets() {
                     ]
                 );
 
+
             const ticketChannel =
                 getTicketValue(
                     ticket,
@@ -857,8 +1776,10 @@ function getFilteredTickets() {
                     ]
                 );
 
+
             const ticketSegment =
                 inferSegment(ticket);
+
 
             const priorityMatch =
                 !priority ||
@@ -867,12 +1788,14 @@ function getFilteredTickets() {
                 ) ===
                 normalize(priority);
 
+
             const typeMatch =
                 !type ||
                 normalize(
                     ticketType
                 ) ===
                 normalize(type);
+
 
             const channelMatch =
                 !channel ||
@@ -881,12 +1804,14 @@ function getFilteredTickets() {
                 ) ===
                 normalize(channel);
 
+
             const segmentMatch =
                 !segment ||
                 normalize(
                     ticketSegment
                 ) ===
                 normalize(segment);
+
 
             return (
                 priorityMatch &&
@@ -904,64 +1829,88 @@ function getFilteredTickets() {
 ========================================================= */
 
 function updateFilteredDashboard() {
+
     const filteredTickets =
         getFilteredTickets();
+
 
     const countElement =
         getElement(
             "filtered-ticket-count"
         );
 
+
     const satisfactionElement =
         getElement(
             "filtered-average-satisfaction"
         );
+
 
     const resolutionElement =
         getElement(
             "filtered-average-resolution"
         );
 
+
     const statusElement =
         getElement(
             "filter-result-status"
         );
+
 
     const filteredStats =
         getElement(
             "filtered-stats"
         );
 
+
     if (!ticketData.length) {
+
         if (countElement) {
+
             countElement.textContent =
                 "0";
         }
 
+
         if (satisfactionElement) {
+
             satisfactionElement.textContent =
                 "N/A";
         }
 
+
         if (resolutionElement) {
+
             resolutionElement.textContent =
                 "See analytics";
         }
 
+
         if (statusElement) {
+
             statusElement.textContent =
                 "Loading ticket data...";
         }
 
+
         return;
     }
 
+
+    /*
+     * Let CSS control the layout.
+     */
+
     if (filteredStats) {
+
         filteredStats.style.display =
-            "block";
+            "";
     }
 
+
     if (countElement) {
+
         countElement.textContent =
             formatNumber(
                 filteredTickets.length
@@ -969,25 +1918,15 @@ function updateFilteredDashboard() {
     }
 
 
-    /* ---------------------------------------------------------
-       CORRECT SATISFACTION CALCULATION
-       ---------------------------------------------------------
-
-       IMPORTANT:
-
-       null must NOT become 0.
-
-       Number(null) === 0
-
-       That was causing the incorrect
-       0.98 / 5 result.
-
-       We explicitly ignore missing ratings.
-    */
+    /* =====================================================
+       SATISFACTION CALCULATION
+    ===================================================== */
 
     const satisfactionValues =
         filteredTickets
+
             .map(ticket => {
+
                 const rawValue =
                     getTicketValue(
                         ticket,
@@ -997,25 +1936,37 @@ function updateFilteredDashboard() {
                         ]
                     );
 
+
+                /*
+                 * Missing ratings are ignored.
+                 */
+
                 if (
                     rawValue === null ||
                     rawValue === undefined ||
                     rawValue === ""
                 ) {
+
                     return null;
                 }
+
 
                 const value =
                     Number(rawValue);
 
+
                 if (
                     !Number.isFinite(value)
                 ) {
+
                     return null;
                 }
 
+
                 return value;
             })
+
+
             .filter(
                 value =>
                     value !== null
@@ -1023,9 +1974,11 @@ function updateFilteredDashboard() {
 
 
     if (satisfactionElement) {
+
         if (
             satisfactionValues.length
         ) {
+
             const total =
                 satisfactionValues.reduce(
                     (sum, value) =>
@@ -1033,9 +1986,11 @@ function updateFilteredDashboard() {
                     0
                 );
 
+
             const average =
                 total /
                 satisfactionValues.length;
+
 
             satisfactionElement.textContent =
                 `${formatNumber(
@@ -1044,48 +1999,55 @@ function updateFilteredDashboard() {
                 )} / 5`;
 
         } else {
+
             satisfactionElement.textContent =
                 "N/A";
         }
     }
 
 
-    /* ---------------------------------------------------------
+    /* =====================================================
        FILTERED RESOLUTION
-       ---------------------------------------------------------
+    ===================================================== */
 
-       ticket_data.json has no usable
-       Time to Resolution values.
-
-       Therefore we intentionally use:
-       "See analytics"
-
-       instead of showing a false number.
-    */
+    /*
+     * ticket_data.json currently does not contain
+     * usable Time to Resolution values.
+     *
+     * Therefore we intentionally do not calculate
+     * a misleading filtered resolution value.
+     */
 
     if (resolutionElement) {
+
         resolutionElement.textContent =
             "See analytics";
     }
 
 
-    /* ---------------------------------------------------------
+    /* =====================================================
        FILTER STATUS
-    */
+    ===================================================== */
 
     if (statusElement) {
+
         const total =
             ticketData.length;
+
 
         const count =
             filteredTickets.length;
 
+
         if (count === total) {
+
             statusElement.textContent =
                 `Showing all ${formatNumber(
                     total
                 )} tickets.`;
+
         } else {
+
             statusElement.textContent =
                 `Showing ${formatNumber(
                     count
@@ -1102,21 +2064,32 @@ function updateFilteredDashboard() {
 ========================================================= */
 
 function resetFilters() {
+
     const filterIds = [
+
         "priority-filter",
+
         "type-filter",
+
         "channel-filter",
+
         "segment-filter-main"
+
     ];
 
+
     filterIds.forEach(id => {
+
         const element =
             getElement(id);
 
+
         if (element) {
+
             element.value = "";
         }
     });
+
 
     updateFilteredDashboard();
 }
@@ -1127,15 +2100,17 @@ function resetFilters() {
 ========================================================= */
 
 async function loadResolutionData() {
+
     /*
      * Load all three files independently.
      *
-     * This prevents one failed file from stopping
-     * the other charts.
+     * This prevents one failed file from
+     * stopping the other charts.
      */
 
     const results =
         await Promise.allSettled([
+
             loadJSON(
                 FILES.resolutionPriority
             ),
@@ -1147,20 +2122,25 @@ async function loadResolutionData() {
             loadJSON(
                 FILES.resolutionChannel
             )
+
         ]);
 
+
     return {
+
         priority:
             results[0].status ===
             "fulfilled"
                 ? results[0].value
                 : null,
 
+
         type:
             results[1].status ===
             "fulfilled"
                 ? results[1].value
                 : null,
+
 
         channel:
             results[2].status ===
@@ -1176,21 +2156,26 @@ async function loadResolutionData() {
 ========================================================= */
 
 function extractResolutionRows(data) {
+
     if (!data) {
         return [];
     }
 
+
     if (Array.isArray(data)) {
         return data;
     }
+
 
     if (
         Array.isArray(
             data.data
         )
     ) {
+
         return data.data;
     }
+
 
     return [];
 }
@@ -1201,34 +2186,48 @@ function extractResolutionRows(data) {
 ========================================================= */
 
 function getResolutionValue(row) {
+
     const possibleValues = [
+
         row.average_resolution_hours,
+
         row.averageResolutionHours,
+
         row["Average Resolution Hours"],
+
         row.average_resolution,
+
         row["Average Resolution"]
+
     ];
+
 
     for (
         const rawValue of possibleValues
     ) {
+
         if (
             rawValue === null ||
             rawValue === undefined ||
             rawValue === ""
         ) {
+
             continue;
         }
+
 
         const value =
             Number(rawValue);
 
+
         if (
             Number.isFinite(value)
         ) {
+
             return value;
         }
     }
+
 
     return null;
 }
@@ -1239,17 +2238,20 @@ function getResolutionValue(row) {
 ========================================================= */
 
 function destroyChart(chartKey) {
+
     if (
         charts[chartKey]
     ) {
+
         charts[chartKey].destroy();
+
         charts[chartKey] = null;
     }
 }
 
 
 /* =========================================================
-   CREATE CHART
+   CREATE RESOLUTION CHART
 ========================================================= */
 
 function createResolutionChart(
@@ -1259,10 +2261,15 @@ function createResolutionChart(
     values,
     title
 ) {
+
     const container =
-        getElement(containerId);
+        getElement(
+            containerId
+        );
+
 
     if (!container) {
+
         console.error(
             `Missing chart container: ${containerId}`
         );
@@ -1270,16 +2277,21 @@ function createResolutionChart(
         return;
     }
 
-    destroyChart(chartKey);
+
+    destroyChart(
+        chartKey
+    );
+
 
     /*
-     * Remove "Loading data..."
+     * Remove loading text.
      */
 
     container.innerHTML = "";
 
+
     /*
-     * Create canvas dynamically.
+     * Create canvas.
      */
 
     const canvas =
@@ -1287,19 +2299,23 @@ function createResolutionChart(
             "canvas"
         );
 
+
     canvas.setAttribute(
         "role",
         "img"
     );
+
 
     canvas.setAttribute(
         "aria-label",
         title
     );
 
+
     container.appendChild(
         canvas
     );
+
 
     /*
      * Check Chart.js.
@@ -1309,18 +2325,25 @@ function createResolutionChart(
         typeof Chart ===
         "undefined"
     ) {
+
         console.error(
             "Chart.js is not available."
         );
 
+
         container.innerHTML = `
+
             <div class="chart-error">
+
                 Chart.js could not be loaded.
+
             </div>
+
         `;
 
         return;
     }
+
 
     /*
      * Validate chart data.
@@ -1330,6 +2353,7 @@ function createResolutionChart(
         labels.length === 0 ||
         values.length === 0
     ) {
+
         showChartError(
             containerId,
             "No resolution data available."
@@ -1337,6 +2361,7 @@ function createResolutionChart(
 
         return;
     }
+
 
     /*
      * Create Chart.js chart.
@@ -1346,52 +2371,77 @@ function createResolutionChart(
         new Chart(
             canvas,
             {
+
                 type: "bar",
 
+
                 data: {
+
                     labels: labels,
 
+
                     datasets: [
+
                         {
+
                             label:
                                 "Average Resolution Time (hrs)",
 
                             data: values,
 
                             borderWidth: 1
+
                         }
+
                     ]
                 },
 
+
                 options: {
+
                     responsive: true,
 
                     maintainAspectRatio:
                         false,
 
+
                     animation: {
+
                         duration: 500
+
                     },
 
+
                     plugins: {
+
                         legend: {
+
                             display: false
+
                         },
 
+
                         title: {
+
                             display: true,
 
                             text: title
+
                         },
 
+
                         tooltip: {
+
                             callbacks: {
+
                                 label:
-                                    function (
+                                    function(
                                         context
                                     ) {
+
                                         const value =
                                             context.parsed.y;
+
 
                                         return (
                                             " " +
@@ -1404,11 +2454,16 @@ function createResolutionChart(
                         }
                     },
 
+
                     scales: {
+
                         y: {
+
                             beginAtZero: true,
 
+
                             title: {
+
                                 display: true,
 
                                 text:
@@ -1416,8 +2471,11 @@ function createResolutionChart(
                             }
                         },
 
+
                         x: {
+
                             title: {
+
                                 display: true,
 
                                 text:
@@ -1436,12 +2494,15 @@ function createResolutionChart(
 ========================================================= */
 
 function renderPriorityChart(data) {
+
     const rows =
         extractResolutionRows(
             data
         );
 
+
     if (!rows.length) {
+
         showChartError(
             "priority-chart",
             "Resolution-by-priority data unavailable."
@@ -1450,29 +2511,39 @@ function renderPriorityChart(data) {
         return;
     }
 
+
     const labels = [];
+
     const values = [];
 
+
     rows.forEach(row => {
+
         const label =
             row.priority ??
             row.Priority ??
             "Unknown";
+
 
         const value =
             getResolutionValue(
                 row
             );
 
+
         if (
             value !== null
         ) {
+
             labels.push(label);
+
             values.push(value);
         }
     });
 
+
     if (!labels.length) {
+
         showChartError(
             "priority-chart",
             "No valid priority resolution values found."
@@ -1481,12 +2552,19 @@ function renderPriorityChart(data) {
         return;
     }
 
+
     createResolutionChart(
+
         "priority-chart",
+
         "priority",
+
         labels,
+
         values,
+
         "Average Resolution Time by Priority"
+
     );
 }
 
@@ -1496,12 +2574,15 @@ function renderPriorityChart(data) {
 ========================================================= */
 
 function renderTypeChart(data) {
+
     const rows =
         extractResolutionRows(
             data
         );
 
+
     if (!rows.length) {
+
         showChartError(
             "type-chart",
             "Resolution-by-ticket-type data unavailable."
@@ -1510,30 +2591,40 @@ function renderTypeChart(data) {
         return;
     }
 
+
     const labels = [];
+
     const values = [];
 
+
     rows.forEach(row => {
+
         const label =
             row.ticket_type ??
             row.ticketType ??
             row["Ticket Type"] ??
             "Unknown";
 
+
         const value =
             getResolutionValue(
                 row
             );
 
+
         if (
             value !== null
         ) {
+
             labels.push(label);
+
             values.push(value);
         }
     });
 
+
     if (!labels.length) {
+
         showChartError(
             "type-chart",
             "No valid ticket-type resolution values found."
@@ -1542,12 +2633,19 @@ function renderTypeChart(data) {
         return;
     }
 
+
     createResolutionChart(
+
         "type-chart",
+
         "type",
+
         labels,
+
         values,
+
         "Average Resolution Time by Ticket Type"
+
     );
 }
 
@@ -1557,12 +2655,15 @@ function renderTypeChart(data) {
 ========================================================= */
 
 function renderChannelChart(data) {
+
     const rows =
         extractResolutionRows(
             data
         );
 
+
     if (!rows.length) {
+
         showChartError(
             "channel-chart",
             "Resolution-by-channel data unavailable."
@@ -1571,30 +2672,40 @@ function renderChannelChart(data) {
         return;
     }
 
+
     const labels = [];
+
     const values = [];
 
+
     rows.forEach(row => {
+
         const label =
             row.channel ??
             row.Channel ??
             row["Ticket Channel"] ??
             "Unknown";
 
+
         const value =
             getResolutionValue(
                 row
             );
 
+
         if (
             value !== null
         ) {
+
             labels.push(label);
+
             values.push(value);
         }
     });
 
+
     if (!labels.length) {
+
         showChartError(
             "channel-chart",
             "No valid channel resolution values found."
@@ -1603,39 +2714,46 @@ function renderChannelChart(data) {
         return;
     }
 
+
     createResolutionChart(
+
         "channel-chart",
+
         "channel",
+
         labels,
+
         values,
+
         "Average Resolution Time by Support Channel"
+
     );
 }
 
 
 /* =========================================================
-   RENDER ALL THREE RESOLUTION CHARTS
+   RENDER ALL RESOLUTION CHARTS
 ========================================================= */
 
 function renderResolutionCharts(
     resolutionData
 ) {
+
     console.log(
         "Resolution analytics loaded:",
         resolutionData
     );
 
-    /*
-     * Each chart is rendered independently.
-     */
 
     renderPriorityChart(
         resolutionData.priority
     );
 
+
     renderTypeChart(
         resolutionData.type
     );
+
 
     renderChannelChart(
         resolutionData.channel
@@ -1651,17 +2769,28 @@ function showChartError(
     containerId,
     message
 ) {
+
     const container =
-        getElement(containerId);
+        getElement(
+            containerId
+        );
+
 
     if (!container) {
         return;
     }
 
+
     container.innerHTML = `
+
         <div class="chart-error">
-            <p>${message}</p>
+
+            <p>
+                ${message}
+            </p>
+
         </div>
+
     `;
 }
 
@@ -1671,21 +2800,33 @@ function showChartError(
 ========================================================= */
 
 async function initializeDashboard() {
+
     try {
+
         /*
          * Load dashboard information.
          */
 
         const [
+
             metrics,
+
             segments,
+
             satisfaction,
+
             resolution
+
         ] = await Promise.all([
+
             loadMetrics(),
+
             loadSegments(),
+
             loadSatisfaction(),
+
             loadResolutionData()
+
         ]);
 
 
@@ -1697,9 +2838,11 @@ async function initializeDashboard() {
             metrics
         );
 
+
         renderSegments(
             segments
         );
+
 
         renderSatisfaction(
             satisfaction
@@ -1722,7 +2865,9 @@ async function initializeDashboard() {
 
         await loadTicketData();
 
+
     } catch (error) {
+
         console.error(
             "Dashboard initialization error:",
             error
@@ -1739,3 +2884,4 @@ document.addEventListener(
     "DOMContentLoaded",
     initializeDashboard
 );
+
