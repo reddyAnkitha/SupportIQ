@@ -2,23 +2,41 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SupportIQ - Customer Support Intelligence</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="style.css">
+    <title>
+        SupportIQ - Customer Support Intelligence
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="style.css">
+
 </head>
 
+
 <body>
+
 
     <!-- =====================================================
          HEADER
     ====================================================== -->
 
     <header>
-        <h1>SupportIQ</h1>
-        <p>Customer Support Intelligence Platform</p>
+
+        <h1>
+            SupportIQ
+        </h1>
+
+        <p>
+            Customer Support Intelligence Platform
+        </p>
+
     </header>
 
 
@@ -27,23 +45,62 @@
     ====================================================== -->
 
     <nav>
-        <a href="#dashboard">Dashboard</a>
-        <a href="#segments">Customer Segmentation</a>
-        <a href="#satisfaction">Satisfaction Risk</a>
-        <a href="#resolution">Resolution Analytics</a>
-        <a href="#about">About</a>
+
+        <a href="#dashboard">
+            Dashboard
+        </a>
+
+        <a href="#segments">
+            Customer Segmentation
+        </a>
+
+        <a href="#satisfaction">
+            Satisfaction Risk
+        </a>
+
+        <a href="#resolution">
+            Resolution Analytics
+        </a>
+
+        <a href="#about">
+            About
+        </a>
+
     </nav>
 
 
+    <!-- =====================================================
+         MAIN CONTENT
+    ====================================================== -->
+
     <main>
+
+
+        <!-- =================================================
+             DASHBOARD STATUS
+        ================================================== -->
+
+        <div
+            id="dashboard-status"
+            class="dashboard-status"
+            role="status"
+            aria-live="polite"
+            style="display: none;">
+
+        </div>
+
 
         <!-- =================================================
              DASHBOARD
         ================================================== -->
 
-        <section class="welcome" id="dashboard">
+        <section
+            class="welcome"
+            id="dashboard">
 
-            <h2>Customer Support Dashboard</h2>
+            <h2>
+                Customer Support Dashboard
+            </h2>
 
             <p>
                 Monitor customer satisfaction, ticket resolution,
@@ -60,40 +117,82 @@
 
         <div class="cards">
 
-            <div class="card">
-                <h3>Total Tickets</h3>
 
-                <div class="value" id="total-tickets">
+            <!-- TOTAL TICKETS -->
+
+            <div class="card">
+
+                <h3>
+                    Total Tickets
+                </h3>
+
+                <div
+                    class="value"
+                    id="total-tickets">
+
                     Loading...
+
                 </div>
+
             </div>
 
 
-            <div class="card">
-                <h3>Average Satisfaction</h3>
+            <!-- AVERAGE SATISFACTION -->
 
-                <div class="value" id="average-satisfaction">
+            <div class="card">
+
+                <h3>
+                    Average Satisfaction
+                </h3>
+
+                <div
+                    class="value"
+                    id="average-satisfaction">
+
                     Loading...
+
                 </div>
+
             </div>
 
 
-            <div class="card">
-                <h3>Avg Resolution Time</h3>
+            <!-- AVERAGE RESOLUTION -->
 
-                <div class="value" id="average-resolution">
+            <div class="card">
+
+                <h3>
+                    Avg Resolution Time
+                </h3>
+
+                <div
+                    class="value"
+                    id="average-resolution">
+
                     Loading...
+
                 </div>
+
             </div>
 
 
-            <div class="card">
-                <h3>Customer Segments</h3>
+            <!-- CUSTOMER SEGMENTS -->
 
-                <div class="value" id="customer-segments">
+            <div class="card">
+
+                <h3>
+                    Customer Segments
+                </h3>
+
+                <div
+                    class="value"
+                    id="customer-segments">
+
                     Loading...
+
                 </div>
+
             </div>
+
 
         </div>
 
@@ -104,34 +203,45 @@
 
         <section id="segments">
 
-            <h2>Customer Segmentation</h2>
+            <h2>
+                Customer Segmentation
+            </h2>
 
             <p>
-                Six customer segments were identified using K-Means
-                clustering on customer-level features including age,
-                average satisfaction, and average resolution time.
-                Segment labels were generated from the resulting
-                cluster profiles.
+                Six customer segments were identified using
+                K-Means clustering on customer-level features
+                including age, average satisfaction, and
+                average resolution time. Segment labels were
+                generated from the resulting cluster profiles.
             </p>
 
 
-            <!-- ML SEGMENT OVERVIEW -->
+            <!-- =================================================
+                 ML SEGMENT OVERVIEW
+            ================================================== -->
 
             <div class="segment-dashboard">
 
-                <!-- Segment Table -->
+
+                <!-- =================================================
+                     SEGMENT TABLE
+                ================================================== -->
 
                 <div class="segment-table-card">
 
                     <div class="section-heading">
 
                         <div>
-                            <h3>Customer Segment Profiles</h3>
+
+                            <h3>
+                                Customer Segment Profiles
+                            </h3>
 
                             <p>
                                 ML-generated customer groups based on
                                 behavioral and support characteristics.
                             </p>
+
                         </div>
 
                     </div>
@@ -140,7 +250,9 @@
                     <div id="segment-container">
 
                         <div class="loading-message">
+
                             Loading customer segments...
+
                         </div>
 
                     </div>
@@ -148,27 +260,43 @@
                 </div>
 
 
-                <!-- Segment Visual -->
+                <!-- =================================================
+                     SEGMENT DISTRIBUTION
+                ================================================== -->
 
                 <div class="segment-chart-card">
 
-                    <h3>Segment Distribution</h3>
+                    <h3>
+                        Segment Distribution
+                    </h3>
 
                     <p>
                         Customer distribution across the six
                         machine-learning segments.
                     </p>
 
+
                     <div class="segment-chart-wrapper">
 
                         <canvas
-                            id="segment-chart"
-                            aria-label="Customer segment distribution chart">
+                            id="segment-distribution-chart"
+                            aria-label="Customer segment distribution chart"
+                            role="img">
+
                         </canvas>
 
                     </div>
 
+                    <!-- Chart legend generated by JavaScript -->
+
+                    <div
+                        id="segment-chart-legend"
+                        class="segment-chart-legend">
+
+                    </div>
+
                 </div>
+
 
             </div>
 
@@ -181,67 +309,95 @@
 
         <section id="satisfaction">
 
-            <h2>Satisfaction Risk</h2>
+            <h2>
+                Satisfaction Risk
+            </h2>
 
             <p>
-                Customer satisfaction risk was analyzed using closed
-                support tickets. Ratings of 1 or 2 were classified
-                as low satisfaction.
+                Customer satisfaction risk was analyzed using
+                closed support tickets. Ratings of 1 or 2 were
+                classified as low satisfaction.
             </p>
 
 
             <div class="cards">
 
+
+                <!-- LOW SATISFACTION -->
+
                 <div class="card">
 
-                    <h3>Low Satisfaction</h3>
+                    <h3>
+                        Low Satisfaction
+                    </h3>
 
                     <div
                         class="value"
                         id="low-satisfaction">
+
                         Loading...
+
                     </div>
 
                 </div>
 
 
+                <!-- SATISFIED CUSTOMERS -->
+
                 <div class="card">
 
-                    <h3>Satisfied Customers</h3>
+                    <h3>
+                        Satisfied Customers
+                    </h3>
 
                     <div
                         class="value"
                         id="satisfied-customers">
+
                         Loading...
+
                     </div>
 
                 </div>
 
 
+                <!-- LOW SATISFACTION RATE -->
+
                 <div class="card">
 
-                    <h3>Low Satisfaction Rate</h3>
+                    <h3>
+                        Low Satisfaction Rate
+                    </h3>
 
                     <div
                         class="value"
                         id="low-satisfaction-rate">
+
                         Loading...
+
                     </div>
 
                 </div>
 
 
+                <!-- MODEL ACCURACY -->
+
                 <div class="card">
 
-                    <h3>Model Accuracy</h3>
+                    <h3>
+                        Model Accuracy
+                    </h3>
 
                     <div
                         class="value"
                         id="model-accuracy">
+
                         Loading...
+
                     </div>
 
                 </div>
+
 
             </div>
 
@@ -254,7 +410,9 @@
 
         <section id="resolution">
 
-            <h2>Resolution Analytics</h2>
+            <h2>
+                Resolution Analytics
+            </h2>
 
             <p>
                 Analyze resolution performance interactively by
@@ -263,27 +421,38 @@
             </p>
 
 
-            <!-- INTERACTIVE FILTERS -->
+            <!-- =================================================
+                 INTERACTIVE FILTERS
+            ================================================== -->
 
             <div class="filter-panel">
 
-                <h3>Interactive Filters</h3>
+                <h3>
+                    Interactive Filters
+                </h3>
 
 
                 <div class="filter-grid">
 
-                    <!-- Priority -->
+
+                    <!-- PRIORITY -->
 
                     <div class="filter-group">
 
                         <label for="priority-filter">
+
                             Priority
+
                         </label>
 
-                        <select id="priority-filter">
+
+                        <select
+                            id="priority-filter">
 
                             <option value="">
+
                                 All Priorities
+
                             </option>
 
                         </select>
@@ -291,18 +460,24 @@
                     </div>
 
 
-                    <!-- Ticket Type -->
+                    <!-- TICKET TYPE -->
 
                     <div class="filter-group">
 
                         <label for="type-filter">
+
                             Ticket Type
+
                         </label>
 
-                        <select id="type-filter">
+
+                        <select
+                            id="type-filter">
 
                             <option value="">
+
                                 All Ticket Types
+
                             </option>
 
                         </select>
@@ -310,18 +485,24 @@
                     </div>
 
 
-                    <!-- Channel -->
+                    <!-- SUPPORT CHANNEL -->
 
                     <div class="filter-group">
 
                         <label for="channel-filter">
+
                             Support Channel
+
                         </label>
 
-                        <select id="channel-filter">
+
+                        <select
+                            id="channel-filter">
 
                             <option value="">
+
                                 All Channels
+
                             </option>
 
                         </select>
@@ -329,23 +510,30 @@
                     </div>
 
 
-                    <!-- Customer Segment -->
+                    <!-- CUSTOMER SEGMENT -->
 
                     <div class="filter-group">
 
                         <label for="segment-filter-main">
+
                             Customer Segment
+
                         </label>
 
-                        <select id="segment-filter-main">
+
+                        <select
+                            id="segment-filter-main">
 
                             <option value="">
+
                                 All Segments
+
                             </option>
 
                         </select>
 
                     </div>
+
 
                 </div>
 
@@ -358,61 +546,94 @@
                     class="cards"
                     id="filtered-stats">
 
+
+                    <!-- FILTERED TICKETS -->
+
                     <div class="card">
 
-                        <h3>Filtered Tickets</h3>
+                        <h3>
+                            Filtered Tickets
+                        </h3>
+
 
                         <div
                             class="value"
                             id="filtered-ticket-count">
+
                             0
+
                         </div>
 
                     </div>
 
 
+                    <!-- FILTERED SATISFACTION -->
+
                     <div class="card">
 
-                        <h3>Filtered Satisfaction</h3>
+                        <h3>
+                            Filtered Satisfaction
+                        </h3>
+
 
                         <div
                             class="value"
                             id="filtered-average-satisfaction">
+
                             N/A
+
                         </div>
 
                     </div>
 
 
+                    <!-- FILTERED RESOLUTION -->
+
                     <div class="card">
 
-                        <h3>Filtered Resolution</h3>
+                        <h3>
+                            Filtered Resolution
+                        </h3>
+
 
                         <div
                             class="value"
                             id="filtered-average-resolution">
+
                             See analytics
+
                         </div>
 
+
                         <small>
-                            Ticket-level resolution values are unavailable
-                            in the source data. See the resolution charts
-                            below for aggregate resolution analytics.
+
+                            Ticket-level resolution values are
+                            unavailable in the source data.
+                            See the resolution charts below for
+                            aggregate resolution analytics.
+
                         </small>
 
                     </div>
 
+
                 </div>
 
 
-                <!-- FILTER STATUS -->
+                <!-- =================================================
+                     FILTER STATUS
+                ================================================== -->
 
                 <p id="filter-result-status">
+
                     Loading ticket data...
+
                 </p>
 
 
-                <!-- RESET -->
+                <!-- =================================================
+                     RESET FILTERS
+                ================================================== -->
 
                 <button
                     id="reset-filters"
@@ -421,6 +642,7 @@
                     Reset Filters
 
                 </button>
+
 
             </div>
 
@@ -432,11 +654,16 @@
             <div class="analytics-grid">
 
 
-                <!-- Priority -->
+                <!-- =================================================
+                     PRIORITY
+                ================================================== -->
 
                 <div class="chart-card">
 
-                    <h3>Resolution by Priority</h3>
+                    <h3>
+                        Resolution by Priority
+                    </h3>
+
 
                     <div
                         id="priority-chart"
@@ -449,11 +676,16 @@
                 </div>
 
 
-                <!-- Ticket Type -->
+                <!-- =================================================
+                     TICKET TYPE
+                ================================================== -->
 
                 <div class="chart-card">
 
-                    <h3>Resolution by Ticket Type</h3>
+                    <h3>
+                        Resolution by Ticket Type
+                    </h3>
+
 
                     <div
                         id="type-chart"
@@ -466,11 +698,16 @@
                 </div>
 
 
-                <!-- Channel -->
+                <!-- =================================================
+                     CHANNEL
+                ================================================== -->
 
                 <div class="chart-card">
 
-                    <h3>Resolution by Channel</h3>
+                    <h3>
+                        Resolution by Channel
+                    </h3>
+
 
                     <div
                         id="channel-chart"
@@ -481,6 +718,7 @@
                     </div>
 
                 </div>
+
 
             </div>
 
@@ -493,13 +731,17 @@
 
         <section id="about">
 
-            <h2>About SupportIQ</h2>
+            <h2>
+                About SupportIQ
+            </h2>
+
 
             <p>
-                SupportIQ uses machine learning and customer support
-                analytics to identify customer segments and understand
-                support performance.
+                SupportIQ uses machine learning and customer
+                support analytics to identify customer segments
+                and understand support performance.
             </p>
+
 
             <p>
                 The platform uses K-Means clustering for customer
@@ -508,6 +750,7 @@
             </p>
 
         </section>
+
 
     </main>
 
@@ -537,6 +780,7 @@
     ====================================================== -->
 
     <script src="script.js"></script>
+
 
 </body>
 
