@@ -2,319 +2,176 @@
 
 ## Customer Support Intelligence Platform
 
-SupportIQ is a customer support analytics and machine learning platform built using the **Customer Support Ticket Dataset**.
-
-The platform analyzes customer support tickets to identify customer segments, understand satisfaction risk, and compare ticket resolution patterns through an interactive web dashboard.
+SupportIQ is a machine learning and analytics platform that analyzes customer support tickets to identify customer segments, satisfaction risks, and resolution-time patterns through an interactive dashboard.
 
 ## 🚀 Live Demo
 
-**Dashboard:**
 https://reddyankitha.github.io/SupportIQ/
 
 ## 📊 Kaggle Notebook
 
-The complete data analysis, preprocessing, machine learning workflow, model evaluation, and customer segmentation are documented in the Kaggle notebook:
-
-https://www.kaggle.com/code/hanumathureddygari/notebook5c2068c982
+https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
 
 ---
 
-## 🎯 Project Objectives
+## 🎯 Key Features
 
-SupportIQ focuses on three customer support business problems:
-
-1. **Customer Segmentation**
-2. **Customer Satisfaction Risk Analysis**
-3. **Ticket Resolution Analytics**
-
-The goal is to transform raw support-ticket data into practical insights that can help support teams understand customer behavior, identify dissatisfaction patterns, and monitor operational performance.
+- Customer segmentation using K-Means clustering
+- Customer satisfaction risk analysis using Random Forest
+- Ticket resolution-time analytics
+- Interactive dashboard filters
+- Customer segment analysis
+- Priority, ticket type, and channel analysis
+- Data visualization using Chart.js
+- GitHub Pages deployment
 
 ---
 
 ## 📦 Dataset
 
-The project uses the **Customer Support Ticket Dataset** from Kaggle.
+**Customer Support Ticket Dataset**
 
-### Dataset Size
+- 8,469 support tickets
+- 17 features
+- Customer demographics
+- Ticket information
+- Priority and support channel
+- Satisfaction ratings
+- Response and resolution information
 
-* **8,469 support tickets**
-* **17 features**
-* Customer information
-* Ticket information
-* Support channel
-* Ticket priority
-* Satisfaction rating
-* Response and resolution information
-
-The dataset contains information about customer demographics, products, ticket types, ticket status, resolution, priority, support channels, response times, resolution times, and satisfaction ratings.
+**Source:** Kaggle
 
 ---
 
-# 🤖 Machine Learning
+## 🤖 Machine Learning
 
-## 1. Customer Segmentation
+### Customer Segmentation
 
-K-Means clustering was used to identify groups of customers with similar support experiences.
+K-Means clustering is used to group customers based on:
 
-### Features Used
+- Customer Age
+- Average Satisfaction
+- Average Resolution Time
 
-* Customer Age
-* Average Satisfaction
-* Average Resolution Time
+### Customer Segments
 
-Six customer segments were identified:
+1. Middle Age - Highly Satisfied and Fast
+2. Older - At Risk and Fast
+3. Older - At Risk and Slow
+4. Older - Satisfied but Slow
+5. Young - At Risk and Fast
+6. Young - Satisfied but Slow
 
-* **Middle Age - Highly Satisfied and Fast**
-* **Older - At Risk and Fast**
-* **Older - At Risk and Slow**
-* **Older - Satisfied but Slow**
-* **Young - At Risk and Fast**
-* **Young - Satisfied but Slow**
+**Silhouette Score:** 0.295
 
-### Clustering Result
+### Satisfaction Risk Analysis
 
-**Silhouette Score: 0.295**
+A Random Forest classifier is used to classify tickets into:
 
-The segmentation provides a simple way to compare customer groups based on satisfaction and support-resolution characteristics.
+- Low Satisfaction
+- Satisfied
 
----
+Ratings of 1 or 2 are treated as low satisfaction.
 
-## 2. Customer Satisfaction Risk
-
-A **Random Forest classifier** was used as a baseline model to classify support tickets into:
-
-* Low Satisfaction
-* Satisfied
-
-Ratings of **1 or 2** were classified as Low Satisfaction.
-
-### Results
-
-| Metric                   | Result |
-| ------------------------ | -----: |
-| Low Satisfaction Tickets |  1,102 |
-| Satisfied Tickets        |  1,667 |
-| Low Satisfaction Rate    |  39.8% |
-| Model Accuracy           | 59.75% |
-
-The model showed limited predictive power. Therefore, SupportIQ presents this component as a **satisfaction-risk analysis baseline**, rather than a production-ready prediction system.
+**Model Accuracy:** 59.75%
 
 ---
 
-## 3. Resolution Analytics
+## 📈 Dashboard
 
-Resolution time is analyzed across:
+The SupportIQ dashboard provides:
 
-* Ticket Priority
-* Ticket Type
-* Support Channel
-* Customer Segments
+- Total ticket count
+- Average satisfaction
+- Average resolution time
+- Customer segment distribution
+- Satisfaction-risk analysis
+- Resolution analytics
+- Interactive filtering
 
-### Average Resolution Time
+### Filters
 
-**11.77 hours**
+Users can filter support tickets by:
 
-The dashboard allows users to compare resolution patterns across different operational categories.
-
-Differences between priority, ticket type, and support channel were relatively small in this dataset, so this component is presented primarily as **operational analytics**.
-
----
-
-# 📈 Dashboard
-
-SupportIQ provides an interactive dashboard for exploring customer support data.
-
-### Dashboard Features
-
-* Overall ticket statistics
-* Average customer satisfaction
-* Average resolution time
-* Customer segmentation
-* Satisfaction-risk metrics
-* Customer segment comparison
-* Interactive ticket filtering
-* Priority analysis
-* Ticket-type analysis
-* Support-channel analysis
-* Resolution analytics
-* Visual charts using Chart.js
-
-### Dashboard Metrics
-
-| Metric                  |           Value |
-| ----------------------- | --------------: |
-| Total Tickets           |       **8,469** |
-| Closed Tickets          |       **2,769** |
-| Open Tickets            |       **2,819** |
-| Pending Tickets         |       **2,881** |
-| Average Satisfaction    |    **2.99 / 5** |
-| Average Resolution Time | **11.77 hours** |
-| Customer Segments       |           **6** |
+- Priority
+- Ticket Type
+- Support Channel
+- Customer Segment
 
 ---
 
-# 🔍 Interactive Analysis
+## 📊 Dashboard Metrics
 
-The dashboard includes filters that allow users to explore the ticket dataset by:
-
-* **Priority**
-* **Ticket Type**
-* **Support Channel**
-* **Customer Segment**
-
-The filtered dashboard displays:
-
-* Number of matching tickets
-* Average satisfaction for the selected tickets
-* Corresponding analytics information
-
-This allows users to move from high-level dashboard metrics to more focused customer-support analysis.
+| Metric | Value |
+|---|---:|
+| Total Tickets | 8,469 |
+| Closed Tickets | 2,769 |
+| Open Tickets | 2,819 |
+| Pending Tickets | 2,881 |
+| Average Satisfaction | 2.99 / 5 |
+| Average Resolution Time | 11.77 hours |
+| Customer Segments | 6 |
 
 ---
 
-# 💡 Key Business Insights
+## 💡 Key Insights
 
-## Customer Segmentation
-
-The analysis identified meaningful differences between customer groups.
-
-The highest-performing segment had:
-
-* **Average satisfaction: 4.44 / 5**
-* **Average resolution time: 5.04 hours**
-
-The highest-risk slow segment had:
-
-* **Average satisfaction: 1.52 / 5**
-* **Average resolution time: 18.81 hours**
-
-This suggests that customers experiencing both **low satisfaction and slower resolution** may require greater attention from support teams.
+- Average customer satisfaction is **2.99 / 5**.
+- **39.8%** of rated closed tickets are classified as low satisfaction.
+- The highest-satisfaction segment has an average satisfaction of **4.44 / 5**.
+- The highest-risk slow segment has an average satisfaction of **1.52 / 5**.
+- Average resolution time is **11.77 hours**.
 
 ---
 
-## Satisfaction
-
-**39.8% of closed tickets** were classified as low satisfaction.
-
-This highlights an opportunity to identify support experiences associated with customer dissatisfaction and investigate the factors contributing to lower ratings.
-
----
-
-## Resolution
-
-Average resolution time was approximately:
-
-**11.77 hours**
-
-Resolution-time differences across priority, ticket type, and support channel were relatively small in this dataset.
-
-This makes resolution analytics more useful for **monitoring and comparison** than for claiming strong predictive performance.
-
----
-
-# 🛠️ Technology Stack
-
-## Machine Learning
-
-* Python
-* Pandas
-* NumPy
-* Scikit-learn
-* K-Means Clustering
-* Random Forest
-* Joblib
-
-## Frontend
-
-* HTML
-* CSS
-* JavaScript
-* Chart.js
-
-## Development & Deployment
-
-* Git
-* GitHub
-* GitHub Pages
-* Kaggle
-
----
-
-# 🚀 How to Run SupportIQ
-
-## Option 1: View the Live Dashboard
-
-No installation is required.
-
-Open the deployed application:
-
-https://reddyankitha.github.io/SupportIQ/
-
----
-
-## Option 2: Run Locally
-
-Clone the repository:
-
-```bash
-git clone https://github.com/reddyAnkitha/SupportIQ.git
-```
-
-Navigate to the project:
-
-```bash
-cd SupportIQ
-```
-
-Because SupportIQ is a static GitHub Pages application, it can be run using a local web server.
-
-If Python is installed, run:
-
-```bash
-python -m http.server 8000
-```
-
-Then open:
+## 🔄 ML to Dashboard Workflow
 
 ```text
-http://localhost:8000
-```
+Customer Support Dataset
+          ↓
+Data Preprocessing
+          ↓
+Feature Engineering
+          ↓
+Machine Learning
+          ↓
+Customer Segmentation
+          ↓
+Exported Analytics
+          ↓
+Interactive Dashboard
+          ↓
+GitHub Pages
 
-The dashboard loads the exported analytics data from the repository.
+Customer segment results are connected to ticket records using:
+ticket_segment_mapping.json
 
----
-
-# 🧠 ML Development
-
-The machine learning models were developed and evaluated in the Kaggle notebook.
-
-**Kaggle Notebook:**
-
-https://www.kaggle.com/code/hanumathureddygari/notebook5c2068c982
-
-The repository contains the exported analytics used by the frontend, while the Kaggle notebook documents:
-
-* Data preprocessing
-* Exploratory data analysis
-* Feature engineering
-* Customer segmentation
-* Model training
-* Model evaluation
-* Analytical results
-
-This separation keeps the deployed GitHub Pages application lightweight while preserving the complete ML workflow in the notebook.
-
----
-
-# 📁 Project Structure
-
-```text
+🛠️ Technology Stack
+Machine Learning
+Python
+Pandas
+NumPy
+Scikit-learn
+K-Means
+Random Forest
+Frontend
+HTML
+CSS
+JavaScript
+Chart.js
+Tools & Deployment
+Kaggle
+Git
+GitHub
+GitHub Pages
+📁 Project Structure
 SupportIQ/
 │
 ├── index.html
 ├── style.css
 ├── script.js
 ├── ticket_data.json
+├── ticket_segment_mapping.json
 ├── README.md
 │
 └── data/
@@ -324,58 +181,18 @@ SupportIQ/
     ├── resolution_by_priority.json
     ├── resolution_by_type.json
     └── resolution_by_channel.json
-```
+🚀 Run Locally
+1. Clone the repository
+git clone https://github.com/reddyAnkitha/SupportIQ.git
+2. Open the project
+cd SupportIQ
+3. Start a local server
+python -m http.server 8000
+4. Open the dashboard
+http://localhost:8000
+👩‍💻 Author
 
----
-
-# ⚠️ Limitations
-
-SupportIQ is a hackathon-oriented analytics and machine learning prototype.
-
-### Satisfaction Model
-
-The Random Forest model achieved:
-
-**59.75% accuracy**
-
-and showed limited ability to identify low-satisfaction tickets.
-
-Therefore, the model should be considered a **baseline analysis**, not a production prediction service.
-
-### Resolution Analysis
-
-Resolution-time analysis provides useful operational comparisons, but the available results do not demonstrate strong predictive power.
-
-### Deployment Architecture
-
-The deployed GitHub Pages application uses **exported analytics data** for the frontend.
-
-The Python machine-learning workflow is developed and evaluated separately in the Kaggle notebook.
-
-As a result, the current deployment does not provide real-time model inference or a live backend API.
-
----
-
-# 🔮 Future Improvements
-
-Potential improvements include:
-
-* Real-time ticket prediction
-* Advanced NLP features from ticket descriptions
-* Customer-level historical features
-* Explainable AI for satisfaction risk
-* Real-time backend API
-* Automated support recommendations
-* Production database integration
-* Live model monitoring
-* Real-time ticket ingestion
-* Model retraining pipelines
-
----
-
-# 👩‍💻 Author
-
-**Ankitha Reddy**
+Ankitha Reddy
 
 Software Development Engineer | Java Full Stack | Cloud & Machine Learning
 
@@ -383,14 +200,4 @@ GitHub:
 https://github.com/reddyAnkitha
 
 Kaggle:
-https://www.kaggle.com/code/hanumathureddygari/notebook5c2068c982
-
----
-
-## ⭐ Project Summary
-
-**SupportIQ combines machine learning, customer-support analytics, and an interactive web dashboard to turn support-ticket data into actionable customer and operational insights.**
-
-The project demonstrates an end-to-end workflow covering:
-
-**Data → Analysis → Machine Learning → Exported Analytics → Interactive Dashboard → GitHub Pages Deployment**
+https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
