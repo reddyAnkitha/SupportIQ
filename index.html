@@ -108,8 +108,10 @@
 
             <p>
                 Six customer segments were identified using K-Means
-                clustering based on customer age, satisfaction,
-                and average resolution time.
+                clustering on customer-level features including age,
+                average satisfaction, and average resolution time.
+                Segment labels were generated from the resulting
+                cluster profiles.
             </p>
 
 
@@ -389,8 +391,14 @@
                         <div
                             class="value"
                             id="filtered-average-resolution">
-                            N/A
+                            See analytics
                         </div>
+
+                        <small>
+                            Ticket-level resolution values are unavailable
+                            in the source data. See the resolution charts
+                            below for aggregate resolution analytics.
+                        </small>
 
                     </div>
 
