@@ -15,10 +15,14 @@ const FILES = {
         DATA_PATH + "resolution_by_channel.json",
 
     // ticket_data.json is in the ROOT of the repository
-    tickets: "ticket_data.json"
+    tickets: "ticket_data.json",
+
+    // K-Means ticket-to-segment mapping
+    ticketSegmentMapping: "ticket_segment_mapping.json"
 };
 
 let ticketData = [];
+let ticketSegmentMapping = [];
 let charts = {};
 
 const fallbackMetrics = {
@@ -87,17 +91,27 @@ function normalize(value) {
 ========================================================= */
 
 async function loadJSON(file) {
-    const response = await fetch(file, {
-        cache: "no-store"
-    });
+
+    const response =
+        await fetch(
+            file,
+            {
+                cache: "no-store"
+            }
+        );
+
 
     if (!response.ok) {
+
         throw new Error(
             `Unable to load ${file}: HTTP ${response.status}`
         );
     }
 
-    const text = await response.text();
+
+    const text =
+        await response.text();
+
 
     return JSON.parse(
         cleanJSONText(text)
@@ -110,65 +124,91 @@ async function loadJSON(file) {
 ========================================================= */
 
 async function loadMetrics() {
+
     try {
-        const response = await fetch(
-            FILES.metrics,
-            {
-                cache: "no-store"
-            }
-        );
+
+        const response =
+            await fetch(
+                FILES.metrics,
+                {
+                    cache: "no-store"
+                }
+            );
+
 
         if (!response.ok) {
+
             throw new Error(
                 "Metrics file unavailable"
             );
         }
 
+
         const text =
             await response.text();
 
-        const lines = text
-            .trim()
-            .split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(Boolean);
+
+        const lines =
+            text
+                .trim()
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(Boolean);
+
 
         const metrics = {};
 
-        lines.slice(1).forEach(line => {
-            const parts = line.split(",");
 
-            if (parts.length < 2) {
-                return;
-            }
+        lines
+            .slice(1)
+            .forEach(line => {
 
-            const key =
-                parts[0]
-                    .trim()
-                    .toLowerCase();
+                const parts =
+                    line.split(",");
 
-            const value =
-                Number(
-                    parts[1].trim()
-                );
 
-            if (
-                Number.isFinite(value)
-            ) {
-                metrics[key] = value;
-            }
-        });
+                if (
+                    parts.length < 2
+                ) {
+                    return;
+                }
+
+
+                const key =
+                    parts[0]
+                        .trim()
+                        .toLowerCase();
+
+
+                const value =
+                    Number(
+                        parts[1].trim()
+                    );
+
+
+                if (
+                    Number.isFinite(value)
+                ) {
+
+                    metrics[key] =
+                        value;
+                }
+            });
+
 
         return {
+
             totalTickets:
                 metrics["total tickets"] ??
                 metrics["total_tickets"] ??
                 fallbackMetrics.totalTickets,
 
+
             averageSatisfaction:
                 metrics["average satisfaction"] ??
                 metrics["average_satisfaction"] ??
                 fallbackMetrics.averageSatisfaction,
+
 
             averageResolution:
                 metrics["average resolution"] ??
@@ -176,17 +216,21 @@ async function loadMetrics() {
                 metrics["average resolution time"] ??
                 fallbackMetrics.averageResolution,
 
+
             customerSegments:
                 metrics["customer segments"] ??
                 metrics["customer_segments"] ??
                 fallbackMetrics.customerSegments
         };
 
+
     } catch (error) {
+
         console.warn(
             "Using fallback dashboard metrics:",
             error
         );
+
 
         return fallbackMetrics;
     }
@@ -198,32 +242,42 @@ async function loadMetrics() {
 ========================================================= */
 
 function renderMetrics(metrics) {
+
     const totalTickets =
-        getElement("total-tickets");
+        getElement(
+            "total-tickets"
+        );
+
 
     const averageSatisfaction =
         getElement(
             "average-satisfaction"
         );
 
+
     const averageResolution =
         getElement(
             "average-resolution"
         );
+
 
     const customerSegments =
         getElement(
             "customer-segments"
         );
 
+
     if (totalTickets) {
+
         totalTickets.textContent =
             formatNumber(
                 metrics.totalTickets
             );
     }
 
+
     if (averageSatisfaction) {
+
         averageSatisfaction.textContent =
             `${formatNumber(
                 metrics.averageSatisfaction,
@@ -231,7 +285,9 @@ function renderMetrics(metrics) {
             )} / 5`;
     }
 
+
     if (averageResolution) {
+
         averageResolution.textContent =
             `${formatNumber(
                 metrics.averageResolution,
@@ -239,7 +295,9 @@ function renderMetrics(metrics) {
             )} hrs`;
     }
 
+
     if (customerSegments) {
+
         customerSegments.textContent =
             formatNumber(
                 metrics.customerSegments
@@ -253,16 +311,20 @@ function renderMetrics(metrics) {
 ========================================================= */
 
 async function loadSegments() {
+
     try {
+
         return await loadJSON(
             FILES.segments
         );
 
     } catch (error) {
+
         console.error(
             "Segment data error:",
             error
         );
+
 
         return {
             segments: []
@@ -281,6 +343,7 @@ function renderSegments(data) {
         getElement(
             "segment-container"
         );
+
 
     if (!container) {
         return;
@@ -319,10 +382,8 @@ function renderSegments(data) {
      * represented by the six segments.
      *
      * IMPORTANT:
-     * This is 2,769 for the current
-     * segmentation dataset.
-     *
-     * It is NOT the total 8,469 tickets.
+     * This represents segmented customers,
+     * not total tickets.
      */
 
     const totalCustomers =
@@ -333,6 +394,7 @@ function renderSegments(data) {
                     Number(
                         segment.customers
                     );
+
 
                 return (
                     sum +
@@ -363,10 +425,12 @@ function renderSegments(data) {
                 segment.avg_satisfaction
             );
 
+
         const resolution =
             Number(
                 segment.avg_resolution_hours
             );
+
 
         const customers =
             Number(
@@ -381,6 +445,7 @@ function renderSegments(data) {
         let riskClass =
             "medium-risk";
 
+
         let riskText =
             "Medium Risk";
 
@@ -394,8 +459,10 @@ function renderSegments(data) {
             if (
                 satisfaction <= 2
             ) {
+
                 riskClass =
                     "high-risk";
+
 
                 riskText =
                     "High Risk";
@@ -403,8 +470,10 @@ function renderSegments(data) {
             } else if (
                 satisfaction >= 4
             ) {
+
                 riskClass =
                     "low-risk";
+
 
                 riskText =
                     "Low Risk";
@@ -452,12 +521,14 @@ function renderSegments(data) {
             if (
                 satisfaction >= 4
             ) {
+
                 satisfactionClass =
                     "satisfaction-good";
 
             } else if (
                 satisfaction <= 2
             ) {
+
                 satisfactionClass =
                     "satisfaction-poor";
             }
@@ -827,7 +898,9 @@ function renderSegments(data) {
          */
 
         if (charts.segment) {
+
             charts.segment.destroy();
+
             charts.segment = null;
         }
 
@@ -852,11 +925,14 @@ function renderSegments(data) {
             new Chart(
                 canvas,
                 {
+
                     type: "doughnut",
+
 
                     data: {
 
                         labels: labels,
+
 
                         datasets: [
                             {
@@ -936,12 +1012,17 @@ function renderSegments(data) {
         const wrapper =
             canvas.parentElement;
 
+
         if (wrapper) {
 
             wrapper.innerHTML = `
+
                 <div class="chart-error">
+
                     Chart.js could not be loaded.
+
                 </div>
+
             `;
         }
     }
@@ -1176,16 +1257,20 @@ function renderSegments(data) {
 ========================================================= */
 
 async function loadSatisfaction() {
+
     try {
+
         return await loadJSON(
             FILES.satisfaction
         );
 
     } catch (error) {
+
         console.error(
             "Satisfaction data error:",
             error
         );
+
 
         return fallbackSatisfaction;
     }
@@ -1199,15 +1284,18 @@ function renderSatisfaction(data) {
             "low-satisfaction"
         );
 
+
     const satisfied =
         getElement(
             "satisfied-customers"
         );
 
+
     const rate =
         getElement(
             "low-satisfaction-rate"
         );
+
 
     const accuracy =
         getElement(
@@ -1255,88 +1343,48 @@ function renderSatisfaction(data) {
 
 
 /* =========================================================
-   TICKET DATA
+   TICKET SEGMENT MAPPING
 ========================================================= */
 
-async function loadTicketData() {
+async function loadTicketSegmentMapping() {
 
     try {
 
-        /*
-         * ticket_data.json is located
-         * in the repository ROOT.
-         */
-
-        const response =
-            await fetch(
-                FILES.tickets,
-                {
-                    cache: "no-store"
-                }
+        const data =
+            await loadJSON(
+                FILES.ticketSegmentMapping
             );
 
 
-        if (!response.ok) {
+        if (!Array.isArray(data)) {
 
             throw new Error(
-                `Unable to load ticket_data.json: HTTP ${response.status}`
+                "ticket_segment_mapping.json must contain an array."
             );
         }
 
 
-        const text =
-            await response.text();
-
-
-        ticketData =
-            JSON.parse(
-                cleanJSONText(text)
-            );
-
-
-        if (!Array.isArray(ticketData)) {
-
-            throw new Error(
-                "ticket_data.json must contain an array."
-            );
-        }
+        ticketSegmentMapping =
+            data;
 
 
         console.log(
-            `Loaded ${ticketData.length} tickets.`
+            `Loaded ${ticketSegmentMapping.length} ticket-segment mappings.`
         );
 
 
-        initializeFilters();
-
-        updateFilteredDashboard();
-
-
-        return ticketData;
+        return ticketSegmentMapping;
 
 
     } catch (error) {
 
         console.error(
-            "Ticket data error:",
+            "Ticket segment mapping error:",
             error
         );
 
 
-        ticketData = [];
-
-
-        const status =
-            getElement(
-                "filter-result-status"
-            );
-
-
-        if (status) {
-
-            status.textContent =
-                "Ticket-level data could not be loaded.";
-        }
+        ticketSegmentMapping = [];
 
 
         return [];
@@ -1384,100 +1432,89 @@ function getTicketValue(
 
 
 /* =========================================================
-   CUSTOMER SEGMENT APPROXIMATION
+   GET ACTUAL K-MEANS TICKET SEGMENT
 ========================================================= */
 
-function inferSegment(ticket) {
+function getTicketSegment(ticket) {
 
-    const ageRaw =
-        getTicketValue(
-            ticket,
-            [
-                "Customer Age",
-                "customer_age"
-            ]
+    const ticketId =
+        normalize(
+            getTicketValue(
+                ticket,
+                [
+                    "Ticket ID",
+                    "ticket_id"
+                ]
+            )
         );
 
 
-    const satisfactionRaw =
-        getTicketValue(
-            ticket,
-            [
-                "Customer Satisfaction Rating",
-                "customer_satisfaction_rating"
-            ]
+    const customerEmail =
+        normalize(
+            getTicketValue(
+                ticket,
+                [
+                    "Customer Email",
+                    "customer_email"
+                ]
+            )
         );
 
 
     /*
-     * Missing age defaults to 30.
-     *
-     * Missing satisfaction defaults to 3.
+     * A composite key is used because
+     * Ticket ID alone may not uniquely
+     * identify a record.
      */
 
-    const age =
-        ageRaw === null ||
-        ageRaw === ""
-            ? 30
-            : Number(ageRaw);
-
-
-    const satisfaction =
-        satisfactionRaw === null ||
-        satisfactionRaw === ""
-            ? 3
-            : Number(satisfactionRaw);
-
-
-    const safeAge =
-        Number.isFinite(age)
-            ? age
-            : 30;
-
-
-    const safeSatisfaction =
-        Number.isFinite(satisfaction)
-            ? satisfaction
-            : 3;
-
-
-    let ageGroup;
-
-
-    if (safeAge < 40) {
-
-        ageGroup =
-            "Young";
-
-    } else if (safeAge < 55) {
-
-        ageGroup =
-            "Middle Age";
-
-    } else {
-
-        ageGroup =
-            "Older";
-    }
-
-
     if (
-        safeSatisfaction <= 2
+        !ticketId ||
+        !customerEmail
     ) {
 
-        return `${ageGroup} - At Risk and Fast`;
+        return null;
     }
 
 
-    if (
-        safeSatisfaction >= 4
-    ) {
+    const mapping =
+        ticketSegmentMapping.find(
+            item => {
 
-        return `${ageGroup} - Highly Satisfied and Fast`;
+                const mappedTicketId =
+                    normalize(
+                        item["Ticket ID"] ??
+                        item.ticket_id
+                    );
+
+
+                const mappedEmail =
+                    normalize(
+                        item["Customer Email"] ??
+                        item.customer_email
+                    );
+
+
+                return (
+                    mappedTicketId ===
+                    ticketId &&
+                    mappedEmail ===
+                    customerEmail
+                );
+            }
+        );
+
+
+    if (!mapping) {
+
+        return null;
     }
 
 
-    return `${ageGroup} - Satisfied but Slow`;
+    return (
+        mapping.segment ??
+        mapping["Segment"] ??
+        null
+    );
 }
 
 
@@ -1505,7 +1542,9 @@ function populateSelect(
         );
 
 
-    defaultOption.value = "";
+    defaultOption.value =
+        "";
+
 
     defaultOption.textContent =
         defaultText;
@@ -1524,9 +1563,12 @@ function populateSelect(
             );
 
 
-        option.value = value;
+        option.value =
+            value;
 
-        option.textContent = value;
+
+        option.textContent =
+            value;
 
 
         select.appendChild(
@@ -1651,6 +1693,11 @@ function initializeFilters() {
         [...channels].sort()
     );
 
+
+    /*
+     * These are the six official
+     * K-Means segment names.
+     */
 
     const officialSegments = [
 
@@ -1777,8 +1824,17 @@ function getFilteredTickets() {
                 );
 
 
+            /*
+             * IMPORTANT:
+             * Use the actual K-Means mapping.
+             * Do NOT infer the segment from
+             * age and satisfaction.
+             */
+
             const ticketSegment =
-                inferSegment(ticket);
+                getTicketSegment(
+                    ticket
+                );
 
 
             const priorityMatch =
@@ -1786,7 +1842,9 @@ function getFilteredTickets() {
                 normalize(
                     ticketPriority
                 ) ===
-                normalize(priority);
+                normalize(
+                    priority
+                );
 
 
             const typeMatch =
@@ -1794,7 +1852,9 @@ function getFilteredTickets() {
                 normalize(
                     ticketType
                 ) ===
-                normalize(type);
+                normalize(
+                    type
+                );
 
 
             const channelMatch =
@@ -1802,7 +1862,9 @@ function getFilteredTickets() {
                 normalize(
                     ticketChannel
                 ) ===
-                normalize(channel);
+                normalize(
+                    channel
+                );
 
 
             const segmentMatch =
@@ -1810,7 +1872,9 @@ function getFilteredTickets() {
                 normalize(
                     ticketSegment
                 ) ===
-                normalize(segment);
+                normalize(
+                    segment
+                );
 
 
             return (
@@ -1952,7 +2016,9 @@ function updateFilteredDashboard() {
 
 
                 const value =
-                    Number(rawValue);
+                    Number(
+                        rawValue
+                    );
 
 
                 if (
@@ -2081,12 +2147,15 @@ function resetFilters() {
     filterIds.forEach(id => {
 
         const element =
-            getElement(id);
+            getElement(
+                id
+            );
 
 
         if (element) {
 
-            element.value = "";
+            element.value =
+                "";
         }
     });
 
@@ -2217,7 +2286,9 @@ function getResolutionValue(row) {
 
 
         const value =
-            Number(rawValue);
+            Number(
+                rawValue
+            );
 
 
         if (
@@ -2245,7 +2316,8 @@ function destroyChart(chartKey) {
 
         charts[chartKey].destroy();
 
-        charts[chartKey] = null;
+        charts[chartKey] =
+            null;
     }
 }
 
@@ -2287,7 +2359,8 @@ function createResolutionChart(
      * Remove loading text.
      */
 
-    container.innerHTML = "";
+    container.innerHTML =
+        "";
 
 
     /*
@@ -2445,8 +2518,11 @@ function createResolutionChart(
 
                                         return (
                                             " " +
-                                            Number(value)
-                                                .toFixed(2) +
+                                            Number(
+                                                value
+                                            ).toFixed(
+                                                2
+                                            ) +
                                             " hrs"
                                         );
                                     }
@@ -2535,9 +2611,14 @@ function renderPriorityChart(data) {
             value !== null
         ) {
 
-            labels.push(label);
+            labels.push(
+                label
+            );
 
-            values.push(value);
+
+            values.push(
+                value
+            );
         }
     });
 
@@ -2616,9 +2697,14 @@ function renderTypeChart(data) {
             value !== null
         ) {
 
-            labels.push(label);
+            labels.push(
+                label
+            );
 
-            values.push(value);
+
+            values.push(
+                value
+            );
         }
     });
 
@@ -2697,9 +2783,14 @@ function renderChannelChart(data) {
             value !== null
         ) {
 
-            labels.push(label);
+            labels.push(
+                label
+            );
 
-            values.push(value);
+
+            values.push(
+                value
+            );
         }
     });
 
@@ -2796,6 +2887,104 @@ function showChartError(
 
 
 /* =========================================================
+   TICKET DATA
+========================================================= */
+
+async function loadTicketData() {
+
+    try {
+
+        /*
+         * ticket_data.json is located
+         * in the repository ROOT.
+         */
+
+        const response =
+            await fetch(
+                FILES.tickets,
+                {
+                    cache: "no-store"
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                `Unable to load ticket_data.json: HTTP ${response.status}`
+            );
+        }
+
+
+        const text =
+            await response.text();
+
+
+        ticketData =
+            JSON.parse(
+                cleanJSONText(text)
+            );
+
+
+        if (!Array.isArray(ticketData)) {
+
+            throw new Error(
+                "ticket_data.json must contain an array."
+            );
+        }
+
+
+        /*
+         * Load the actual K-Means
+         * ticket-to-segment mapping.
+         */
+
+        await loadTicketSegmentMapping();
+
+
+        console.log(
+            `Loaded ${ticketData.length} tickets.`
+        );
+
+
+        initializeFilters();
+
+        updateFilteredDashboard();
+
+
+        return ticketData;
+
+
+    } catch (error) {
+
+        console.error(
+            "Ticket data error:",
+            error
+        );
+
+
+        ticketData = [];
+
+
+        const status =
+            getElement(
+                "filter-result-status"
+            );
+
+
+        if (status) {
+
+            status.textContent =
+                "Ticket-level data could not be loaded.";
+        }
+
+
+        return [];
+    }
+}
+
+
+/* =========================================================
    INITIALIZE DASHBOARD
 ========================================================= */
 
@@ -2859,8 +3048,8 @@ async function initializeDashboard() {
 
 
         /*
-         * Load ticket data for
-         * interactive filtering.
+         * Load ticket data and
+         * actual K-Means mapping.
          */
 
         await loadTicketData();
@@ -2884,4 +3073,3 @@ document.addEventListener(
     "DOMContentLoaded",
     initializeDashboard
 );
-
