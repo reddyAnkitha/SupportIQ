@@ -14,7 +14,9 @@ body {
     line-height: 1.6;
 }
 
-/* Header */
+/* =========================
+   Header
+========================= */
 
 header {
     background: linear-gradient(135deg, #172554, #1e40af);
@@ -35,7 +37,9 @@ header p {
     opacity: 0.9;
 }
 
-/* Navigation */
+/* =========================
+   Navigation
+========================= */
 
 nav {
     position: sticky;
@@ -61,7 +65,9 @@ nav a:hover {
     color: #2563eb;
 }
 
-/* Main */
+/* =========================
+   Main
+========================= */
 
 main {
     max-width: 1150px;
@@ -77,7 +83,9 @@ main {
     margin-top: 0;
 }
 
-/* Headings */
+/* =========================
+   Headings
+========================= */
 
 h2 {
     color: #172554;
@@ -93,7 +101,9 @@ section {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
 }
 
-/* Dashboard Cards */
+/* =========================
+   Dashboard Cards
+========================= */
 
 .cards {
     display: grid;
@@ -129,54 +139,55 @@ section {
     color: #172554;
 }
 
-/* Customer Segmentation */
+/* =========================
+   Customer Segmentation
+========================= */
 
-.segment-filter {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 20px 0;
-    padding: 16px;
-    background: #f8fafc;
+#segments > p {
+    color: #64748b;
+    max-width: 850px;
+}
+
+/* Main segmentation layout */
+
+.segment-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+    gap: 24px;
+    margin-top: 25px;
+    align-items: stretch;
+}
+
+/* Table panel */
+
+.segment-table-panel {
+    background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
 }
 
-.segment-filter label {
-    font-weight: bold;
-    color: #334155;
+.segment-table-panel h3,
+.segment-chart-panel h3 {
+    margin: 0;
+    padding: 18px 20px;
+    color: #172554;
+    font-size: 17px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.segment-filter select {
-    min-width: 280px;
-    padding: 10px 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    background: white;
-    color: #1e293b;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.segment-filter select:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-/* Segmentation Table */
+/* Segmentation table */
 
 .segment-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    border-radius: 8px;
-    overflow: hidden;
+    margin: 0;
 }
 
 .segment-table th,
 .segment-table td {
-    padding: 14px;
+    padding: 13px 14px;
     border-bottom: 1px solid #e2e8f0;
     text-align: left;
 }
@@ -184,18 +195,129 @@ section {
 .segment-table th {
     background: #172554;
     color: white;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: bold;
 }
 
 .segment-table td {
-    font-size: 14px;
+    font-size: 13px;
+    color: #334155;
+}
+
+.segment-table tbody tr {
+    transition: background 0.2s ease;
 }
 
 .segment-table tbody tr:hover {
     background: #f8fafc;
 }
 
-/* Segmentation Chart */
+.segment-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* =========================
+   Segment Badges
+========================= */
+
+.segment-badge {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.3;
+    background: #e2e8f0;
+    color: #334155;
+}
+
+/* High-risk segment */
+
+.segment-risk-high .segment-badge,
+.segment-badge.segment-risk-high {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Highly satisfied segment */
+
+.segment-satisfied .segment-badge,
+.segment-badge.segment-satisfied {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+/* Stable / satisfied but slow */
+
+.segment-stable .segment-badge,
+.segment-badge.segment-stable {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* Fast segment */
+
+.segment-fast .segment-badge {
+    border: 1px solid #86efac;
+}
+
+/* Slow segment */
+
+.segment-slow .segment-badge {
+    border: 1px solid #fcd34d;
+}
+
+/* =========================
+   Segment Status Badges
+========================= */
+
+.risk-badge {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.risk-high {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.risk-low {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.risk-stable {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* =========================
+   Segmentation Chart
+========================= */
+
+.segment-chart-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    min-height: 100%;
+}
+
+.segment-chart-panel .chart-wrapper {
+    padding: 20px;
+    height: 390px;
+}
+
+.segment-chart-panel canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Legacy segment chart support */
 
 .segment-chart {
     margin-top: 30px;
@@ -210,7 +332,43 @@ section {
     color: #172554;
 }
 
-/* Chart Containers */
+.segment-chart .chart-wrapper {
+    height: 320px;
+}
+
+/* =========================
+   Segment Summary
+========================= */
+
+.segment-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 18px 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.segment-summary-item {
+    text-align: center;
+}
+
+.segment-summary-item strong {
+    display: block;
+    font-size: 20px;
+    color: #172554;
+}
+
+.segment-summary-item span {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: #64748b;
+}
+
+/* =========================
+   Chart Containers
+========================= */
 
 .chart-wrapper {
     position: relative;
@@ -218,11 +376,13 @@ section {
     height: 300px;
 }
 
-.segment-chart .chart-wrapper {
-    height: 320px;
+.chart-card canvas {
+    max-width: 100%;
 }
 
-/* Resolution Analytics */
+/* =========================
+   Resolution Analytics
+========================= */
 
 .analytics-grid {
     display: grid;
@@ -248,7 +408,110 @@ section {
     max-width: 100%;
 }
 
-/* Error Messages */
+/* =========================
+   Interactive Filters
+========================= */
+
+.filter-panel {
+    margin-top: 25px;
+    padding: 22px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+}
+
+.filter-panel h3 {
+    margin-top: 0;
+    color: #172554;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-top: 18px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.filter-group label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #475569;
+}
+
+.filter-group select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: white;
+    color: #1e293b;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.filter-group select:hover {
+    border-color: #94a3b8;
+}
+
+.filter-group select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+/* Filtered result cards */
+
+#filtered-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+#filtered-stats .card {
+    padding: 18px;
+}
+
+#filtered-stats .value {
+    font-size: 25px;
+}
+
+/* Filter status */
+
+#filter-result-status {
+    margin: 15px 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* Reset button */
+
+#reset-filters {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: #172554;
+    color: white;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#reset-filters:hover {
+    background: #1e40af;
+    transform: translateY(-1px);
+}
+
+/* =========================
+   Error Messages
+========================= */
 
 .error-message {
     margin: 15px 0;
@@ -260,7 +523,9 @@ section {
     font-size: 14px;
 }
 
-/* Loading State */
+/* =========================
+   Loading State
+========================= */
 
 #segment-container:empty,
 #priority-chart:empty,
@@ -269,7 +534,9 @@ section {
     min-height: 50px;
 }
 
-/* Resolution Rows */
+/* =========================
+   Resolution Rows
+========================= */
 
 .resolution-row {
     display: flex;
@@ -288,7 +555,9 @@ section {
     color: #172554;
 }
 
-/* Footer */
+/* =========================
+   Footer
+========================= */
 
 footer {
     margin-top: 50px;
@@ -299,16 +568,33 @@ footer {
     font-size: 14px;
 }
 
-/* Responsive Design */
+/* =========================
+   Responsive Design
+========================= */
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
 
-    .cards {
+    .segment-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .segment-chart-panel .chart-wrapper {
+        height: 350px;
+    }
+
+    .filter-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
     .analytics-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+
+    .cards {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     nav a {
@@ -323,6 +609,31 @@ footer {
     .segment-filter select {
         width: 100%;
         min-width: 0;
+    }
+
+    #filtered-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 650px) {
+
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #filtered-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .segment-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .segment-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
     }
 }
 
@@ -363,10 +674,18 @@ footer {
         margin-top: 20px;
     }
 
-    .segment-table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
+    .segment-layout {
+        gap: 15px;
+    }
+
+    .segment-table th,
+    .segment-table td {
+        padding: 11px 10px;
+    }
+
+    .segment-chart-panel .chart-wrapper {
+        height: 300px;
+        padding: 15px;
     }
 
     .chart-wrapper {
@@ -376,4 +695,12 @@ footer {
     .segment-chart .chart-wrapper {
         height: 280px;
     }
-   
+
+    .filter-panel {
+        padding: 17px;
+    }
+
+    #reset-filters {
+        width: 100%;
+    }
+}
