@@ -1,30 +1,20 @@
 /* =========================================================
-   SupportIQ - Customer Support Intelligence Dashboard
+   SupportIQ
+   Customer Support Intelligence Platform
    ========================================================= */
 
 "use strict";
-
-/* =========================================================
-   Global State
-   ========================================================= */
-
-let ticketData = [];
-let dashboardMetrics = {};
-let resolutionByPriority = [];
-let resolutionByType = [];
-let resolutionByChannel = [];
-
-let segmentData = [];
-let satisfactionData = {};
-
-let filtersReady = false;
-let charts = {};
 
 
 /* =========================================================
    Configuration
    ========================================================= */
 
+/*
+ * Analytics files are inside the data/ folder.
+ *
+ * ticket_data.json is in the repository ROOT.
+ */
 const DATA_PATH = "data/";
 
 const FILES = {
@@ -39,13 +29,31 @@ const FILES = {
 
 
 /* =========================================================
+   Global State
+   ========================================================= */
+
+let ticketData = [];
+let dashboardMetrics = {};
+let segmentData = [];
+let satisfactionData = {};
+
+let resolutionByPriority = [];
+let resolutionByType = [];
+let resolutionByChannel = [];
+
+let charts = {};
+let filtersReady = false;
+
+
+/* =========================================================
    Utility Functions
    ========================================================= */
 
-/**
- * Convert a value into a number safely.
+/*
+ * Safely convert a value to a number.
  */
 function toNumber(value, fallback = null) {
+
     if (
         value === null ||
         value === undefined ||
@@ -58,15 +66,23 @@ function toNumber(value, fallback = null) {
 
     const number = Number(value);
 
-    return Number.isFinite(number) ? number : fallback;
+    if (Number.isFinite(number)) {
+        return number;
+    }
+
+    return fallback;
 }
 
 
-/**
- * Safely normalize text.
+/*
+ * Normalize text for reliable comparisons.
  */
 function normalizeText(value) {
-    if (value === null || value === undefined) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
         return "";
     }
 
@@ -78,219 +94,152 @@ function normalizeText(value) {
 }
 
 
-/**
- * Display-friendly text.
- */
-function displayText(value) {
-    if (value === null || value === undefined || value === "") {
-        return "N/A";
-    }
-
-    return String(value);
-}
-
-
-/**
- * Round a number.
- */
-function round(value, decimals = 2) {
-    if (!Number.isFinite(value)) {
-        return null;
-    }
-
-    const factor = Math.pow(10, decimals);
-
-    return Math.round(value * factor) / factor;
-}
-
-
-/**
- * Calculate average from valid numeric values.
+/*
+ * Calculate an average from valid numeric values.
  */
 function average(values) {
-    const valid = values
+
+    const validValues = values
         .map(value => toNumber(value, null))
         .filter(value => value !== null);
 
-    if (valid.length === 0) {
+    if (validValues.length === 0) {
         return null;
     }
 
-    return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+    const total = validValues.reduce(
+        (sum, value) => sum + value,
+        0
+    );
+
+    return total / validValues.length;
 }
 
 
-/**
- * Capitalize each word.
+/*
+ * Format whole numbers.
+ */
+function formatNumber(value) {
+
+    const number = toNumber(value, null);
+
+    if (number === null) {
+        return "N/A";
+    }
+
+    return number.toLocaleString("en-US", {
+        maximumFractionDigits: 0
+    });
+}
+
+
+/*
+ * Format decimal numbers.
+ */
+function formatDecimal(value, decimals = 2) {
+
+    const number = toNumber(value, null);
+
+    if (number === null) {
+        return "N/A";
+    }
+
+    return number.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+
+/*
+ * Convert text into title case.
  */
 function titleCase(value) {
+
     return String(value)
-        .replace(/\s+/g, " ")
         .trim()
-        .split(" ")
+        .split(/\s+/)
         .map(word => {
+
             if (!word) {
                 return "";
             }
 
-            return word.charAt(0).toUpperCase() + word.slice(1);
+            return (
+                word.charAt(0).toUpperCase() +
+                word.slice(1)
+            );
         })
         .join(" ");
 }
 
 
-/* =========================================================
-   Resolution Handling
-   ========================================================= */
-
-/**
- * Convert a resolution value to hours.
- *
- * IMPORTANT:
- * ticket_data.json contains NaN for Time to Resolution.
- * Therefore this function intentionally returns null for
- * missing values rather than inventing a resolution time.
+/*
+ * Safely place text into an HTML element.
  */
-function getResolutionHours(value) {
-    if (
+function setElementText(id, value) {
+
+    const element =
+        document.getElementById(id);
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent =
         value === null ||
         value === undefined ||
-        value === "" ||
-        value === "NaN" ||
-        value === "null"
-    ) {
-        return null;
-    }
+        value === ""
+            ? "N/A"
+            : String(value);
+}
 
-    if (typeof value === "number") {
-        return Number.isFinite(value) ? value : null;
-    }
 
-    const text = String(value).trim();
+/*
+ * Escape dynamic HTML.
+ */
+function escapeHTML(value) {
 
-    if (!text || text.toLowerCase() === "nan") {
-        return null;
-    }
-
-    /*
-     * Numeric value.
-     */
-    const numeric = Number(text);
-
-    if (Number.isFinite(numeric)) {
-        return numeric;
-    }
-
-    /*
-     * Pandas timedelta examples:
-     *
-     * 0 days 11:45:00
-     * 1 days 04:30:00
-     * 11:45:00
-     */
-    let match = text.match(
-        /^(-?\d+)\s+days?\s+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?$/
-    );
-
-    if (match) {
-        const days = Number(match[1]);
-        const hours = Number(match[2]);
-        const minutes = Number(match[3]);
-        const seconds = Number(match[4] || 0);
-
-        return (
-            days * 24 +
-            hours +
-            minutes / 60 +
-            seconds / 3600
-        );
-    }
-
-    /*
-     * HH:MM:SS
-     */
-    match = text.match(
-        /^(\d{1,3}):(\d{2}):(\d{2})$/
-    );
-
-    if (match) {
-        const hours = Number(match[1]);
-        const minutes = Number(match[2]);
-        const seconds = Number(match[3]);
-
-        return hours + minutes / 60 + seconds / 3600;
-    }
-
-    /*
-     * HH:MM
-     */
-    match = text.match(
-        /^(\d{1,3}):(\d{2})$/
-    );
-
-    if (match) {
-        const hours = Number(match[1]);
-        const minutes = Number(match[2]);
-
-        return hours + minutes / 60;
-    }
-
-    /*
-     * Examples:
-     * 11.77 hours
-     * 11 hours
-     */
-    match = text.match(
-        /(-?\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/i
-    );
-
-    if (match) {
-        return Number(match[1]);
-    }
-
-    /*
-     * ISO-style duration:
-     * PT11H30M
-     */
-    match = text.match(
-        /^P(?:\d+D)?T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/i
-    );
-
-    if (match) {
-        const hours = Number(match[1] || 0);
-        const minutes = Number(match[2] || 0);
-        const seconds = Number(match[3] || 0);
-
-        return hours + minutes / 60 + seconds / 3600;
-    }
-
-    return null;
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 
 /* =========================================================
-   Safe JSON Loading
+   JSON Loading
    ========================================================= */
 
+/*
+ * Load JSON from the data/ directory.
+ *
+ * The ticket file is loaded separately because it is
+ * stored in the repository root.
+ */
 async function loadJSON(filename) {
-    const response = await fetch(DATA_PATH + filename, {
-        cache: "no-store"
-    });
+
+    const response = await fetch(
+        DATA_PATH + filename,
+        {
+            cache: "no-store"
+        }
+    );
 
     if (!response.ok) {
+
         throw new Error(
-            `Unable to load ${filename} (${response.status})`
+            `Unable to load ${filename}. HTTP ${response.status}`
         );
     }
 
     const text = await response.text();
 
     /*
-     * The exported ticket JSON can contain JavaScript-style
-     * NaN / Infinity values from pandas.
-     *
-     * JSON.parse() does not accept these values, so convert
-     * them to null before parsing.
+     * Convert pandas-style NaN and Infinity values
+     * into valid JSON null values.
      */
     const safeText = text
         .replace(/\bNaN\b/g, "null")
@@ -306,13 +255,18 @@ async function loadJSON(filename) {
    ========================================================= */
 
 async function loadCSV(filename) {
-    const response = await fetch(DATA_PATH + filename, {
-        cache: "no-store"
-    });
+
+    const response = await fetch(
+        DATA_PATH + filename,
+        {
+            cache: "no-store"
+        }
+    );
 
     if (!response.ok) {
+
         throw new Error(
-            `Unable to load ${filename} (${response.status})`
+            `Unable to load ${filename}. HTTP ${response.status}`
         );
     }
 
@@ -320,62 +274,110 @@ async function loadCSV(filename) {
 }
 
 
-/**
- * Basic CSV parser.
+/*
+ * Simple CSV parser.
  */
 function parseCSV(csvText) {
+
     const rows = [];
     let row = [];
     let cell = "";
     let insideQuotes = false;
 
-    for (let i = 0; i < csvText.length; i++) {
-        const char = csvText[i];
-        const next = csvText[i + 1];
+    for (
+        let i = 0;
+        i < csvText.length;
+        i++
+    ) {
 
-        if (char === '"' && insideQuotes && next === '"') {
+        const character =
+            csvText[i];
+
+        const nextCharacter =
+            csvText[i + 1];
+
+        if (
+            character === '"' &&
+            insideQuotes &&
+            nextCharacter === '"'
+        ) {
+
             cell += '"';
             i++;
+
             continue;
         }
 
-        if (char === '"') {
-            insideQuotes = !insideQuotes;
-            continue;
-        }
+        if (character === '"') {
 
-        if (char === "," && !insideQuotes) {
-            row.push(cell.trim());
-            cell = "";
+            insideQuotes =
+                !insideQuotes;
+
             continue;
         }
 
         if (
-            (char === "\n" || char === "\r") &&
+            character === "," &&
             !insideQuotes
         ) {
-            if (char === "\r" && next === "\n") {
+
+            row.push(cell.trim());
+            cell = "";
+
+            continue;
+        }
+
+        if (
+            (
+                character === "\n" ||
+                character === "\r"
+            ) &&
+            !insideQuotes
+        ) {
+
+            if (
+                character === "\r" &&
+                nextCharacter === "\n"
+            ) {
+
                 i++;
             }
 
             row.push(cell.trim());
 
-            if (row.some(value => value !== "")) {
+            if (
+                row.some(
+                    value =>
+                        value !== ""
+                )
+            ) {
+
                 rows.push(row);
             }
 
             row = [];
             cell = "";
+
             continue;
         }
 
-        cell += char;
+        cell += character;
     }
 
-    if (cell !== "" || row.length > 0) {
+    if (
+        cell !== "" ||
+        row.length > 0
+    ) {
+
         row.push(cell.trim());
 
-        if (row.some(value => value !== "")) {
+        if (
+            row.some(
+                value =>
+                    value !== ""
+            )
+        ) {
+
             rows.push(row);
         }
     }
@@ -384,17 +386,25 @@ function parseCSV(csvText) {
         return [];
     }
 
-    const headers = rows[0];
+    const headers =
+        rows[0];
 
-    return rows.slice(1).map(values => {
-        const object = {};
+    return rows
+        .slice(1)
+        .map(values => {
 
-        headers.forEach((header, index) => {
-            object[header] = values[index] ?? "";
+            const object = {};
+
+            headers.forEach(
+                (header, index) => {
+
+                    object[header] =
+                        values[index] ?? "";
+                }
+            );
+
+            return object;
         });
-
-        return object;
-    });
 }
 
 
@@ -403,59 +413,157 @@ function parseCSV(csvText) {
    ========================================================= */
 
 async function loadDashboardMetrics() {
+
     try {
-        const csv = await loadCSV(FILES.metrics);
-        const rows = parseCSV(csv);
+
+        const csv =
+            await loadCSV(
+                FILES.metrics
+            );
+
+        const rows =
+            parseCSV(csv);
 
         rows.forEach(row => {
-            const metric = normalizeText(row.metric);
-            const value = toNumber(row.value, null);
 
-            if (metric && value !== null) {
-                dashboardMetrics[metric] = value;
+            const metric =
+                normalizeText(
+                    row.metric
+                );
+
+            const value =
+                toNumber(
+                    row.value,
+                    null
+                );
+
+            if (
+                metric &&
+                value !== null
+            ) {
+
+                dashboardMetrics[
+                    metric
+                ] = value;
             }
         });
+
     } catch (error) {
+
         console.warn(
             "Dashboard metrics could not be loaded:",
             error
         );
     }
 
+
     /*
-     * Reliable fallback values from the project's analytics.
+     * Reliable fallback values from
+     * the SupportIQ analytics.
      */
-    if (
-        !Number.isFinite(
-            dashboardMetrics["total tickets"]
-        )
-    ) {
-        dashboardMetrics["total tickets"] = 8469;
-    }
 
     if (
         !Number.isFinite(
-            dashboardMetrics["average satisfaction"]
+            dashboardMetrics[
+                "total tickets"
+            ]
         )
     ) {
-        dashboardMetrics["average satisfaction"] = 2.99;
+
+        dashboardMetrics[
+            "total tickets"
+        ] = 8469;
     }
+
 
     if (
         !Number.isFinite(
-            dashboardMetrics["average resolution"]
+            dashboardMetrics[
+                "average satisfaction"
+            ]
         )
     ) {
-        dashboardMetrics["average resolution"] = 11.77;
+
+        dashboardMetrics[
+            "average satisfaction"
+        ] = 2.99;
     }
+
 
     if (
         !Number.isFinite(
-            dashboardMetrics["customer segments"]
+            dashboardMetrics[
+                "average resolution"
+            ]
         )
     ) {
-        dashboardMetrics["customer segments"] = 6;
+
+        dashboardMetrics[
+            "average resolution"
+        ] = 11.77;
     }
+
+
+    if (
+        !Number.isFinite(
+            dashboardMetrics[
+                "customer segments"
+            ]
+        )
+    ) {
+
+        dashboardMetrics[
+            "customer segments"
+        ] = 6;
+    }
+}
+
+
+/*
+ * Render the four main dashboard cards.
+ */
+function renderDashboard() {
+
+    setElementText(
+        "total-tickets",
+        formatNumber(
+            dashboardMetrics[
+                "total tickets"
+            ]
+        )
+    );
+
+
+    setElementText(
+        "average-satisfaction",
+        formatDecimal(
+            dashboardMetrics[
+                "average satisfaction"
+            ],
+            2
+        ) + " / 5"
+    );
+
+
+    setElementText(
+        "average-resolution",
+        formatDecimal(
+            dashboardMetrics[
+                "average resolution"
+            ],
+            2
+        ) + " hrs"
+    );
+
+
+    setElementText(
+        "customer-segments",
+        formatNumber(
+            dashboardMetrics[
+                "customer segments"
+            ]
+        )
+    );
 }
 
 
@@ -463,64 +571,188 @@ async function loadDashboardMetrics() {
    Ticket Data
    ========================================================= */
 
+/*
+ * IMPORTANT:
+ *
+ * ticket_data.json is located in the ROOT of GitHub Pages.
+ *
+ * Therefore we use:
+ *
+ *     fetch("ticket_data.json")
+ *
+ * and NOT:
+ *
+ *     fetch("data/ticket_data.json")
+ */
 async function loadTicketData() {
-    try {
-        const data = await loadJSON(FILES.tickets);
 
-        if (Array.isArray(data)) {
-            ticketData = data;
-        } else {
-            console.error(
-                "ticket_data.json does not contain an array."
+    try {
+
+        const response =
+            await fetch(
+                FILES.tickets,
+                {
+                    cache: "no-store"
+                }
             );
 
-            ticketData = [];
+
+        if (!response.ok) {
+
+            throw new Error(
+                `Unable to load ticket_data.json. HTTP ${response.status}`
+            );
         }
 
+
+        const text =
+            await response.text();
+
+
+        /*
+         * ticket_data.json contains NaN values
+         * generated from pandas.
+         *
+         * JSON.parse() does not support NaN.
+         */
+        const safeText =
+            text
+                .replace(
+                    /\bNaN\b/g,
+                    "null"
+                )
+                .replace(
+                    /\bInfinity\b/g,
+                    "null"
+                )
+                .replace(
+                    /\b-Infinity\b/g,
+                    "null"
+                );
+
+
+        const data =
+            JSON.parse(
+                safeText
+            );
+
+
+        if (!Array.isArray(data)) {
+
+            throw new Error(
+                "ticket_data.json does not contain an array."
+            );
+        }
+
+
+        ticketData = data;
+
+
         console.log(
-            `Loaded ${ticketData.length} ticket records.`
+            `SupportIQ: loaded ${ticketData.length} tickets.`
         );
 
+
+        /*
+         * Initialize filters after ticket data
+         * has successfully loaded.
+         */
         initializeFilters();
+
+
         updateFilteredDashboard();
 
+
     } catch (error) {
+
         console.error(
             "Ticket data loading error:",
             error
         );
 
+
         ticketData = [];
 
+
         showDataError(
-            "Ticket-level data could not be loaded."
+            "Unable to load ticket-level data."
         );
+
+
+        setElementText(
+            "filtered-ticket-count",
+            "Unavailable"
+        );
+
+
+        setElementText(
+            "filtered-average-satisfaction",
+            "Unavailable"
+        );
+
+
+        setElementText(
+            "filtered-average-resolution",
+            "See analytics"
+        );
+
+
+        const status =
+            document.getElementById(
+                "filter-result-status"
+            );
+
+
+        if (status) {
+
+            status.textContent =
+                "Unable to load ticket-level data.";
+        }
     }
 }
 
 
 /* =========================================================
-   Supporting Analytics Data
+   Segment Data
    ========================================================= */
 
 async function loadSegmentData() {
-    try {
-        const data = await loadJSON(FILES.segments);
 
-        segmentData =
+    try {
+
+        const data =
+            await loadJSON(
+                FILES.segments
+            );
+
+
+        if (
             Array.isArray(data)
-                ? data
-                : data.segments || [];
+        ) {
+
+            segmentData =
+                data;
+
+        } else {
+
+            segmentData =
+                data.segments || [];
+        }
+
 
         renderSegments();
 
+
     } catch (error) {
+
         console.error(
             "Segment data loading error:",
             error
         );
 
+
         segmentData = [];
+
 
         showDataError(
             "Customer segment analytics could not be loaded."
@@ -529,128 +761,32 @@ async function loadSegmentData() {
 }
 
 
-async function loadSatisfactionData() {
-    try {
-        const data = await loadJSON(FILES.satisfaction);
-
-        satisfactionData = data || {};
-
-        renderSatisfaction();
-
-    } catch (error) {
-        console.error(
-            "Satisfaction data loading error:",
-            error
-        );
-
-        satisfactionData = {};
-
-        showDataError(
-            "Satisfaction analytics could not be loaded."
-        );
-    }
-}
-
-
-async function loadResolutionData() {
-    try {
-        const priorityData = await loadJSON(
-            FILES.priorityResolution
-        );
-
-        const typeData = await loadJSON(
-            FILES.typeResolution
-        );
-
-        const channelData = await loadJSON(
-            FILES.channelResolution
-        );
-
-        resolutionByPriority =
-            priorityData.data || [];
-
-        resolutionByType =
-            typeData.data || [];
-
-        resolutionByChannel =
-            channelData.data || [];
-
-        renderResolutionCharts();
-
-    } catch (error) {
-        console.error(
-            "Resolution analytics loading error:",
-            error
-        );
-
-        resolutionByPriority = [];
-        resolutionByType = [];
-        resolutionByChannel = [];
-
-        showDataError(
-            "Resolution analytics could not be loaded."
-        );
-    }
-}
-
-
-/* =========================================================
-   Main Dashboard
-   ========================================================= */
-
-function renderDashboard() {
-    setElementText(
-        "total-tickets",
-        formatNumber(
-            dashboardMetrics["total tickets"]
-        )
-    );
-
-    setElementText(
-        "average-satisfaction",
-        formatDecimal(
-            dashboardMetrics["average satisfaction"],
-            2
-        ) + " / 5"
-    );
-
-    setElementText(
-        "average-resolution",
-        formatDecimal(
-            dashboardMetrics["average resolution"],
-            2
-        ) + " hrs"
-    );
-
-    setElementText(
-        "customer-segments",
-        formatNumber(
-            dashboardMetrics["customer segments"]
-        )
-    );
-}
-
-
-/* =========================================================
-   Segment Rendering
-   ========================================================= */
-
+/*
+ * Render the customer segmentation table.
+ */
 function renderSegments() {
+
     const container =
         document.getElementById(
             "segment-container"
         );
 
+
     if (!container) {
         return;
     }
 
-    if (!segmentData.length) {
+
+    if (
+        !segmentData.length
+    ) {
+
         container.innerHTML =
             "<p>No segment data available.</p>";
 
         return;
     }
+
 
     let html = `
         <div class="segment-table-wrapper">
@@ -664,43 +800,80 @@ function renderSegments() {
                         <th>Avg Resolution</th>
                     </tr>
                 </thead>
+
                 <tbody>
     `;
 
-    segmentData.forEach(segment => {
-        const name =
-            segment.segment ||
-            segment.name ||
-            "Unknown";
 
-        const customers =
-            toNumber(segment.customers, 0);
+    segmentData.forEach(
+        segment => {
 
-        const age =
-            toNumber(segment.avg_age, null);
+            const name =
+                segment.segment ||
+                segment.name ||
+                "Unknown";
 
-        const satisfaction =
-            toNumber(
-                segment.avg_satisfaction,
-                null
-            );
 
-        const resolution =
-            toNumber(
-                segment.avg_resolution_hours,
-                null
-            );
+            const customers =
+                toNumber(
+                    segment.customers,
+                    0
+                );
 
-        html += `
-            <tr>
-                <td>${escapeHTML(name)}</td>
-                <td>${formatNumber(customers)}</td>
-                <td>${formatDecimal(age, 1)}</td>
-                <td>${formatDecimal(satisfaction, 2)}</td>
-                <td>${formatDecimal(resolution, 2)} hrs</td>
-            </tr>
-        `;
-    });
+
+            const age =
+                toNumber(
+                    segment.avg_age,
+                    null
+                );
+
+
+            const satisfaction =
+                toNumber(
+                    segment.avg_satisfaction,
+                    null
+                );
+
+
+            const resolution =
+                toNumber(
+                    segment.avg_resolution_hours,
+                    null
+                );
+
+
+            html += `
+                <tr>
+                    <td>
+                        ${escapeHTML(name)}
+                    </td>
+
+                    <td>
+                        ${formatNumber(customers)}
+                    </td>
+
+                    <td>
+                        ${formatDecimal(age, 1)}
+                    </td>
+
+                    <td>
+                        ${formatDecimal(
+                            satisfaction,
+                            2
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatDecimal(
+                            resolution,
+                            2
+                        )} hrs
+                    </td>
+                </tr>
+            `;
+        }
+    );
+
 
     html += `
                 </tbody>
@@ -708,58 +881,391 @@ function renderSegments() {
         </div>
     `;
 
-    container.innerHTML = html;
+
+    container.innerHTML =
+        html;
 }
 
 
 /* =========================================================
-   Satisfaction Rendering
+   Satisfaction Data
    ========================================================= */
 
+async function loadSatisfactionData() {
+
+    try {
+
+        const data =
+            await loadJSON(
+                FILES.satisfaction
+            );
+
+
+        satisfactionData =
+            data || {};
+
+
+        renderSatisfaction();
+
+
+    } catch (error) {
+
+        console.error(
+            "Satisfaction data loading error:",
+            error
+        );
+
+
+        satisfactionData = {};
+
+
+        showDataError(
+            "Satisfaction analytics could not be loaded."
+        );
+    }
+}
+
+
+/*
+ * Render satisfaction metrics.
+ */
 function renderSatisfaction() {
+
     const low =
         toNumber(
-            satisfactionData.low_satisfaction_tickets,
+            satisfactionData[
+                "low_satisfaction_tickets"
+            ],
             1102
         );
 
+
     const satisfied =
         toNumber(
-            satisfactionData.satisfied_tickets,
+            satisfactionData[
+                "satisfied_tickets"
+            ],
             1667
         );
 
+
     const lowRate =
         toNumber(
-            satisfactionData.low_satisfaction_percentage,
+            satisfactionData[
+                "low_satisfaction_percentage"
+            ],
             39.8
         );
 
+
     const accuracy =
         toNumber(
-            satisfactionData.model_accuracy,
+            satisfactionData[
+                "model_accuracy"
+            ],
             59.75
         );
+
 
     setElementText(
         "low-satisfaction",
         formatNumber(low)
     );
 
+
     setElementText(
         "satisfied-customers",
         formatNumber(satisfied)
     );
 
+
     setElementText(
         "low-satisfaction-rate",
-        formatDecimal(lowRate, 1) + "%"
+        formatDecimal(
+            lowRate,
+            1
+        ) + "%"
     );
+
 
     setElementText(
         "model-accuracy",
-        formatDecimal(accuracy, 2) + "%"
+        formatDecimal(
+            accuracy,
+            2
+        ) + "%"
     );
+}
+
+
+/* =========================================================
+   Resolution Data
+   ========================================================= */
+
+async function loadResolutionData() {
+
+    try {
+
+        const priorityData =
+            await loadJSON(
+                FILES.priorityResolution
+            );
+
+
+        const typeData =
+            await loadJSON(
+                FILES.typeResolution
+            );
+
+
+        const channelData =
+            await loadJSON(
+                FILES.channelResolution
+            );
+
+
+        resolutionByPriority =
+            priorityData.data || [];
+
+
+        resolutionByType =
+            typeData.data || [];
+
+
+        resolutionByChannel =
+            channelData.data || [];
+
+
+        renderResolutionCharts();
+
+
+    } catch (error) {
+
+        console.error(
+            "Resolution analytics loading error:",
+            error
+        );
+
+
+        resolutionByPriority = [];
+        resolutionByType = [];
+        resolutionByChannel = [];
+
+
+        showDataError(
+            "Resolution analytics could not be loaded."
+        );
+    }
+}
+
+
+/* =========================================================
+   Resolution Conversion
+   ========================================================= */
+
+/*
+ * Convert a resolution value to hours.
+ *
+ * This is intentionally defensive.
+ *
+ * If ticket-level resolution is missing,
+ * the function returns null.
+ */
+function getResolutionHours(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        value === "NaN" ||
+        value === "null"
+    ) {
+
+        return null;
+    }
+
+
+    /*
+     * Already numeric.
+     */
+    if (
+        typeof value === "number"
+    ) {
+
+        return Number.isFinite(value)
+            ? value
+            : null;
+    }
+
+
+    const text =
+        String(value).trim();
+
+
+    if (
+        !text ||
+        text.toLowerCase() === "nan"
+    ) {
+
+        return null;
+    }
+
+
+    /*
+     * Numeric string.
+     */
+    const numeric =
+        Number(text);
+
+
+    if (
+        Number.isFinite(numeric)
+    ) {
+
+        return numeric;
+    }
+
+
+    /*
+     * Pandas timedelta format:
+     *
+     * 0 days 11:45:00
+     */
+    let match =
+        text.match(
+            /^(-?\d+)\s+days?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+        );
+
+
+    if (match) {
+
+        const days =
+            Number(match[1]);
+
+        const hours =
+            Number(match[2]);
+
+        const minutes =
+            Number(match[3]);
+
+        const seconds =
+            Number(match[4] || 0);
+
+
+        return (
+            days * 24 +
+            hours +
+            minutes / 60 +
+            seconds / 3600
+        );
+    }
+
+
+    /*
+     * HH:MM:SS
+     */
+    match =
+        text.match(
+            /^(\d{1,3}):(\d{2}):(\d{2})$/
+        );
+
+
+    if (match) {
+
+        const hours =
+            Number(match[1]);
+
+        const minutes =
+            Number(match[2]);
+
+        const seconds =
+            Number(match[3]);
+
+
+        return (
+            hours +
+            minutes / 60 +
+            seconds / 3600
+        );
+    }
+
+
+    /*
+     * HH:MM
+     */
+    match =
+        text.match(
+            /^(\d{1,3}):(\d{2})$/
+        );
+
+
+    if (match) {
+
+        const hours =
+            Number(match[1]);
+
+        const minutes =
+            Number(match[2]);
+
+
+        return (
+            hours +
+            minutes / 60
+        );
+    }
+
+
+    /*
+     * Example:
+     *
+     * 11.77 hours
+     */
+    match =
+        text.match(
+            /(-?\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/i
+        );
+
+
+    if (match) {
+
+        return Number(
+            match[1]
+        );
+    }
+
+
+    /*
+     * ISO duration:
+     *
+     * PT11H30M
+     */
+    match =
+        text.match(
+            /^P(?:\d+D)?T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/i
+        );
+
+
+    if (match) {
+
+        const hours =
+            Number(match[1] || 0);
+
+        const minutes =
+            Number(match[2] || 0);
+
+        const seconds =
+            Number(match[3] || 0);
+
+
+        return (
+            hours +
+            minutes / 60 +
+            seconds / 3600
+        );
+    }
+
+
+    return null;
 }
 
 
@@ -768,29 +1274,38 @@ function renderSatisfaction() {
    ========================================================= */
 
 function initializeFilters() {
-    if (!ticketData.length) {
+
+    if (
+        !ticketData.length
+    ) {
+
         return;
     }
+
 
     const priorityFilter =
         document.getElementById(
             "priority-filter"
         );
 
+
     const typeFilter =
         document.getElementById(
             "type-filter"
         );
+
 
     const channelFilter =
         document.getElementById(
             "channel-filter"
         );
 
+
     const segmentFilter =
         document.getElementById(
             "segment-filter-main"
         );
+
 
     if (
         !priorityFilter ||
@@ -798,198 +1313,286 @@ function initializeFilters() {
         !channelFilter ||
         !segmentFilter
     ) {
+
+        console.warn(
+            "One or more filter elements are missing from index.html."
+        );
+
         return;
     }
 
+
     /*
-     * Prevent rebuilding filters unnecessarily.
+     * Build filters only once.
      */
-    if (!filtersReady) {
-        populateFilter(
-            priorityFilter,
-            getUniqueValues(
-                ticketData,
-                "Ticket Priority"
-            ),
-            "All Priorities"
-        );
+    if (
+        filtersReady
+    ) {
 
-        populateFilter(
-            typeFilter,
-            getUniqueValues(
-                ticketData,
-                "Ticket Type"
-            ),
-            "All Ticket Types"
-        );
-
-        populateFilter(
-            channelFilter,
-            getUniqueValues(
-                ticketData,
-                "Ticket Channel"
-            ),
-            "All Channels"
-        );
-
-        populateSegmentFilter(
-            segmentFilter
-        );
-
-        priorityFilter.addEventListener(
-            "change",
-            updateFilteredDashboard
-        );
-
-        typeFilter.addEventListener(
-            "change",
-            updateFilteredDashboard
-        );
-
-        channelFilter.addEventListener(
-            "change",
-            updateFilteredDashboard
-        );
-
-        segmentFilter.addEventListener(
-            "change",
-            updateFilteredDashboard
-        );
-
-        const resetButton =
-            document.getElementById(
-                "reset-filters"
-            );
-
-        if (resetButton) {
-            resetButton.addEventListener(
-                "click",
-                resetFilters
-            );
-        }
-
-        filtersReady = true;
+        return;
     }
+
+
+    populateFilter(
+        priorityFilter,
+        getUniqueValues(
+            ticketData,
+            "Ticket Priority"
+        ),
+        "All Priorities"
+    );
+
+
+    populateFilter(
+        typeFilter,
+        getUniqueValues(
+            ticketData,
+            "Ticket Type"
+        ),
+        "All Ticket Types"
+    );
+
+
+    populateFilter(
+        channelFilter,
+        getUniqueValues(
+            ticketData,
+            "Ticket Channel"
+        ),
+        "All Channels"
+    );
+
+
+    populateSegmentFilter(
+        segmentFilter
+    );
+
+
+    priorityFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
+    );
+
+
+    typeFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
+    );
+
+
+    channelFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
+    );
+
+
+    segmentFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
+    );
+
+
+    const resetButton =
+        document.getElementById(
+            "reset-filters"
+        );
+
+
+    if (resetButton) {
+
+        resetButton.addEventListener(
+            "click",
+            resetFilters
+        );
+    }
+
+
+    filtersReady = true;
 }
 
 
-/**
- * Populate standard select filter.
+/*
+ * Populate a normal select filter.
  */
 function populateFilter(
     select,
     values,
     defaultLabel
 ) {
-    const sortedValues = [...values].sort(
-        (a, b) =>
-            String(a).localeCompare(
-                String(b)
-            )
-    );
 
     select.innerHTML = "";
 
+
     const defaultOption =
-        document.createElement("option");
+        document.createElement(
+            "option"
+        );
+
 
     defaultOption.value = "";
     defaultOption.textContent =
         defaultLabel;
 
-    select.appendChild(defaultOption);
 
-    sortedValues.forEach(value => {
-        const option =
-            document.createElement("option");
+    select.appendChild(
+        defaultOption
+    );
 
-        option.value = value;
-        option.textContent = titleCase(value);
 
-        select.appendChild(option);
-    });
+    const sortedValues =
+        [...values].sort(
+            (a, b) =>
+                String(a).localeCompare(
+                    String(b)
+                )
+        );
+
+
+    sortedValues.forEach(
+        value => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                value;
+
+
+            option.textContent =
+                titleCase(value);
+
+
+            select.appendChild(
+                option
+            );
+        }
+    );
 }
 
 
-/**
- * Populate segment filter.
+/*
+ * Populate customer segment filter.
  */
-function populateSegmentFilter(select) {
+function populateSegmentFilter(
+    select
+) {
+
     select.innerHTML = "";
 
+
     const defaultOption =
-        document.createElement("option");
+        document.createElement(
+            "option"
+        );
+
 
     defaultOption.value = "";
     defaultOption.textContent =
         "All Segments";
 
-    select.appendChild(defaultOption);
 
-    segmentData.forEach(segment => {
-        const name =
-            segment.segment ||
-            segment.name;
+    select.appendChild(
+        defaultOption
+    );
 
-        if (!name) {
-            return;
+
+    segmentData.forEach(
+        segment => {
+
+            const name =
+                segment.segment ||
+                segment.name;
+
+
+            if (!name) {
+                return;
+            }
+
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                name;
+
+
+            option.textContent =
+                name;
+
+
+            select.appendChild(
+                option
+            );
         }
-
-        const option =
-            document.createElement("option");
-
-        option.value = name;
-        option.textContent = name;
-
-        select.appendChild(option);
-    });
+    );
 }
 
 
-/**
- * Get unique values.
+/*
+ * Get unique values from a ticket field.
  */
 function getUniqueValues(
     data,
     field
 ) {
-    const values = new Set();
 
-    data.forEach(row => {
-        const value = row[field];
+    const values =
+        new Set();
 
-        if (
-            value !== null &&
-            value !== undefined &&
-            String(value).trim() !== ""
-        ) {
-            values.add(String(value).trim());
+
+    data.forEach(
+        ticket => {
+
+            const value =
+                ticket[field];
+
+
+            if (
+                value !== null &&
+                value !== undefined &&
+                String(value).trim() !== ""
+            ) {
+
+                values.add(
+                    String(value).trim()
+                );
+            }
         }
-    });
+    );
+
 
     return [...values];
 }
 
 
 /* =========================================================
-   Segment Classification
+   Customer Segment Classification
    ========================================================= */
 
-/**
- * Approximate ticket-level segment.
+/*
+ * ticket_data.json does not contain the original
+ * K-Means cluster label.
  *
- * Note:
- * The exported segment analytics are based on closed-ticket
- * segmentation. ticket_data.json does not contain the original
- * cluster label, so this function only provides a useful
- * ticket-level classification for filtering.
+ * Therefore this function provides a rule-based
+ * ticket-level segment for interactive filtering.
+ *
+ * The six official K-Means results shown in the
+ * segmentation table remain unchanged.
  */
 function inferSegment(ticket) {
+
     const age =
         toNumber(
             ticket["Customer Age"],
             null
         );
+
 
     const satisfaction =
         toNumber(
@@ -999,27 +1602,51 @@ function inferSegment(ticket) {
             null
         );
 
+
     const resolution =
         getResolutionHours(
-            ticket["Time to Resolution"]
+            ticket[
+                "Time to Resolution"
+            ]
         );
+
 
     if (
         age === null &&
         satisfaction === null
     ) {
+
         return "";
     }
 
-    let ageGroup = "Middle Age";
 
-    if (age !== null) {
-        if (age < 35) {
-            ageGroup = "Young";
-        } else if (age >= 50) {
-            ageGroup = "Older";
+    /*
+     * Customer age groups.
+     */
+    let ageGroup =
+        "Middle Age";
+
+
+    if (
+        age !== null
+    ) {
+
+        if (
+            age < 35
+        ) {
+
+            ageGroup =
+                "Young";
+
+        } else if (
+            age >= 50
+        ) {
+
+            ageGroup =
+                "Older";
         }
     }
+
 
     /*
      * Satisfaction categories.
@@ -1028,143 +1655,289 @@ function inferSegment(ticket) {
         satisfaction !== null &&
         satisfaction <= 2;
 
+
     const highlySatisfied =
         satisfaction !== null &&
         satisfaction >= 4;
 
+
     /*
-     * If resolution is unavailable, use satisfaction
-     * to keep the classification stable rather than
-     * inventing a resolution value.
+     * Since ticket-level Time to Resolution
+     * is missing in the current JSON, do not
+     * invent a speed category.
+     *
+     * Use the closest available category.
      */
-    if (resolution === null) {
-        if (atRisk) {
-            return `${ageGroup} - At Risk and Fast`;
+    if (
+        resolution === null
+    ) {
+
+        if (
+            atRisk
+        ) {
+
+            return (
+                ageGroup +
+                " - At Risk and Fast"
+            );
         }
 
-        if (highlySatisfied) {
-            return `${ageGroup} - Satisfied but Slow`;
+
+        if (
+            highlySatisfied
+        ) {
+
+            return (
+                ageGroup +
+                " - Satisfied but Slow"
+            );
         }
+
 
         return "";
     }
 
-    const fast = resolution < 10;
 
-    if (atRisk && fast) {
-        return `${ageGroup} - At Risk and Fast`;
+    const fast =
+        resolution < 10;
+
+
+    if (
+        atRisk &&
+        fast
+    ) {
+
+        return (
+            ageGroup +
+            " - At Risk and Fast"
+        );
     }
 
-    if (atRisk && !fast) {
-        return `${ageGroup} - At Risk and Slow`;
+
+    if (
+        atRisk &&
+        !fast
+    ) {
+
+        return (
+            ageGroup +
+            " - At Risk and Slow"
+        );
     }
 
-    if (highlySatisfied && fast) {
-        return `${ageGroup} - Highly Satisfied and Fast`;
+
+    if (
+        highlySatisfied &&
+        fast
+    ) {
+
+        return (
+            ageGroup +
+            " - Highly Satisfied and Fast"
+        );
     }
 
-    if (highlySatisfied && !fast) {
-        return `${ageGroup} - Satisfied but Slow`;
+
+    if (
+        highlySatisfied &&
+        !fast
+    ) {
+
+        return (
+            ageGroup +
+            " - Satisfied but Slow"
+        );
     }
+
 
     return fast
-        ? `${ageGroup} - At Risk and Fast`
-        : `${ageGroup} - Satisfied but Slow`;
+        ? ageGroup +
+          " - At Risk and Fast"
+        : ageGroup +
+          " - Satisfied but Slow";
 }
 
 
 /* =========================================================
-   Filtering
+   Get Current Filter Values
+   ========================================================= */
+
+function getFilterValue(id) {
+
+    const element =
+        document.getElementById(id);
+
+
+    if (!element) {
+        return "";
+    }
+
+
+    return element.value || "";
+}
+
+
+/* =========================================================
+   Filter Tickets
    ========================================================= */
 
 function getFilteredTickets() {
-    if (!ticketData.length) {
+
+    if (
+        !ticketData.length
+    ) {
+
         return [];
     }
+
 
     const priority =
         getFilterValue(
             "priority-filter"
         );
 
+
     const type =
         getFilterValue(
             "type-filter"
         );
+
 
     const channel =
         getFilterValue(
             "channel-filter"
         );
 
+
     const segment =
         getFilterValue(
             "segment-filter-main"
         );
 
-    return ticketData.filter(ticket => {
-        const ticketPriority =
-            String(
-                ticket["Ticket Priority"] || ""
-            ).trim();
 
-        const ticketType =
-            String(
-                ticket["Ticket Type"] || ""
-            ).trim();
+    return ticketData.filter(
+        ticket => {
 
-        const ticketChannel =
-            String(
-                ticket["Ticket Channel"] || ""
-            ).trim();
+            const ticketPriority =
+                String(
+                    ticket[
+                        "Ticket Priority"
+                    ] || ""
+                ).trim();
 
-        if (
-            priority &&
-            normalizeText(ticketPriority) !==
-                normalizeText(priority)
-        ) {
-            return false;
-        }
 
-        if (
-            type &&
-            normalizeText(ticketType) !==
-                normalizeText(type)
-        ) {
-            return false;
-        }
+            const ticketType =
+                String(
+                    ticket[
+                        "Ticket Type"
+                    ] || ""
+                ).trim();
 
-        if (
-            channel &&
-            normalizeText(ticketChannel) !==
-                normalizeText(channel)
-        ) {
-            return false;
-        }
 
-        if (segment) {
-            const inferred =
-                inferSegment(ticket);
+            const ticketChannel =
+                String(
+                    ticket[
+                        "Ticket Channel"
+                    ] || ""
+                ).trim();
 
-            if (inferred !== segment) {
+
+            /*
+             * Priority filter.
+             */
+            if (
+                priority &&
+                normalizeText(
+                    ticketPriority
+                ) !==
+                normalizeText(
+                    priority
+                )
+            ) {
+
                 return false;
             }
-        }
 
-        return true;
-    });
+
+            /*
+             * Ticket type filter.
+             */
+            if (
+                type &&
+                normalizeText(
+                    ticketType
+                ) !==
+                normalizeText(
+                    type
+                )
+            ) {
+
+                return false;
+            }
+
+
+            /*
+             * Channel filter.
+             */
+            if (
+                channel &&
+                normalizeText(
+                    ticketChannel
+                ) !==
+                normalizeText(
+                    channel
+                )
+            ) {
+
+                return false;
+            }
+
+
+            /*
+             * Segment filter.
+             */
+            if (
+                segment
+            ) {
+
+                const inferredSegment =
+                    inferSegment(ticket);
+
+
+                if (
+                    inferredSegment !==
+                    segment
+                ) {
+
+                    return false;
+                }
+            }
+
+
+            return true;
+        }
+    );
 }
 
 
-/**
- * Update filtered dashboard.
- */
+/* =========================================================
+   Update Filtered Dashboard
+   ========================================================= */
+
 function updateFilteredDashboard() {
-    const filtered =
+
+    const filteredTickets =
         getFilteredTickets();
 
-    updateFilteredStats(filtered);
-    updateFilterStatus(filtered);
+
+    updateFilteredStats(
+        filteredTickets
+    );
+
+
+    updateFilterStatus(
+        filteredTickets
+    );
 }
 
 
@@ -1173,86 +1946,128 @@ function updateFilteredDashboard() {
    ========================================================= */
 
 function updateFilteredStats(
-    filtered
+    filteredTickets
 ) {
-    const ticketCount =
-        filtered.length;
 
-    const satisfactionValues =
-        filtered
-            .map(ticket =>
-                toNumber(
-                    ticket[
-                        "Customer Satisfaction Rating"
-                    ],
-                    null
-                )
-            )
-            .filter(
-                value => value !== null
-            );
+    const ticketCount =
+        filteredTickets.length;
+
 
     /*
-     * Important:
-     *
-     * Time to Resolution is NaN in the
-     * ticket-level JSON. Therefore we do
-     * NOT calculate a filtered average
-     * from this field.
+     * Satisfaction values are available
+     * at ticket level for the valid records.
      */
-    const resolutionValues =
-        filtered
-            .map(ticket =>
-                getResolutionHours(
-                    ticket[
-                        "Time to Resolution"
-                    ]
-                )
+    const satisfactionValues =
+        filteredTickets
+            .map(
+                ticket =>
+                    toNumber(
+                        ticket[
+                            "Customer Satisfaction Rating"
+                        ],
+                        null
+                    )
             )
             .filter(
-                value => value !== null
+                value =>
+                    value !== null
             );
+
 
     const avgSatisfaction =
         average(
             satisfactionValues
         );
 
+
+    /*
+     * Time to Resolution in the uploaded
+     * ticket-level JSON is NaN.
+     *
+     * Therefore this calculation will only
+     * happen if valid values actually exist.
+     */
+    const resolutionValues =
+        filteredTickets
+            .map(
+                ticket =>
+                    getResolutionHours(
+                        ticket[
+                            "Time to Resolution"
+                        ]
+                    )
+            )
+            .filter(
+                value =>
+                    value !== null
+            );
+
+
     const avgResolution =
         average(
             resolutionValues
         );
 
+
+    /*
+     * Filtered ticket count.
+     */
     setElementText(
         "filtered-ticket-count",
-        formatNumber(ticketCount)
+        formatNumber(
+            ticketCount
+        )
     );
 
+
+    /*
+     * Filtered satisfaction.
+     */
     setElementText(
         "filtered-average-satisfaction",
         avgSatisfaction === null
             ? "N/A"
-            : `${formatDecimal(
-                  avgSatisfaction,
-                  2
-              )} / 5`
+            : (
+                formatDecimal(
+                    avgSatisfaction,
+                    2
+                ) +
+                " / 5"
+            )
     );
 
+
+    /*
+     * Filtered resolution.
+     *
+     * We cannot calculate this from the
+     * current ticket-level JSON because
+     * Time to Resolution is missing.
+     */
     const resolutionElement =
         document.getElementById(
             "filtered-average-resolution"
         );
 
-    if (resolutionElement) {
-        if (avgResolution === null) {
+
+    if (
+        resolutionElement
+    ) {
+
+        if (
+            avgResolution === null
+        ) {
+
             resolutionElement.textContent =
                 "See analytics";
+
         } else {
+
             resolutionElement.textContent =
-                `${formatDecimal(
+                formatDecimal(
                     avgResolution,
                     2
-                )} hrs`;
+                ) + " hrs";
         }
     }
 }
@@ -1263,36 +2078,43 @@ function updateFilteredStats(
    ========================================================= */
 
 function updateFilterStatus(
-    filtered
+    filteredTickets
 ) {
+
     const status =
         document.getElementById(
             "filter-result-status"
         );
 
+
     if (!status) {
         return;
     }
+
 
     const priority =
         getFilterValue(
             "priority-filter"
         );
 
+
     const type =
         getFilterValue(
             "type-filter"
         );
+
 
     const channel =
         getFilterValue(
             "channel-filter"
         );
 
+
     const segment =
         getFilterValue(
             "segment-filter-main"
         );
+
 
     const hasFilter =
         Boolean(
@@ -1302,17 +2124,23 @@ function updateFilterStatus(
             segment
         );
 
-    if (!hasFilter) {
+
+    if (
+        !hasFilter
+    ) {
+
         status.textContent =
             `Showing all ${formatNumber(
                 ticketData.length
             )} tickets.`;
+
         return;
     }
 
+
     status.textContent =
         `Showing ${formatNumber(
-            filtered.length
+            filteredTickets.length
         )} of ${formatNumber(
             ticketData.length
         )} tickets.`;
@@ -1324,19 +2152,29 @@ function updateFilterStatus(
    ========================================================= */
 
 function resetFilters() {
-    [
+
+    const filterIds = [
         "priority-filter",
         "type-filter",
         "channel-filter",
         "segment-filter-main"
-    ].forEach(id => {
-        const element =
-            document.getElementById(id);
+    ];
 
-        if (element) {
-            element.value = "";
+
+    filterIds.forEach(
+        id => {
+
+            const element =
+                document.getElementById(id);
+
+
+            if (element) {
+
+                element.value = "";
+            }
         }
-    });
+    );
+
 
     updateFilteredDashboard();
 }
@@ -1347,9 +2185,11 @@ function resetFilters() {
    ========================================================= */
 
 function renderResolutionCharts() {
+
     if (
         typeof Chart === "undefined"
     ) {
+
         console.warn(
             "Chart.js is not available."
         );
@@ -1357,12 +2197,20 @@ function renderResolutionCharts() {
         return;
     }
 
+
+    /*
+     * Resolution by priority.
+     */
     createResolutionChart(
         "priority-chart",
+
         "Average Resolution Time by Priority",
+
         resolutionByPriority.map(
-            item => item.priority
+            item =>
+                item.priority
         ),
+
         resolutionByPriority.map(
             item =>
                 toNumber(
@@ -1372,12 +2220,20 @@ function renderResolutionCharts() {
         )
     );
 
+
+    /*
+     * Resolution by ticket type.
+     */
     createResolutionChart(
         "type-chart",
+
         "Average Resolution Time by Ticket Type",
+
         resolutionByType.map(
-            item => item.ticket_type
+            item =>
+                item.ticket_type
         ),
+
         resolutionByType.map(
             item =>
                 toNumber(
@@ -1387,12 +2243,20 @@ function renderResolutionCharts() {
         )
     );
 
+
+    /*
+     * Resolution by support channel.
+     */
     createResolutionChart(
         "channel-chart",
+
         "Average Resolution Time by Support Channel",
+
         resolutionByChannel.map(
-            item => item.channel
+            item =>
+                item.channel
         ),
+
         resolutionByChannel.map(
             item =>
                 toNumber(
@@ -1404,8 +2268,8 @@ function renderResolutionCharts() {
 }
 
 
-/**
- * Create / replace a Chart.js bar chart.
+/*
+ * Create or replace a Chart.js chart.
  */
 function createResolutionChart(
     elementId,
@@ -1413,87 +2277,130 @@ function createResolutionChart(
     labels,
     values
 ) {
+
     const canvas =
         document.getElementById(
             elementId
         );
 
+
     if (!canvas) {
         return;
     }
 
-    if (charts[elementId]) {
-        charts[elementId].destroy();
+
+    /*
+     * Destroy an existing chart
+     * before creating a new one.
+     */
+    if (
+        charts[elementId]
+    ) {
+
+        charts[
+            elementId
+        ].destroy();
     }
 
-    charts[elementId] =
-        new Chart(canvas, {
-            type: "bar",
 
-            data: {
-                labels: labels,
+    charts[
+        elementId
+    ] =
+        new Chart(
+            canvas,
+            {
+                type: "bar",
 
-                datasets: [
-                    {
-                        label:
-                            "Average Resolution Time (hours)",
+                data: {
 
-                        data: values,
+                    labels: labels,
 
-                        borderWidth: 1
-                    }
-                ]
-            },
+                    datasets: [
+                        {
+                            label:
+                                "Average Resolution Time (hours)",
 
-            options: {
-                responsive: true,
+                            data: values,
 
-                maintainAspectRatio: false,
-
-                plugins: {
-                    legend: {
-                        display: true
-                    },
-
-                    title: {
-                        display: true,
-                        text: title
-                    },
-
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value =
-                                    context.parsed.y;
-
-                                return ` ${formatDecimal(
-                                    value,
-                                    2
-                                )} hrs`;
-                            }
+                            borderWidth: 1
                         }
-                    }
+                    ]
                 },
 
-                scales: {
-                    y: {
-                        beginAtZero: true,
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+
+                    plugins: {
+
+                        legend: {
+                            display: true
+                        },
+
 
                         title: {
+
                             display: true,
-                            text:
-                                "Hours"
+
+                            text: title
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+                                    function(context) {
+
+                                        const value =
+                                            context.parsed.y;
+
+
+                                        return (
+                                            " " +
+                                            formatDecimal(
+                                                value,
+                                                2
+                                            ) +
+                                            " hrs"
+                                        );
+                                    }
+                            }
                         }
                     },
 
-                    x: {
-                        ticks: {
-                            autoSkip: false
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            title: {
+
+                                display: true,
+
+                                text: "Hours"
+                            }
+                        },
+
+
+                        x: {
+
+                            ticks: {
+
+                                autoSkip: false
+                            }
                         }
                     }
                 }
             }
-        });
+        );
 }
 
 
@@ -1501,22 +2408,29 @@ function createResolutionChart(
    Error Handling
    ========================================================= */
 
-function showDataError(message) {
-    console.warn(message);
+function showDataError(
+    message
+) {
 
-    /*
-     * Do not replace the entire page.
-     * Add a small non-blocking warning if a
-     * dedicated error container exists.
-     */
+    console.warn(
+        "SupportIQ:",
+        message
+    );
+
+
     const errorContainer =
         document.getElementById(
             "data-error"
         );
 
-    if (errorContainer) {
+
+    if (
+        errorContainer
+    ) {
+
         errorContainer.textContent =
             message;
+
 
         errorContainer.style.display =
             "block";
@@ -1525,137 +2439,61 @@ function showDataError(message) {
 
 
 /* =========================================================
-   DOM Helpers
-   ========================================================= */
-
-function setElementText(
-    id,
-    value
-) {
-    const element =
-        document.getElementById(id);
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent =
-        displayText(value);
-}
-
-
-function getFilterValue(id) {
-    const element =
-        document.getElementById(id);
-
-    if (!element) {
-        return "";
-    }
-
-    return element.value || "";
-}
-
-
-/**
- * Escape HTML before inserting dynamic
- * text into HTML.
- */
-function escapeHTML(value) {
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-/* =========================================================
-   Formatting
-   ========================================================= */
-
-function formatNumber(value) {
-    const number =
-        toNumber(value, null);
-
-    if (number === null) {
-        return "N/A";
-    }
-
-    return number.toLocaleString(
-        "en-US",
-        {
-            maximumFractionDigits: 0
-        }
-    );
-}
-
-
-function formatDecimal(
-    value,
-    decimals = 2
-) {
-    const number =
-        toNumber(value, null);
-
-    if (number === null) {
-        return "N/A";
-    }
-
-    return number.toLocaleString(
-        "en-US",
-        {
-            minimumFractionDigits:
-                decimals,
-
-            maximumFractionDigits:
-                decimals
-        }
-    );
-}
-
-
-/* =========================================================
-   Initialization
+   Application Initialization
    ========================================================= */
 
 async function initializeDashboard() {
+
     console.log(
         "SupportIQ dashboard initializing..."
     );
 
-    /*
-     * Load independent data sources.
-     * Promise.allSettled prevents one missing
-     * analytics file from breaking the whole dashboard.
-     */
-    await Promise.allSettled([
-        loadDashboardMetrics(),
-        loadSegmentData(),
-        loadSatisfactionData(),
-        loadResolutionData(),
-        loadTicketData()
-    ]);
 
+    /*
+     * Load all independent data sources.
+     *
+     * Promise.allSettled means one failed
+     * file will not destroy the entire dashboard.
+     */
+    await Promise.allSettled(
+        [
+            loadDashboardMetrics(),
+            loadSegmentData(),
+            loadSatisfactionData(),
+            loadResolutionData(),
+            loadTicketData()
+        ]
+    );
+
+
+    /*
+     * Render main dashboard after
+     * analytics data has been loaded.
+     */
     renderDashboard();
 
+
     /*
-     * Ticket data may finish after the other
-     * files, so make sure filters are ready.
+     * Make sure ticket filters are ready.
      */
-    if (ticketData.length) {
+    if (
+        ticketData.length
+    ) {
+
         initializeFilters();
+
         updateFilteredDashboard();
     }
 
+
     console.log(
-        "SupportIQ dashboard initialized."
+        "SupportIQ dashboard initialized successfully."
     );
 }
 
 
 /* =========================================================
-   Start Application
+   Start
    ========================================================= */
 
 document.addEventListener(
