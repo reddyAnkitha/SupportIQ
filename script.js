@@ -1,3 +1,4 @@
+```javascript
 console.log("SupportIQ dashboard loaded");
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -8,6 +9,24 @@ document.addEventListener("DOMContentLoaded", function () {
     loadResolutionData();
 
 });
+
+
+/* =========================================================
+   GLOBAL DATA
+========================================================= */
+
+let resolutionData = {
+    priority: [],
+    type: [],
+    channel: []
+};
+
+let segmentData = [];
+
+let priorityChart = null;
+let typeChart = null;
+let channelChart = null;
+let segmentChart = null;
 
 
 /* =========================================================
@@ -27,7 +46,8 @@ async function loadDashboardMetrics() {
 
         const text = await response.text();
 
-        const lines = text.trim().split(/\r?\n/);
+        const lines =
+            text.trim().split(/\r?\n/);
 
         const metrics = {};
 
@@ -44,22 +64,17 @@ async function loadDashboardMetrics() {
 
         });
 
-
         document.getElementById("total-tickets").textContent =
             Number(metrics.total_tickets).toLocaleString();
-
 
         document.getElementById("average-satisfaction").textContent =
             metrics.average_satisfaction + " / 5";
 
-
         document.getElementById("average-resolution").textContent =
             metrics.average_resolution_hours + " hrs";
 
-
         document.getElementById("customer-segments").textContent =
             metrics.customer_segments;
-
 
     } catch (error) {
 
@@ -68,25 +83,10 @@ async function loadDashboardMetrics() {
             error
         );
 
-        showError(
-            "total-tickets",
-            "Unable to load"
-        );
-
-        showError(
-            "average-satisfaction",
-            "Unable to load"
-        );
-
-        showError(
-            "average-resolution",
-            "Unable to load"
-        );
-
-        showError(
-            "customer-segments",
-            "Unable to load"
-        );
+        showError("total-tickets", "Unable to load");
+        showError("average-satisfaction", "Unable to load");
+        showError("average-resolution", "Unable to load");
+        showError("customer-segments", "Unable to load");
 
     }
 
@@ -113,13 +113,26 @@ async function loadSegments() {
         const data =
             await response.json();
 
+        if (!data.segments ||
+            !Array.isArray(data.segments)) {
+
+            throw new Error(
+                "Invalid segment data"
+            );
+
+        }
+
+        segmentData = data.segments;
+
         const container =
-            document.getElementById("segment-container");
+            document.getElementById(
+                "segment-container"
+            );
+
+        container.innerHTML = "";
 
 
-        /*
-         * Add interactive segment filter
-         */
+        /* Existing segment filter */
 
         const filterContainer =
             document.createElement("div");
@@ -139,11 +152,15 @@ async function loadSegments() {
                     All Segments
                 </option>
 
-                ${data.segments.map(function (segment) {
+                ${segmentData.map(function (segment) {
 
                     return `
-                        <option value="${escapeHtml(segment.segment)}">
-                            ${escapeHtml(segment.segment)}
+                        <option value="${escapeHtml(
+                            segment.segment
+                        )}">
+                            ${escapeHtml(
+                                segment.segment
+                            )}
                         </option>
                     `;
 
@@ -153,15 +170,12 @@ async function loadSegments() {
 
         `;
 
+        container.appendChild(
+            filterContainer
+        );
 
-        container.innerHTML = "";
 
-        container.appendChild(filterContainer);
-
-
-        /*
-         * Create table container
-         */
+        /* Segment table */
 
         const tableContainer =
             document.createElement("div");
@@ -169,12 +183,12 @@ async function loadSegments() {
         tableContainer.id =
             "segment-table-container";
 
-        container.appendChild(tableContainer);
+        container.appendChild(
+            tableContainer
+        );
 
 
-        /*
-         * Create chart container
-         */
+        /* Segment chart */
 
         const chartContainer =
             document.createElement("div");
@@ -182,34 +196,49 @@ async function loadSegments() {
         chartContainer.id =
             "segment-chart-container";
 
-        container.appendChild(chartContainer);
+        container.appendChild(
+            chartContainer
+        );
 
-
-        /*
-         * Initial display
-         */
 
         renderSegments(
-            data.segments,
+            segmentData,
             "all"
         );
 
 
-        /*
-         * Filter change event
-         */
-
         document
             .getElementById("segment-filter")
-            .addEventListener("change", function () {
+            .addEventListener(
+                "change",
+                function () {
 
-                renderSegments(
-                    data.segments,
-                    this.value
-                );
+                    renderSegments(
+                        segmentData,
+                        this.value
+                    );
 
-            });
+                    /*
+                     * Keep the main filter synchronized.
+                     */
 
+                    const mainFilter =
+                        document.getElementById(
+                            "segment-filter-main"
+                        );
+
+                    if (mainFilter) {
+
+                        mainFilter.value =
+                            this.value;
+
+                    }
+
+                }
+            );
+
+
+        populateMainSegmentFilter();
 
     } catch (error) {
 
@@ -235,6 +264,45 @@ async function loadSegments() {
 
 
 /* =========================================================
+   MAIN SEGMENT FILTER
+========================================================= */
+
+function populateMainSegmentFilter() {
+
+    const filter =
+        document.getElementById(
+            "segment-filter-main"
+        );
+
+    if (!filter) {
+        return;
+    }
+
+    filter.innerHTML = `
+        <option value="all">
+            All Segments
+        </option>
+    `;
+
+    segmentData.forEach(function (segment) {
+
+        const option =
+            document.createElement("option");
+
+        option.value =
+            segment.segment;
+
+        option.textContent =
+            segment.segment;
+
+        filter.appendChild(option);
+
+    });
+
+}
+
+
+/* =========================================================
    RENDER CUSTOMER SEGMENTS
 ========================================================= */
 
@@ -245,7 +313,6 @@ function renderSegments(
 
     let filteredSegments;
 
-
     if (selectedSegment === "all") {
 
         filteredSegments =
@@ -254,20 +321,20 @@ function renderSegments(
     } else {
 
         filteredSegments =
-            segments.filter(function (segment) {
+            segments.filter(
+                function (segment) {
 
-                return segment.segment ===
-                    selectedSegment;
+                    return segment.segment ===
+                        selectedSegment;
 
-            });
+                }
+            );
 
     }
-
 
     renderSegmentTable(
         filteredSegments
     );
-
 
     renderSegmentChart(
         filteredSegments
@@ -289,6 +356,9 @@ function renderSegmentTable(
             "segment-table-container"
         );
 
+    if (!container) {
+        return;
+    }
 
     if (!segments.length) {
 
@@ -302,7 +372,6 @@ function renderSegmentTable(
 
     }
 
-
     let table = `
 
         <table class="segment-table">
@@ -310,13 +379,11 @@ function renderSegmentTable(
             <thead>
 
                 <tr>
-
                     <th>Customer Segment</th>
                     <th>Customers</th>
                     <th>Avg Age</th>
                     <th>Avg Satisfaction</th>
                     <th>Avg Resolution</th>
-
                 </tr>
 
             </thead>
@@ -325,7 +392,6 @@ function renderSegmentTable(
 
     `;
 
-
     segments.forEach(function (segment) {
 
         table += `
@@ -333,11 +399,15 @@ function renderSegmentTable(
             <tr>
 
                 <td>
-                    ${escapeHtml(segment.segment)}
+                    ${escapeHtml(
+                        segment.segment
+                    )}
                 </td>
 
                 <td>
-                    ${Number(segment.customers).toLocaleString()}
+                    ${Number(
+                        segment.customers
+                    ).toLocaleString()}
                 </td>
 
                 <td>
@@ -358,7 +428,6 @@ function renderSegmentTable(
 
     });
 
-
     table += `
 
             </tbody>
@@ -366,7 +435,6 @@ function renderSegmentTable(
         </table>
 
     `;
-
 
     container.innerHTML =
         table;
@@ -378,9 +446,6 @@ function renderSegmentTable(
    SEGMENT CHART
 ========================================================= */
 
-let segmentChart = null;
-
-
 function renderSegmentChart(
     segments
 ) {
@@ -390,6 +455,9 @@ function renderSegmentChart(
             "segment-chart-container"
         );
 
+    if (!container) {
+        return;
+    }
 
     container.innerHTML = `
 
@@ -409,23 +477,18 @@ function renderSegmentChart(
 
     `;
 
-
     const canvas =
         document.getElementById(
             "segment-canvas"
         );
 
-
-    /*
-     * Destroy previous chart
-     */
-
     if (segmentChart) {
-
         segmentChart.destroy();
-
     }
 
+    if (!segments.length) {
+        return;
+    }
 
     segmentChart =
         new Chart(canvas, {
@@ -434,37 +497,32 @@ function renderSegmentChart(
 
             data: {
 
-                labels: segments.map(
-                    function (segment) {
+                labels:
+                    segments.map(
+                        function (segment) {
+                            return segment.segment;
+                        }
+                    ),
 
-                        return segment.segment;
+                datasets: [{
 
-                    }
-                ),
+                    label:
+                        "Average Satisfaction",
 
-                datasets: [
+                    data:
+                        segments.map(
+                            function (segment) {
 
-                    {
+                                return Number(
+                                    segment.avg_satisfaction
+                                );
 
-                        label:
-                            "Average Satisfaction",
+                            }
+                        ),
 
-                        data:
-                            segments.map(
-                                function (segment) {
+                    borderWidth: 1
 
-                                    return Number(
-                                        segment.avg_satisfaction
-                                    );
-
-                                }
-                            ),
-
-                        borderWidth: 1
-
-                    }
-
-                ]
+                }]
 
             },
 
@@ -526,14 +584,12 @@ async function loadSatisfactionData() {
         const data =
             await response.json();
 
-
         document.getElementById(
             "low-satisfaction"
         ).textContent =
             Number(
                 data.low_satisfaction_tickets
             ).toLocaleString();
-
 
         document.getElementById(
             "satisfied-customers"
@@ -542,18 +598,15 @@ async function loadSatisfactionData() {
                 data.satisfied_tickets
             ).toLocaleString();
 
-
         document.getElementById(
             "low-satisfaction-rate"
         ).textContent =
             data.low_satisfaction_percentage + "%";
 
-
         document.getElementById(
             "model-accuracy"
         ).textContent =
             data.model_accuracy + "%";
-
 
     } catch (error) {
 
@@ -562,29 +615,25 @@ async function loadSatisfactionData() {
             error
         );
 
+        showError(
+            "low-satisfaction",
+            "Unavailable"
+        );
 
-        document.getElementById(
-            "low-satisfaction"
-        ).textContent =
-            "Unavailable";
+        showError(
+            "satisfied-customers",
+            "Unavailable"
+        );
 
+        showError(
+            "low-satisfaction-rate",
+            "Unavailable"
+        );
 
-        document.getElementById(
-            "satisfied-customers"
-        ).textContent =
-            "Unavailable";
-
-
-        document.getElementById(
-            "low-satisfaction-rate"
-        ).textContent =
-            "Unavailable";
-
-
-        document.getElementById(
-            "model-accuracy"
-        ).textContent =
-            "Unavailable";
+        showError(
+            "model-accuracy",
+            "Unavailable"
+        );
 
     }
 
@@ -599,79 +648,106 @@ async function loadResolutionData() {
 
     try {
 
-        const priorityResponse =
-            await fetch(
+        const [
+            priorityResponse,
+            typeResponse,
+            channelResponse
+        ] = await Promise.all([
+
+            fetch(
                 "./data/resolution_by_priority.json"
-            );
+            ),
+
+            fetch(
+                "./data/resolution_by_type.json"
+            ),
+
+            fetch(
+                "./data/resolution_by_channel.json"
+            )
+
+        ]);
+
 
         if (!priorityResponse.ok) {
-
             throw new Error(
                 "resolution_by_priority.json not found"
             );
-
         }
+
+        if (!typeResponse.ok) {
+            throw new Error(
+                "resolution_by_type.json not found"
+            );
+        }
+
+        if (!channelResponse.ok) {
+            throw new Error(
+                "resolution_by_channel.json not found"
+            );
+        }
+
 
         const priorityData =
             await priorityResponse.json();
 
-
-        const typeResponse =
-            await fetch(
-                "./data/resolution_by_type.json"
-            );
-
-        if (!typeResponse.ok) {
-
-            throw new Error(
-                "resolution_by_type.json not found"
-            );
-
-        }
-
         const typeData =
             await typeResponse.json();
-
-
-        const channelResponse =
-            await fetch(
-                "./data/resolution_by_channel.json"
-            );
-
-        if (!channelResponse.ok) {
-
-            throw new Error(
-                "resolution_by_channel.json not found"
-            );
-
-        }
 
         const channelData =
             await channelResponse.json();
 
 
-        createResolutionChart(
-            "priority-chart",
-            priorityData.data,
-            "priority",
-            "Resolution Time by Priority"
+        if (!Array.isArray(priorityData.data) ||
+            !Array.isArray(typeData.data) ||
+            !Array.isArray(channelData.data)) {
+
+            throw new Error(
+                "Invalid resolution analytics data"
+            );
+
+        }
+
+
+        resolutionData.priority =
+            priorityData.data;
+
+        resolutionData.type =
+            typeData.data;
+
+        resolutionData.channel =
+            channelData.data;
+
+
+        /* Populate filters */
+
+        populateFilter(
+            "priority-filter",
+            resolutionData.priority,
+            "priority"
+        );
+
+        populateFilter(
+            "type-filter",
+            resolutionData.type,
+            "ticket_type"
+        );
+
+        populateFilter(
+            "channel-filter",
+            resolutionData.channel,
+            "channel"
         );
 
 
-        createResolutionChart(
-            "type-chart",
-            typeData.data,
-            "ticket_type",
-            "Resolution Time by Ticket Type"
-        );
+        /* Create initial charts */
+
+        updateResolutionCharts();
 
 
-        createResolutionChart(
-            "channel-chart",
-            channelData.data,
-            "channel",
-            "Resolution Time by Channel"
-        );
+        /* Add filter listeners */
+
+        setupInteractiveFilters();
 
 
     } catch (error) {
@@ -681,20 +757,400 @@ async function loadResolutionData() {
             error
         );
 
+        showChartError("priority-chart");
+        showChartError("type-chart");
+        showChartError("channel-chart");
 
-        showChartError(
-            "priority-chart"
+    }
+
+}
+
+
+/* =========================================================
+   POPULATE FILTER
+========================================================= */
+
+function populateFilter(
+    filterId,
+    data,
+    key
+) {
+
+    const filter =
+        document.getElementById(filterId);
+
+    if (!filter) {
+        return;
+    }
+
+    const currentValue =
+        filter.value;
+
+    const defaultText =
+        filterId === "priority-filter"
+            ? "All Priorities"
+            : filterId === "type-filter"
+                ? "All Ticket Types"
+                : "All Channels";
+
+
+    filter.innerHTML = "";
+
+    const allOption =
+        document.createElement("option");
+
+    allOption.value = "all";
+    allOption.textContent =
+        defaultText;
+
+    filter.appendChild(
+        allOption
+    );
+
+
+    const values = [
+        ...new Set(
+            data.map(
+                function (item) {
+                    return item[key];
+                }
+            )
+        )
+    ];
+
+
+    values.forEach(function (value) {
+
+        const option =
+            document.createElement("option");
+
+        option.value =
+            value;
+
+        option.textContent =
+            value;
+
+        filter.appendChild(
+            option
         );
 
-        showChartError(
-            "type-chart"
+    });
+
+
+    if (
+        currentValue &&
+        values.includes(currentValue)
+    ) {
+
+        filter.value =
+            currentValue;
+
+    }
+
+}
+
+
+/* =========================================================
+   INTERACTIVE FILTERS
+========================================================= */
+
+function setupInteractiveFilters() {
+
+    const filterIds = [
+
+        "priority-filter",
+        "type-filter",
+        "channel-filter",
+        "segment-filter-main"
+
+    ];
+
+
+    filterIds.forEach(function (filterId) {
+
+        const filter =
+            document.getElementById(
+                filterId
+            );
+
+        if (!filter) {
+            return;
+        }
+
+
+        filter.addEventListener(
+            "change",
+            function () {
+
+                updateResolutionCharts();
+
+                updateMainSegmentView();
+
+            }
         );
 
-        showChartError(
-            "channel-chart"
+    });
+
+
+    const resetButton =
+        document.getElementById(
+            "reset-filters"
+        );
+
+
+    if (resetButton) {
+
+        resetButton.addEventListener(
+            "click",
+            resetAllFilters
         );
 
     }
+
+}
+
+
+/* =========================================================
+   UPDATE RESOLUTION CHARTS
+========================================================= */
+
+function updateResolutionCharts() {
+
+    const priorityFilter =
+        getFilterValue(
+            "priority-filter"
+        );
+
+    const typeFilter =
+        getFilterValue(
+            "type-filter"
+        );
+
+    const channelFilter =
+        getFilterValue(
+            "channel-filter"
+        );
+
+
+    /*
+     * Since the current resolution JSON files
+     * are aggregated independently, each chart
+     * responds to its own filter.
+     */
+
+    let priorityData =
+        resolutionData.priority;
+
+    let typeData =
+        resolutionData.type;
+
+    let channelData =
+        resolutionData.channel;
+
+
+    if (priorityFilter !== "all") {
+
+        priorityData =
+            priorityData.filter(
+                function (item) {
+
+                    return item.priority ===
+                        priorityFilter;
+
+                }
+            );
+
+    }
+
+
+    if (typeFilter !== "all") {
+
+        typeData =
+            typeData.filter(
+                function (item) {
+
+                    return item.ticket_type ===
+                        typeFilter;
+
+                }
+            );
+
+    }
+
+
+    if (channelFilter !== "all") {
+
+        channelData =
+            channelData.filter(
+                function (item) {
+
+                    return item.channel ===
+                        channelFilter;
+
+                }
+            );
+
+    }
+
+
+    createResolutionChart(
+        "priority-chart",
+        priorityData,
+        "priority",
+        "Resolution Time by Priority",
+        priorityChart
+    );
+
+
+    createResolutionChart(
+        "type-chart",
+        typeData,
+        "ticket_type",
+        "Resolution Time by Ticket Type",
+        typeChart
+    );
+
+
+    createResolutionChart(
+        "channel-chart",
+        channelData,
+        "channel",
+        "Resolution Time by Channel",
+        channelChart
+    );
+
+}
+
+
+/* =========================================================
+   UPDATE MAIN SEGMENT VIEW
+========================================================= */
+
+function updateMainSegmentView() {
+
+    const filter =
+        document.getElementById(
+            "segment-filter-main"
+        );
+
+    if (!filter) {
+        return;
+    }
+
+    const selectedSegment =
+        filter.value;
+
+
+    const existingSegmentFilter =
+        document.getElementById(
+            "segment-filter"
+        );
+
+
+    if (existingSegmentFilter) {
+
+        existingSegmentFilter.value =
+            selectedSegment;
+
+    }
+
+
+    renderSegments(
+        segmentData,
+        selectedSegment
+    );
+
+}
+
+
+/* =========================================================
+   RESET FILTERS
+========================================================= */
+
+function resetAllFilters() {
+
+    const priorityFilter =
+        document.getElementById(
+            "priority-filter"
+        );
+
+    const typeFilter =
+        document.getElementById(
+            "type-filter"
+        );
+
+    const channelFilter =
+        document.getElementById(
+            "channel-filter"
+        );
+
+    const segmentFilter =
+        document.getElementById(
+            "segment-filter-main"
+        );
+
+
+    if (priorityFilter) {
+        priorityFilter.value =
+            "all";
+    }
+
+    if (typeFilter) {
+        typeFilter.value =
+            "all";
+    }
+
+    if (channelFilter) {
+        channelFilter.value =
+            "all";
+    }
+
+    if (segmentFilter) {
+        segmentFilter.value =
+            "all";
+    }
+
+
+    const oldSegmentFilter =
+        document.getElementById(
+            "segment-filter"
+        );
+
+    if (oldSegmentFilter) {
+        oldSegmentFilter.value =
+            "all";
+    }
+
+
+    updateResolutionCharts();
+
+    renderSegments(
+        segmentData,
+        "all"
+    );
+
+}
+
+
+/* =========================================================
+   GET FILTER VALUE
+========================================================= */
+
+function getFilterValue(
+    filterId
+) {
+
+    const filter =
+        document.getElementById(
+            filterId
+        );
+
+    if (!filter) {
+        return "all";
+    }
+
+    return filter.value ||
+        "all";
 
 }
 
@@ -707,13 +1163,36 @@ function createResolutionChart(
     containerId,
     data,
     labelKey,
-    chartTitle
+    chartTitle,
+    existingChart
 ) {
 
     const container =
         document.getElementById(
             containerId
         );
+
+    if (!container) {
+        return;
+    }
+
+
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+
+    if (!data || !data.length) {
+
+        container.innerHTML = `
+            <p class="error-message">
+                No data available for the selected filter.
+            </p>
+        `;
+
+        return null;
+
+    }
 
 
     container.innerHTML = `
@@ -733,40 +1212,38 @@ function createResolutionChart(
         );
 
 
-    new Chart(canvas, {
+    return new Chart(canvas, {
 
         type: "bar",
 
         data: {
 
             labels:
-                data.map(function (item) {
+                data.map(
+                    function (item) {
+                        return item[labelKey];
+                    }
+                ),
 
-                    return item[labelKey];
+            datasets: [{
 
-                }),
+                label:
+                    "Average Resolution Time (hours)",
 
-            datasets: [
-
-                {
-
-                    label:
-                        "Average Resolution Time (hours)",
-
-                    data:
-                        data.map(function (item) {
+                data:
+                    data.map(
+                        function (item) {
 
                             return Number(
                                 item.average_resolution_hours
                             );
 
-                        }),
+                        }
+                    ),
 
-                    borderWidth: 1
+                borderWidth: 1
 
-                }
-
-            ]
+            }]
 
         },
 
@@ -779,17 +1256,12 @@ function createResolutionChart(
             plugins: {
 
                 legend: {
-
                     display: false
-
                 },
 
                 title: {
-
                     display: false,
-
                     text: chartTitle
-
                 }
 
             },
@@ -857,8 +1329,10 @@ function showChartError(
         container.innerHTML = `
 
             <p class="error-message">
+
                 Unable to load analytics data.
                 Please try again later.
+
             </p>
 
         `;
@@ -877,10 +1351,31 @@ function escapeHtml(
 ) {
 
     return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 
 }
+```
