@@ -18,7 +18,7 @@ const FILES = {
     resolutionChannel:
         DATA_PATH + "resolution_by_channel.json",
 
-    // ticket_data.json is in the ROOT
+    // ticket_data.json is located in the repository root
     tickets:
         "ticket_data.json",
 
@@ -28,6 +28,10 @@ const FILES = {
 };
 
 
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
+
 let ticketData = [];
 
 let ticketSegmentMapping = [];
@@ -36,6 +40,12 @@ let ticketSegmentMap = new Map();
 
 let charts = {};
 
+let filtersInitialized = false;
+
+
+/* =========================================================
+   FALLBACK DATA
+========================================================= */
 
 const fallbackMetrics = {
 
@@ -64,15 +74,44 @@ const fallbackSatisfaction = {
 
 
 /* =========================================================
+   OFFICIAL K-MEANS SEGMENTS
+========================================================= */
+
+const OFFICIAL_SEGMENTS = [
+
+    "Middle Age - Highly Satisfied and Fast",
+
+    "Older - At Risk and Fast",
+
+    "Older - At Risk and Slow",
+
+    "Older - Satisfied but Slow",
+
+    "Young - At Risk and Fast",
+
+    "Young - Satisfied but Slow"
+
+];
+
+
+/* =========================================================
    GENERAL HELPERS
 ========================================================= */
 
+
+/*
+ * Get DOM element by ID.
+ */
 
 function getElement(id) {
 
     return document.getElementById(id);
 }
 
+
+/*
+ * Format numeric values safely.
+ */
 
 function formatNumber(value, decimals = 0) {
 
@@ -88,9 +127,15 @@ function formatNumber(value, decimals = 0) {
         minimumFractionDigits: decimals,
 
         maximumFractionDigits: decimals
+
     });
 }
 
+
+/*
+ * Clean JavaScript-style NaN / Infinity values
+ * before JSON parsing.
+ */
 
 function cleanJSONText(text) {
 
@@ -104,6 +149,10 @@ function cleanJSONText(text) {
 }
 
 
+/*
+ * Normalize values for comparisons.
+ */
+
 function normalize(value) {
 
     if (
@@ -114,7 +163,6 @@ function normalize(value) {
         return "";
     }
 
-
     return String(value)
 
         .trim()
@@ -124,10 +172,128 @@ function normalize(value) {
 
 
 /*
- * Create a consistent key for ticket mapping.
+ * Escape dynamic values before inserting
+ * them into HTML.
+ *
+ * This improves frontend robustness and
+ * avoids unsafe HTML injection.
+ */
+
+function escapeHTML(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return "";
+    }
+
+    return String(value)
+
+        .replace(/&/g, "&amp;")
+
+        .replace(/</g, "&lt;")
+
+        .replace(/>/g, "&gt;")
+
+        .replace(/"/g, "&quot;")
+
+        .replace(/'/g, "&#039;");
+}
+
+
+/*
+ * Show a visible dashboard status message.
+ */
+
+function showDashboardStatus(
+    message,
+    type = "error"
+) {
+
+    const existing =
+        getElement(
+            "dashboard-status"
+        );
+
+
+    if (existing) {
+
+        existing.textContent =
+            message;
+
+        existing.className =
+            `dashboard-status ${type}`;
+
+        existing.style.display =
+            "block";
+
+        return;
+    }
+
+
+    const status =
+        document.createElement(
+            "div"
+        );
+
+
+    status.id =
+        "dashboard-status";
+
+
+    status.className =
+        `dashboard-status ${type}`;
+
+
+    status.textContent =
+        message;
+
+
+    const main =
+        document.querySelector(
+            "main"
+        );
+
+
+    if (main) {
+
+        main.prepend(status);
+    }
+}
+
+
+/*
+ * Clear visible dashboard status.
+ */
+
+function clearDashboardStatus() {
+
+    const status =
+        getElement(
+            "dashboard-status"
+        );
+
+
+    if (status) {
+
+        status.style.display =
+            "none";
+
+        status.textContent =
+            "";
+    }
+}
+
+
+/*
+ * Create a consistent key for
+ * ticket-to-segment mapping.
  *
  * Ticket ID alone may not uniquely identify
- * every record, so Customer Email is included.
+ * every record, therefore Customer Email
+ * is included.
  */
 
 function makeTicketKey(
@@ -162,27 +328,45 @@ function makeTicketKey(
 ========================================================= */
 
 
+/*
+ * Generic JSON loader.
+ */
+
 async function loadJSON(file) {
 
     const response =
         await fetch(
+
             file,
+
             {
-                cache: "no-store"
+                cache:
+                    "no-store"
             }
+
         );
 
 
     if (!response.ok) {
 
         throw new Error(
+
             `Unable to load ${file}: HTTP ${response.status}`
+
         );
     }
 
 
     const text =
         await response.text();
+
+
+    if (!text.trim()) {
+
+        throw new Error(
+            `${file} is empty.`
+        );
+    }
 
 
     return JSON.parse(
@@ -192,7 +376,7 @@ async function loadJSON(file) {
 
 
 /* =========================================================
-   LOAD DASHBOARD METRICS
+   DASHBOARD METRICS
 ========================================================= */
 
 
@@ -202,23 +386,35 @@ async function loadMetrics() {
 
         const response =
             await fetch(
+
                 FILES.metrics,
+
                 {
-                    cache: "no-store"
+                    cache:
+                        "no-store"
                 }
+
             );
 
 
         if (!response.ok) {
 
             throw new Error(
-                "Metrics file unavailable"
+                "Metrics file unavailable."
             );
         }
 
 
         const text =
             await response.text();
+
+
+        if (!text.trim()) {
+
+            throw new Error(
+                "Metrics file is empty."
+            );
+        }
 
 
         const lines =
@@ -243,42 +439,47 @@ async function loadMetrics() {
 
             .slice(1)
 
-            .forEach(line => {
+            .forEach(
+                line => {
 
-                const parts =
-                    line.split(",");
+                    const parts =
+                        line.split(",");
 
 
-                if (
-                    parts.length < 2
-                ) {
+                    if (
+                        parts.length < 2
+                    ) {
 
-                    return;
+                        return;
+                    }
+
+
+                    const key =
+                        parts[0]
+
+                            .trim()
+
+                            .toLowerCase();
+
+
+                    const value =
+                        Number(
+                            parts[1].trim()
+                        );
+
+
+                    if (
+                        Number.isFinite(
+                            value
+                        )
+                    ) {
+
+                        metrics[key] =
+                            value;
+                    }
+
                 }
-
-
-                const key =
-                    parts[0]
-
-                        .trim()
-
-                        .toLowerCase();
-
-
-                const value =
-                    Number(
-                        parts[1].trim()
-                    );
-
-
-                if (
-                    Number.isFinite(value)
-                ) {
-
-                    metrics[key] =
-                        value;
-                }
-            });
+            );
 
 
         return {
@@ -306,6 +507,7 @@ async function loadMetrics() {
                 metrics["customer segments"] ??
                 metrics["customer_segments"] ??
                 fallbackMetrics.customerSegments
+
         };
 
 
@@ -416,6 +618,7 @@ async function loadSegments() {
         return {
 
             segments: []
+
         };
     }
 }
@@ -462,16 +665,23 @@ function renderSegments(data) {
 
     if (!segments.length) {
 
-        container.innerHTML =
-            "<p>Customer segmentation data unavailable.</p>";
+        container.innerHTML = `
+
+            <div class="chart-error">
+
+                Customer segmentation data unavailable.
+
+            </div>
+
+        `;
 
         return;
     }
 
 
     /*
-     * Calculate total customers represented
-     * by the six K-Means segments.
+     * Calculate total customers
+     * represented by the segments.
      */
 
     const totalCustomers =
@@ -490,6 +700,7 @@ function renderSegments(data) {
                     sum +
 
                     (
+
                         Number.isFinite(
                             customers
                         )
@@ -497,11 +708,15 @@ function renderSegments(data) {
                             ? customers
 
                             : 0
+
                     )
+
                 );
+
             },
 
             0
+
         );
 
 
@@ -509,12 +724,18 @@ function renderSegments(data) {
        TABLE ROWS
     ===================================================== */
 
-
     let tableRows = "";
 
 
     segments.forEach(
         segment => {
+
+            const segmentName =
+                escapeHTML(
+                    segment.segment ??
+                    "N/A"
+                );
+
 
             const satisfaction =
                 Number(
@@ -648,7 +869,7 @@ function renderSegments(data) {
                             <div>
 
                                 <strong>
-                                    ${segment.segment ?? "N/A"}
+                                    ${segmentName}
                                 </strong>
 
                                 <div class="segment-badges">
@@ -657,14 +878,18 @@ function renderSegments(data) {
                                         segment-badge
                                         ${riskClass}
                                     ">
+
                                         ${riskText}
+
                                     </span>
 
                                     <span class="
                                         segment-badge
                                         ${speedClass}
                                     ">
+
                                         ${speedText}
+
                                     </span>
 
                                 </div>
@@ -677,17 +902,21 @@ function renderSegments(data) {
 
 
                     <td class="number-cell">
+
                         ${formatNumber(
                             customers
                         )}
+
                     </td>
 
 
                     <td class="number-cell">
+
                         ${formatNumber(
                             segment.avg_age,
                             1
                         )}
+
                     </td>
 
 
@@ -701,7 +930,9 @@ function renderSegments(data) {
                             ${formatNumber(
                                 satisfaction,
                                 2
-                            )} / 5
+                            )}
+
+                            / 5
 
                         </span>
 
@@ -718,13 +949,16 @@ function renderSegments(data) {
                             ${formatNumber(
                                 resolution,
                                 2
-                            )} hrs
+                            )}
+
+                            hrs
 
                         </span>
 
                     </td>
 
                 </tr>
+
             `;
         }
     );
@@ -733,7 +967,6 @@ function renderSegments(data) {
     /* =====================================================
        COMPLETE SEGMENT DASHBOARD
     ===================================================== */
-
 
     container.innerHTML = `
 
@@ -854,6 +1087,7 @@ function renderSegments(data) {
                     <div
                         id="segment-chart-legend"
                         class="segment-chart-legend">
+
                     </div>
 
                 </div>
@@ -870,6 +1104,7 @@ function renderSegments(data) {
                     <div
                         id="segment-insights"
                         class="segment-insights">
+
                     </div>
 
                 </div>
@@ -878,6 +1113,7 @@ function renderSegments(data) {
             </div>
 
         </div>
+
     `;
 
 
@@ -888,12 +1124,17 @@ function renderSegments(data) {
 
     const validSegments =
         segments.filter(
+
             segment =>
+
                 Number.isFinite(
+
                     Number(
                         segment.avg_satisfaction
                     )
+
                 )
+
         );
 
 
@@ -927,6 +1168,7 @@ function renderSegments(data) {
                     ? current
 
                     : best
+
         );
 
 
@@ -952,6 +1194,7 @@ function renderSegments(data) {
                     ? current
 
                     : worst
+
         );
 
 
@@ -977,6 +1220,7 @@ function renderSegments(data) {
                     ? current
 
                     : largest
+
         );
 
 
@@ -986,12 +1230,17 @@ function renderSegments(data) {
 
     const segmentsWithResolution =
         segments.filter(
+
             segment =>
+
                 Number.isFinite(
+
                     Number(
                         segment.avg_resolution_hours
                     )
+
                 )
+
         );
 
 
@@ -1037,35 +1286,33 @@ function renderSegments(data) {
         typeof Chart !== "undefined"
     ) {
 
-        /*
-         * Destroy previous chart.
-         */
-
-        if (charts.segment) {
-
-            charts.segment.destroy();
-
-            charts.segment = null;
-        }
+        destroyChart(
+            "segment"
+        );
 
 
         const labels =
             segments.map(
+
                 segment =>
                     segment.segment
+
             );
 
 
         const values =
             segments.map(
+
                 segment =>
                     Number(
                         segment.customers
                     )
+
             );
 
 
         charts.segment =
+
             new Chart(
 
                 canvas,
@@ -1091,8 +1338,11 @@ function renderSegments(data) {
 
                                 borderWidth:
                                     2
+
                             }
+
                         ]
+
                     },
 
 
@@ -1114,6 +1364,7 @@ function renderSegments(data) {
 
                                 display:
                                     false
+
                             },
 
 
@@ -1142,7 +1393,9 @@ function renderSegments(data) {
                                                         totalCustomers
                                                     ) * 100
 
-                                                    : 0;
+                                                    :
+
+                                                    0;
 
 
                                             return (
@@ -1154,13 +1407,21 @@ function renderSegments(data) {
                                                 `(${percentage.toFixed(
                                                     1
                                                 )}%)`
+
                                             );
+
                                         }
+
                                 }
+
                             }
+
                         }
+
                     }
+
                 }
+
             );
 
 
@@ -1179,7 +1440,9 @@ function renderSegments(data) {
                     Chart.js could not be loaded.
 
                 </div>
+
             `;
+
         }
     }
 
@@ -1202,6 +1465,7 @@ function renderSegments(data) {
             segments
 
                 .map(
+
                     segment => {
 
                         const customers =
@@ -1220,7 +1484,9 @@ function renderSegments(data) {
                                     totalCustomers
                                 ) * 100
 
-                                : 0;
+                                :
+
+                                0;
 
 
                         return `
@@ -1230,27 +1496,39 @@ function renderSegments(data) {
                                 <span class="legend-dot"></span>
 
                                 <span class="legend-name">
-                                    ${segment.segment}
+
+                                    ${escapeHTML(
+                                        segment.segment
+                                    )}
+
                                 </span>
 
                                 <strong>
+
                                     ${formatNumber(
                                         customers
                                     )}
+
                                 </strong>
 
                                 <span class="legend-percent">
+
                                     ${percentage.toFixed(
                                         1
                                     )}%
+
                                 </span>
 
                             </div>
+
                         `;
+
                     }
+
                 )
 
                 .join("");
+
     }
 
 
@@ -1285,7 +1563,9 @@ function renderSegments(data) {
                     totalCustomers
                 ) * 100
 
-                : 0;
+                :
+
+                0;
 
 
         insights.innerHTML = `
@@ -1305,7 +1585,9 @@ function renderSegments(data) {
                     </span>
 
                     <strong>
-                        ${bestSegment.segment}
+                        ${escapeHTML(
+                            bestSegment.segment
+                        )}
                     </strong>
 
                     <small>
@@ -1313,14 +1595,18 @@ function renderSegments(data) {
                         ${formatNumber(
                             bestSegment.avg_satisfaction,
                             2
-                        )} / 5 satisfaction
+                        )}
+
+                        / 5 satisfaction
 
                         ·
 
                         ${formatNumber(
                             bestSegment.avg_resolution_hours,
                             2
-                        )} hrs resolution
+                        )}
+
+                        hrs resolution
 
                     </small>
 
@@ -1344,7 +1630,9 @@ function renderSegments(data) {
                     </span>
 
                     <strong>
-                        ${highestRiskSegment.segment}
+                        ${escapeHTML(
+                            highestRiskSegment.segment
+                        )}
                     </strong>
 
                     <small>
@@ -1352,14 +1640,18 @@ function renderSegments(data) {
                         ${formatNumber(
                             highestRiskSegment.avg_satisfaction,
                             2
-                        )} / 5 satisfaction
+                        )}
+
+                        / 5 satisfaction
 
                         ·
 
                         ${formatNumber(
                             highestRiskSegment.avg_resolution_hours,
                             2
-                        )} hrs resolution
+                        )}
+
+                        hrs resolution
 
                     </small>
 
@@ -1383,7 +1675,9 @@ function renderSegments(data) {
                     </span>
 
                     <strong>
-                        ${largestSegment.segment}
+                        ${escapeHTML(
+                            largestSegment.segment
+                        )}
                     </strong>
 
                     <small>
@@ -1424,7 +1718,9 @@ function renderSegments(data) {
                     </span>
 
                     <strong>
-                        ${fastestSegment.segment}
+                        ${escapeHTML(
+                            fastestSegment.segment
+                        )}
                     </strong>
 
                     <small>
@@ -1543,6 +1839,10 @@ function renderSatisfaction(data) {
 ========================================================= */
 
 
+/*
+ * Load actual K-Means ticket-to-segment mapping.
+ */
+
 async function loadTicketSegmentMapping() {
 
     try {
@@ -1556,7 +1856,9 @@ async function loadTicketSegmentMapping() {
         if (!Array.isArray(data)) {
 
             throw new Error(
+
                 "ticket_segment_mapping.json must contain an array."
+
             );
         }
 
@@ -1564,7 +1866,9 @@ async function loadTicketSegmentMapping() {
         if (!data.length) {
 
             throw new Error(
+
                 "ticket_segment_mapping.json is empty."
+
             );
         }
 
@@ -1574,24 +1878,25 @@ async function loadTicketSegmentMapping() {
 
 
         /*
-         * Build a Map once.
-         *
-         * This is much faster than using .find()
-         * for every ticket during filtering.
+         * Build fast lookup map.
          */
 
         buildTicketSegmentMap();
 
 
         /*
-         * Validate mapping content.
+         * Validate segment names.
          */
 
         const segmentNames =
             new Set();
 
 
+        let invalidRows = 0;
+
+
         ticketSegmentMapping.forEach(
+
             item => {
 
                 const segment =
@@ -1605,33 +1910,107 @@ async function loadTicketSegmentMapping() {
                     segmentNames.add(
                         String(segment)
                     );
+
+                } else {
+
+                    invalidRows++;
+
                 }
+
             }
+
         );
 
 
         console.log(
+
             "K-Means segment names:",
+
             [...segmentNames]
+
         );
 
 
         console.log(
+
             `Loaded ${ticketSegmentMapping.length} ticket-segment mappings.`
+
         );
 
 
         console.log(
+
             `Unique mapped ticket/email pairs: ${ticketSegmentMap.size}`
+
         );
+
+
+        if (invalidRows > 0) {
+
+            console.warn(
+
+                `${invalidRows} mapping rows do not contain a segment.`
+
+            );
+        }
+
+
+        /*
+         * Validate expected six K-Means groups.
+         */
+
+        const missingOfficialSegments =
+            OFFICIAL_SEGMENTS.filter(
+
+                segment =>
+                    !segmentNames.has(
+                        segment
+                    )
+
+            );
 
 
         if (
-            segmentNames.size !== 6
+            segmentNames.size !==
+            OFFICIAL_SEGMENTS.length
         ) {
 
             console.warn(
-                `Expected 6 K-Means segments but found ${segmentNames.size}.`
+
+                `Expected ${OFFICIAL_SEGMENTS.length} K-Means segments but found ${segmentNames.size}.`
+
+            );
+
+        }
+
+
+        if (
+            missingOfficialSegments.length
+        ) {
+
+            console.warn(
+
+                "Missing official K-Means segments:",
+
+                missingOfficialSegments
+
+            );
+
+        }
+
+
+        /*
+         * Mapping must have usable entries.
+         */
+
+        if (
+            ticketSegmentMap.size === 0
+        ) {
+
+            throw new Error(
+
+                "No valid ticket-to-segment mappings were found."
+
             );
         }
 
@@ -1642,15 +2021,29 @@ async function loadTicketSegmentMapping() {
     } catch (error) {
 
         console.error(
+
             "Ticket segment mapping error:",
+
             error
+
         );
 
 
-        ticketSegmentMapping = [];
+        ticketSegmentMapping =
+            [];
+
 
         ticketSegmentMap =
             new Map();
+
+
+        showDashboardStatus(
+
+            "K-Means segment mapping could not be loaded. Segment filtering is unavailable.",
+
+            "warning"
+
+        );
 
 
         return [];
@@ -1663,6 +2056,13 @@ async function loadTicketSegmentMapping() {
 ========================================================= */
 
 
+/*
+ * Converts the mapping array into a Map.
+ *
+ * This prevents repeated .find() operations
+ * across 8,469 tickets.
+ */
+
 function buildTicketSegmentMap() {
 
     ticketSegmentMap =
@@ -1670,6 +2070,7 @@ function buildTicketSegmentMap() {
 
 
     ticketSegmentMapping.forEach(
+
         item => {
 
             const ticketId =
@@ -1690,8 +2091,11 @@ function buildTicketSegmentMap() {
 
             const key =
                 makeTicketKey(
+
                     ticketId,
+
                     customerEmail
+
                 );
 
 
@@ -1706,7 +2110,7 @@ function buildTicketSegmentMap() {
 
             /*
              * Keep the first valid mapping
-             * if duplicate records exist.
+             * when duplicate records exist.
              */
 
             if (
@@ -1714,16 +2118,24 @@ function buildTicketSegmentMap() {
             ) {
 
                 ticketSegmentMap.set(
+
                     key,
-                    segment
+
+                    String(segment)
+
                 );
+
             }
+
         }
+
     );
 
 
     console.log(
+
         `Built ${ticketSegmentMap.size} ticket-segment lookup entries.`
+
     );
 }
 
@@ -1733,20 +2145,39 @@ function buildTicketSegmentMap() {
 ========================================================= */
 
 
+/*
+ * Supports both original dataset field names
+ * and normalized field names.
+ */
+
 function getTicketValue(
     ticket,
     possibleNames
 ) {
+
+    if (
+        !ticket ||
+        typeof ticket !== "object"
+    ) {
+
+        return null;
+    }
+
 
     for (
         const name of possibleNames
     ) {
 
         if (
+
             Object.prototype.hasOwnProperty.call(
+
                 ticket,
+
                 name
+
             )
+
         ) {
 
             const value =
@@ -1754,13 +2185,19 @@ function getTicketValue(
 
 
             if (
+
                 value !== null &&
+
                 value !== undefined
+
             ) {
 
                 return value;
+
             }
+
         }
+
     }
 
 
@@ -1777,28 +2214,43 @@ function getTicketSegment(ticket) {
 
     const ticketId =
         getTicketValue(
+
             ticket,
+
             [
+
                 "Ticket ID",
+
                 "ticket_id"
+
             ]
+
         );
 
 
     const customerEmail =
         getTicketValue(
+
             ticket,
+
             [
+
                 "Customer Email",
+
                 "customer_email"
+
             ]
+
         );
 
 
     const key =
         makeTicketKey(
+
             ticketId,
+
             customerEmail
+
         );
 
 
@@ -1813,8 +2265,13 @@ function getTicketSegment(ticket) {
      */
 
     return (
-        ticketSegmentMap.get(key) ??
+
+        ticketSegmentMap.get(
+            key
+        ) ??
+
         null
+
     );
 }
 
@@ -1836,7 +2293,8 @@ function populateSelect(
     }
 
 
-    select.innerHTML = "";
+    select.innerHTML =
+        "";
 
 
     const defaultOption =
@@ -1859,6 +2317,7 @@ function populateSelect(
 
 
     values.forEach(
+
         value => {
 
             const option =
@@ -1878,7 +2337,9 @@ function populateSelect(
             select.appendChild(
                 option
             );
+
         }
+
     );
 }
 
@@ -1933,35 +2394,54 @@ function initializeFilters() {
 
 
     ticketData.forEach(
+
         ticket => {
 
             const priority =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Priority",
+
                         "ticket_priority"
+
                     ]
+
                 );
 
 
             const type =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Type",
+
                         "ticket_type"
+
                     ]
+
                 );
 
 
             const channel =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Channel",
+
                         "ticket_channel"
+
                     ]
+
                 );
 
 
@@ -1987,7 +2467,9 @@ function initializeFilters() {
                     channel
                 );
             }
+
         }
+
     );
 
 
@@ -1998,6 +2480,7 @@ function initializeFilters() {
         "All Priorities",
 
         [...priorities].sort()
+
     );
 
 
@@ -2008,6 +2491,7 @@ function initializeFilters() {
         "All Ticket Types",
 
         [...types].sort()
+
     );
 
 
@@ -2018,29 +2502,13 @@ function initializeFilters() {
         "All Channels",
 
         [...channels].sort()
+
     );
 
 
     /*
-     * Official K-Means segment names.
+     * Use official K-Means segment names.
      */
-
-    const officialSegments = [
-
-        "Middle Age - Highly Satisfied and Fast",
-
-        "Older - At Risk and Fast",
-
-        "Older - At Risk and Slow",
-
-        "Older - Satisfied but Slow",
-
-        "Young - At Risk and Fast",
-
-        "Young - Satisfied but Slow"
-
-    ];
-
 
     populateSelect(
 
@@ -2048,43 +2516,71 @@ function initializeFilters() {
 
         "All Segments",
 
-        officialSegments
+        OFFICIAL_SEGMENTS
+
     );
 
 
-    [
-        priorityFilter,
-        typeFilter,
-        channelFilter,
-        segmentFilter
-    ]
+    /*
+     * Avoid duplicate event listeners.
+     */
 
-        .forEach(
-            filter => {
+    if (!filtersInitialized) {
 
-                if (filter) {
+        [
 
-                    filter.addEventListener(
-                        "change",
-                        updateFilteredDashboard
-                    );
+            priorityFilter,
+
+            typeFilter,
+
+            channelFilter,
+
+            segmentFilter
+
+        ]
+
+            .forEach(
+
+                filter => {
+
+                    if (filter) {
+
+                        filter.addEventListener(
+
+                            "change",
+
+                            updateFilteredDashboard
+
+                        );
+
+                    }
+
                 }
-            }
-        );
+
+            );
 
 
-    const resetButton =
-        getElement(
-            "reset-filters"
-        );
+        const resetButton =
+            getElement(
+                "reset-filters"
+            );
 
 
-    if (resetButton) {
+        if (resetButton) {
 
-        resetButton.addEventListener(
-            "click",
-            resetFilters
-        );
+            resetButton.addEventListener(
+
+                "click",
+
+                resetFilters
+
+            );
+
+        }
+
+
+        filtersInitialized =
+            true;
     }
 }
 
@@ -2132,31 +2628,49 @@ function getFilteredTickets() {
 
             const ticketPriority =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Priority",
+
                         "ticket_priority"
+
                     ]
+
                 );
 
 
             const ticketType =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Type",
+
                         "ticket_type"
+
                     ]
+
                 );
 
 
             const ticketChannel =
                 getTicketValue(
+
                     ticket,
+
                     [
+
                         "Ticket Channel",
+
                         "ticket_channel"
+
                     ]
+
                 );
 
 
@@ -2210,8 +2724,8 @@ function getFilteredTickets() {
 
 
             /*
-             * If a segment is selected,
-             * a missing mapping must NOT match.
+             * Missing segment mapping must
+             * never match a selected segment.
              */
 
             const segmentMatch =
@@ -2246,8 +2760,10 @@ function getFilteredTickets() {
                 channelMatch &&
 
                 segmentMatch
+
             );
         }
+
     );
 }
 
@@ -2319,7 +2835,7 @@ function updateFilteredDashboard() {
         if (statusElement) {
 
             statusElement.textContent =
-                "Loading ticket data...";
+                "Ticket data unavailable.";
         }
 
 
@@ -2357,15 +2873,22 @@ function updateFilteredDashboard() {
         filteredTickets
 
             .map(
+
                 ticket => {
 
                     const rawValue =
                         getTicketValue(
+
                             ticket,
+
                             [
+
                                 "Customer Satisfaction Rating",
+
                                 "customer_satisfaction_rating"
+
                             ]
+
                         );
 
 
@@ -2404,12 +2927,16 @@ function updateFilteredDashboard() {
 
 
                     return value;
+
                 }
+
             )
 
             .filter(
+
                 value =>
                     value !== null
+
             );
 
 
@@ -2423,9 +2950,11 @@ function updateFilteredDashboard() {
                 satisfactionValues.reduce(
 
                     (sum, value) =>
+
                         sum + value,
 
                     0
+
                 );
 
 
@@ -2459,8 +2988,8 @@ function updateFilteredDashboard() {
      * ticket_data.json does not contain
      * usable Time to Resolution values.
      *
-     * Therefore do not calculate a
-     * misleading filtered resolution.
+     * Therefore we intentionally do not
+     * calculate a misleading filtered value.
      */
 
     if (resolutionElement) {
@@ -2503,6 +3032,7 @@ function updateFilteredDashboard() {
                 )} of ${formatNumber(
                     total
                 )} tickets.`;
+
         }
     }
 }
@@ -2529,6 +3059,7 @@ function resetFilters() {
 
 
     filterIds.forEach(
+
         id => {
 
             const element =
@@ -2541,8 +3072,11 @@ function resetFilters() {
 
                 element.value =
                     "";
+
             }
+
         }
+
     );
 
 
@@ -2559,6 +3093,9 @@ async function loadResolutionData() {
 
     /*
      * Load all three files independently.
+     *
+     * One broken file should not prevent
+     * the other charts from loading.
      */
 
     const results =
@@ -2621,6 +3158,7 @@ async function loadResolutionData() {
                 :
 
                 null
+
     };
 }
 
@@ -2666,6 +3204,15 @@ function extractResolutionRows(data) {
 
 
 function getResolutionValue(row) {
+
+    if (
+        !row ||
+        typeof row !== "object"
+    ) {
+
+        return null;
+    }
+
 
     const possibleValues = [
 
@@ -2768,7 +3315,9 @@ function createResolutionChart(
     if (!container) {
 
         console.error(
+
             `Missing chart container: ${containerId}`
+
         );
 
         return;
@@ -2782,6 +3331,43 @@ function createResolutionChart(
 
     container.innerHTML =
         "";
+
+
+    if (
+        typeof Chart ===
+        "undefined"
+    ) {
+
+        showChartError(
+
+            containerId,
+
+            "Chart.js could not be loaded."
+
+        );
+
+        return;
+    }
+
+
+    if (
+
+        !labels.length ||
+
+        !values.length
+
+    ) {
+
+        showChartError(
+
+            containerId,
+
+            "No resolution data available."
+
+        );
+
+        return;
+    }
 
 
     const canvas =
@@ -2807,188 +3393,181 @@ function createResolutionChart(
     );
 
 
-    if (
-        typeof Chart ===
-        "undefined"
-    ) {
+    try {
+
+        charts[chartKey] =
+
+            new Chart(
+
+                canvas,
+
+                {
+
+                    type:
+                        "bar",
+
+
+                    data: {
+
+                        labels:
+                            labels,
+
+
+                        datasets: [
+
+                            {
+
+                                label:
+                                    "Average Resolution Time (hrs)",
+
+                                data:
+                                    values,
+
+                                borderWidth:
+                                    1
+
+                            }
+
+                        ]
+
+                    },
+
+
+                    options: {
+
+                        responsive:
+                            true,
+
+                        maintainAspectRatio:
+                            false,
+
+
+                        animation: {
+
+                            duration:
+                                500
+
+                        },
+
+
+                        plugins: {
+
+                            legend: {
+
+                                display:
+                                    false
+
+                            },
+
+
+                            title: {
+
+                                display:
+                                    true,
+
+                                text:
+                                    title
+
+                            },
+
+
+                            tooltip: {
+
+                                callbacks: {
+
+                                    label:
+
+                                        function(
+                                            context
+                                        ) {
+
+                                            const value =
+                                                context.parsed.y;
+
+
+                                            return (
+
+                                                " " +
+
+                                                Number(
+                                                    value
+                                                ).toFixed(
+                                                    2
+                                                ) +
+
+                                                " hrs"
+
+                                            );
+
+                                        }
+
+                                }
+
+                            }
+
+                        },
+
+
+                        scales: {
+
+                            y: {
+
+                                beginAtZero:
+                                    true,
+
+
+                                title: {
+
+                                    display:
+                                        true,
+
+                                    text:
+                                        "Average Resolution Time (hrs)"
+
+                                }
+
+                            },
+
+
+                            x: {
+
+                                title: {
+
+                                    display:
+                                        true,
+
+                                    text:
+                                        "Category"
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+    } catch (error) {
 
         console.error(
-            "Chart.js is not available."
+            `Unable to create ${chartKey} chart:`,
+            error
         );
 
-
-        container.innerHTML = `
-
-            <div class="chart-error">
-
-                Chart.js could not be loaded.
-
-            </div>
-
-        `;
-
-        return;
-    }
-
-
-    if (
-
-        labels.length === 0 ||
-
-        values.length === 0
-
-    ) {
 
         showChartError(
 
             containerId,
 
-            "No resolution data available."
+            "Unable to render this chart."
 
         );
 
-        return;
     }
-
-
-    charts[chartKey] =
-
-        new Chart(
-
-            canvas,
-
-            {
-
-                type:
-                    "bar",
-
-
-                data: {
-
-                    labels:
-                        labels,
-
-
-                    datasets: [
-
-                        {
-
-                            label:
-                                "Average Resolution Time (hrs)",
-
-                            data:
-                                values,
-
-                            borderWidth:
-                                1
-
-                        }
-
-                    ]
-                },
-
-
-                options: {
-
-                    responsive:
-                        true,
-
-                    maintainAspectRatio:
-                        false,
-
-
-                    animation: {
-
-                        duration:
-                            500
-
-                    },
-
-
-                    plugins: {
-
-                        legend: {
-
-                            display:
-                                false
-                        },
-
-
-                        title: {
-
-                            display:
-                                true,
-
-                            text:
-                                title
-                        },
-
-
-                        tooltip: {
-
-                            callbacks: {
-
-                                label:
-                                    function(
-                                        context
-                                    ) {
-
-                                        const value =
-                                            context.parsed.y;
-
-
-                                        return (
-
-                                            " " +
-
-                                            Number(
-                                                value
-                                            ).toFixed(
-                                                2
-                                            ) +
-
-                                            " hrs"
-                                        );
-                                    }
-                            }
-                        }
-                    },
-
-
-                    scales: {
-
-                        y: {
-
-                            beginAtZero:
-                                true,
-
-
-                            title: {
-
-                                display:
-                                    true,
-
-                                text:
-                                    "Average Resolution Time (hrs)"
-                            }
-                        },
-
-
-                        x: {
-
-                            title: {
-
-                                display:
-                                    true,
-
-                                text:
-                                    "Category"
-                            }
-                        }
-                    }
-                }
-            }
-        );
 }
 
 
@@ -3025,6 +3604,7 @@ function renderPriorityChart(data) {
 
 
     rows.forEach(
+
         row => {
 
             const label =
@@ -3047,15 +3627,18 @@ function renderPriorityChart(data) {
             ) {
 
                 labels.push(
-                    label
+                    String(label)
                 );
 
 
                 values.push(
                     value
                 );
+
             }
+
         }
+
     );
 
 
@@ -3122,6 +3705,7 @@ function renderTypeChart(data) {
 
 
     rows.forEach(
+
         row => {
 
             const label =
@@ -3146,15 +3730,18 @@ function renderTypeChart(data) {
             ) {
 
                 labels.push(
-                    label
+                    String(label)
                 );
 
 
                 values.push(
                     value
                 );
+
             }
+
         }
+
     );
 
 
@@ -3221,6 +3808,7 @@ function renderChannelChart(data) {
 
 
     rows.forEach(
+
         row => {
 
             const label =
@@ -3245,15 +3833,18 @@ function renderChannelChart(data) {
             ) {
 
                 labels.push(
-                    label
+                    String(label)
                 );
 
 
                 values.push(
                     value
                 );
+
             }
+
         }
+
     );
 
 
@@ -3297,23 +3888,32 @@ function renderResolutionCharts(
 ) {
 
     console.log(
+
         "Resolution analytics loaded:",
+
         resolutionData
+
     );
 
 
     renderPriorityChart(
+
         resolutionData.priority
+
     );
 
 
     renderTypeChart(
+
         resolutionData.type
+
     );
 
 
     renderChannelChart(
+
         resolutionData.channel
+
     );
 }
 
@@ -3340,17 +3940,38 @@ function showChartError(
     }
 
 
-    container.innerHTML = `
+    container.innerHTML =
+        "";
 
-        <div class="chart-error">
 
-            <p>
-                ${message}
-            </p>
+    const errorBox =
+        document.createElement(
+            "div"
+        );
 
-        </div>
 
-    `;
+    errorBox.className =
+        "chart-error";
+
+
+    const paragraph =
+        document.createElement(
+            "p"
+        );
+
+
+    paragraph.textContent =
+        message;
+
+
+    errorBox.appendChild(
+        paragraph
+    );
+
+
+    container.appendChild(
+        errorBox
+    );
 }
 
 
@@ -3365,7 +3986,7 @@ async function loadTicketData() {
 
         /*
          * ticket_data.json is located
-         * in the repository ROOT.
+         * in the repository root.
          */
 
         const response =
@@ -3374,8 +3995,10 @@ async function loadTicketData() {
                 FILES.tickets,
 
                 {
+
                     cache:
                         "no-store"
+
                 }
 
             );
@@ -3393,6 +4016,16 @@ async function loadTicketData() {
 
         const text =
             await response.text();
+
+
+        if (!text.trim()) {
+
+            throw new Error(
+
+                "ticket_data.json is empty."
+
+            );
+        }
 
 
         ticketData =
@@ -3420,6 +4053,18 @@ async function loadTicketData() {
         }
 
 
+        if (
+            ticketData.length === 0
+        ) {
+
+            throw new Error(
+
+                "ticket_data.json contains no ticket records."
+
+            );
+        }
+
+
         /*
          * Load actual K-Means mapping.
          */
@@ -3434,10 +4079,28 @@ async function loadTicketData() {
         );
 
 
+        /*
+         * Initialize filters only after
+         * ticket data and mapping are ready.
+         */
+
         initializeFilters();
 
 
         updateFilteredDashboard();
+
+
+        /*
+         * If mapping was loaded successfully,
+         * clear previous warning.
+         */
+
+        if (
+            ticketSegmentMap.size > 0
+        ) {
+
+            clearDashboardStatus();
+        }
 
 
         return ticketData;
@@ -3456,9 +4119,7 @@ async function loadTicketData() {
 
         ticketData = [];
 
-
         ticketSegmentMapping = [];
-
 
         ticketSegmentMap =
             new Map();
@@ -3475,7 +4136,17 @@ async function loadTicketData() {
             status.textContent =
 
                 "Ticket-level data could not be loaded.";
+
         }
+
+
+        showDashboardStatus(
+
+            "Ticket-level data could not be loaded. Interactive filtering is unavailable.",
+
+            "error"
+
+        );
 
 
         return [];
@@ -3562,6 +4233,15 @@ async function initializeDashboard() {
             "Dashboard initialization error:",
 
             error
+
+        );
+
+
+        showDashboardStatus(
+
+            "Some dashboard components could not be loaded. Please refresh the page.",
+
+            "error"
 
         );
     }
