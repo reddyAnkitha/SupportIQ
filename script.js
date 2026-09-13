@@ -5,12 +5,16 @@ const FILES = {
     segments: DATA_PATH + "segment_dashboard.json",
     satisfaction: DATA_PATH + "satisfaction_dashboard.json",
 
-    // Resolution analytics files
-    resolutionPriority: DATA_PATH + "resolution_by_priority.json",
-    resolutionType: DATA_PATH + "resolution_by_type.json",
-    resolutionChannel: DATA_PATH + "resolution_by_channel.json",
+    resolutionPriority:
+        DATA_PATH + "resolution_by_priority.json",
 
-    // Ticket-level data is in the repository ROOT
+    resolutionType:
+        DATA_PATH + "resolution_by_type.json",
+
+    resolutionChannel:
+        DATA_PATH + "resolution_by_channel.json",
+
+    // ticket_data.json is in the ROOT of the repository
     tickets: "ticket_data.json"
 };
 
@@ -41,6 +45,7 @@ function getElement(id) {
     return document.getElementById(id);
 }
 
+
 function formatNumber(value, decimals = 0) {
     const number = Number(value);
 
@@ -54,6 +59,7 @@ function formatNumber(value, decimals = 0) {
     });
 }
 
+
 function cleanJSONText(text) {
     return text
         .replace(/\bNaN\b/g, "null")
@@ -61,17 +67,23 @@ function cleanJSONText(text) {
         .replace(/\b-Infinity\b/g, "null");
 }
 
+
 function normalize(value) {
-    if (value === null || value === undefined) {
+    if (
+        value === null ||
+        value === undefined
+    ) {
         return "";
     }
 
-    return String(value).trim().toLowerCase();
+    return String(value)
+        .trim()
+        .toLowerCase();
 }
 
 
 /* =========================================================
-   LOAD JSON FILE
+   LOAD JSON
 ========================================================= */
 
 async function loadJSON(file) {
@@ -87,7 +99,9 @@ async function loadJSON(file) {
 
     const text = await response.text();
 
-    return JSON.parse(cleanJSONText(text));
+    return JSON.parse(
+        cleanJSONText(text)
+    );
 }
 
 
@@ -97,15 +111,21 @@ async function loadJSON(file) {
 
 async function loadMetrics() {
     try {
-        const response = await fetch(FILES.metrics, {
-            cache: "no-store"
-        });
+        const response = await fetch(
+            FILES.metrics,
+            {
+                cache: "no-store"
+            }
+        );
 
         if (!response.ok) {
-            throw new Error("Metrics file unavailable");
+            throw new Error(
+                "Metrics file unavailable"
+            );
         }
 
-        const text = await response.text();
+        const text =
+            await response.text();
 
         const lines = text
             .trim()
@@ -122,15 +142,19 @@ async function loadMetrics() {
                 return;
             }
 
-            const key = parts[0]
-                .trim()
-                .toLowerCase();
+            const key =
+                parts[0]
+                    .trim()
+                    .toLowerCase();
 
-            const value = Number(
-                parts[1].trim()
-            );
+            const value =
+                Number(
+                    parts[1].trim()
+                );
 
-            if (Number.isFinite(value)) {
+            if (
+                Number.isFinite(value)
+            ) {
                 metrics[key] = value;
             }
         });
@@ -178,17 +202,25 @@ function renderMetrics(metrics) {
         getElement("total-tickets");
 
     const averageSatisfaction =
-        getElement("average-satisfaction");
+        getElement(
+            "average-satisfaction"
+        );
 
     const averageResolution =
-        getElement("average-resolution");
+        getElement(
+            "average-resolution"
+        );
 
     const customerSegments =
-        getElement("customer-segments");
+        getElement(
+            "customer-segments"
+        );
 
     if (totalTickets) {
         totalTickets.textContent =
-            formatNumber(metrics.totalTickets);
+            formatNumber(
+                metrics.totalTickets
+            );
     }
 
     if (averageSatisfaction) {
@@ -217,7 +249,7 @@ function renderMetrics(metrics) {
 
 
 /* =========================================================
-   LOAD CUSTOMER SEGMENTS
+   CUSTOMER SEGMENTS
 ========================================================= */
 
 async function loadSegments() {
@@ -239,21 +271,20 @@ async function loadSegments() {
 }
 
 
-/* =========================================================
-   RENDER CUSTOMER SEGMENTS
-========================================================= */
-
 function renderSegments(data) {
     const container =
-        getElement("segment-container");
+        getElement(
+            "segment-container"
+        );
 
     if (!container) {
         return;
     }
 
-    const segments = Array.isArray(data)
-        ? data
-        : data.segments || [];
+    const segments =
+        Array.isArray(data)
+            ? data
+            : data.segments || [];
 
     if (!segments.length) {
         container.innerHTML =
@@ -326,7 +357,7 @@ function renderSegments(data) {
 
 
 /* =========================================================
-   LOAD SATISFACTION DATA
+   SATISFACTION RISK
 ========================================================= */
 
 async function loadSatisfaction() {
@@ -346,22 +377,26 @@ async function loadSatisfaction() {
 }
 
 
-/* =========================================================
-   RENDER SATISFACTION
-========================================================= */
-
 function renderSatisfaction(data) {
     const low =
-        getElement("low-satisfaction");
+        getElement(
+            "low-satisfaction"
+        );
 
     const satisfied =
-        getElement("satisfied-customers");
+        getElement(
+            "satisfied-customers"
+        );
 
     const rate =
-        getElement("low-satisfaction-rate");
+        getElement(
+            "low-satisfaction-rate"
+        );
 
     const accuracy =
-        getElement("model-accuracy");
+        getElement(
+            "model-accuracy"
+        );
 
     if (low) {
         low.textContent =
@@ -396,28 +431,28 @@ function renderSatisfaction(data) {
 
 
 /* =========================================================
-   LOAD TICKET DATA
+   TICKET DATA
 ========================================================= */
 
 async function loadTicketData() {
     try {
         /*
-         * IMPORTANT:
-         * ticket_data.json is in the repository ROOT.
+         * ticket_data.json is located in the repository ROOT.
          *
          * Correct:
          *     ticket_data.json
          *
-         * NOT:
+         * Not:
          *     data/ticket_data.json
          */
 
-        const response = await fetch(
-            FILES.tickets,
-            {
-                cache: "no-store"
-            }
-        );
+        const response =
+            await fetch(
+                FILES.tickets,
+                {
+                    cache: "no-store"
+                }
+            );
 
         if (!response.ok) {
             throw new Error(
@@ -428,11 +463,10 @@ async function loadTicketData() {
         const text =
             await response.text();
 
-        const cleanedText =
-            cleanJSONText(text);
-
         ticketData =
-            JSON.parse(cleanedText);
+            JSON.parse(
+                cleanJSONText(text)
+            );
 
         if (!Array.isArray(ticketData)) {
             throw new Error(
@@ -445,6 +479,7 @@ async function loadTicketData() {
         );
 
         initializeFilters();
+
         updateFilteredDashboard();
 
         return ticketData;
@@ -480,7 +515,9 @@ function getTicketValue(
     ticket,
     possibleNames
 ) {
-    for (const name of possibleNames) {
+    for (
+        const name of possibleNames
+    ) {
         if (
             Object.prototype.hasOwnProperty.call(
                 ticket,
@@ -499,64 +536,77 @@ function getTicketValue(
         }
     }
 
-    return "";
+    return null;
 }
 
 
 /* =========================================================
-   INFER CUSTOMER SEGMENT
+   CUSTOMER SEGMENT APPROXIMATION
 ========================================================= */
 
 function inferSegment(ticket) {
-    const ageValue =
-        Number(
-            getTicketValue(
-                ticket,
-                [
-                    "Customer Age",
-                    "customer_age"
-                ]
-            )
+    const ageRaw =
+        getTicketValue(
+            ticket,
+            [
+                "Customer Age",
+                "customer_age"
+            ]
         );
 
-    const satisfactionValue =
-        Number(
-            getTicketValue(
-                ticket,
-                [
-                    "Customer Satisfaction Rating",
-                    "customer_satisfaction_rating"
-                ]
-            )
+    const satisfactionRaw =
+        getTicketValue(
+            ticket,
+            [
+                "Customer Satisfaction Rating",
+                "customer_satisfaction_rating"
+            ]
         );
+
+    /*
+     * IMPORTANT:
+     *
+     * Convert only actual values.
+     * Do not convert null to 0.
+     */
 
     const age =
-        Number.isFinite(ageValue)
-            ? ageValue
-            : 30;
+        ageRaw === null ||
+        ageRaw === ""
+            ? 30
+            : Number(ageRaw);
 
     const satisfaction =
-        Number.isFinite(
-            satisfactionValue
-        )
-            ? satisfactionValue
+        satisfactionRaw === null ||
+        satisfactionRaw === ""
+            ? 3
+            : Number(satisfactionRaw);
+
+    const safeAge =
+        Number.isFinite(age)
+            ? age
+            : 30;
+
+    const safeSatisfaction =
+        Number.isFinite(satisfaction)
+            ? satisfaction
             : 3;
 
     let ageGroup;
 
-    if (age < 40) {
+    if (safeAge < 40) {
         ageGroup = "Young";
-    } else if (age < 55) {
+    } else if (safeAge < 55) {
         ageGroup = "Middle Age";
     } else {
         ageGroup = "Older";
     }
 
-    if (satisfaction <= 2) {
+    if (safeSatisfaction <= 2) {
         return `${ageGroup} - At Risk and Fast`;
     }
 
-    if (satisfaction >= 4) {
+    if (safeSatisfaction >= 4) {
         return `${ageGroup} - Highly Satisfied and Fast`;
     }
 
@@ -565,7 +615,7 @@ function inferSegment(ticket) {
 
 
 /* =========================================================
-   POPULATE SELECT
+   POPULATE FILTER
 ========================================================= */
 
 function populateSelect(
@@ -585,6 +635,7 @@ function populateSelect(
         );
 
     defaultOption.value = "";
+
     defaultOption.textContent =
         defaultText;
 
@@ -749,7 +800,7 @@ function initializeFilters() {
 
 
 /* =========================================================
-   GET FILTERED TICKETS
+   FILTER TICKETS
 ========================================================= */
 
 function getFilteredTickets() {
@@ -849,7 +900,7 @@ function getFilteredTickets() {
 
 
 /* =========================================================
-   UPDATE FILTERED DASHBOARD
+   FILTERED DASHBOARD
 ========================================================= */
 
 function updateFilteredDashboard() {
@@ -917,32 +968,73 @@ function updateFilteredDashboard() {
             );
     }
 
+
+    /* ---------------------------------------------------------
+       CORRECT SATISFACTION CALCULATION
+       ---------------------------------------------------------
+
+       IMPORTANT:
+
+       null must NOT become 0.
+
+       Number(null) === 0
+
+       That was causing the incorrect
+       0.98 / 5 result.
+
+       We explicitly ignore missing ratings.
+    */
+
     const satisfactionValues =
         filteredTickets
-            .map(ticket =>
-                Number(
+            .map(ticket => {
+                const rawValue =
                     getTicketValue(
                         ticket,
                         [
                             "Customer Satisfaction Rating",
                             "customer_satisfaction_rating"
                         ]
-                    )
-                )
-            )
+                    );
+
+                if (
+                    rawValue === null ||
+                    rawValue === undefined ||
+                    rawValue === ""
+                ) {
+                    return null;
+                }
+
+                const value =
+                    Number(rawValue);
+
+                if (
+                    !Number.isFinite(value)
+                ) {
+                    return null;
+                }
+
+                return value;
+            })
             .filter(
                 value =>
-                    Number.isFinite(value)
+                    value !== null
             );
 
+
     if (satisfactionElement) {
-        if (satisfactionValues.length) {
-            const average =
+        if (
+            satisfactionValues.length
+        ) {
+            const total =
                 satisfactionValues.reduce(
                     (sum, value) =>
                         sum + value,
                     0
-                ) /
+                );
+
+            const average =
+                total /
                 satisfactionValues.length;
 
             satisfactionElement.textContent =
@@ -957,21 +1049,29 @@ function updateFilteredDashboard() {
         }
     }
 
-    /*
-     * ticket_data.json contains NaN/null values
-     * for Time to Resolution.
-     *
-     * Therefore we intentionally do not calculate
-     * filtered resolution from ticket_data.json.
-     *
-     * Resolution Analytics uses the dedicated
-     * aggregate JSON files below.
-     */
+
+    /* ---------------------------------------------------------
+       FILTERED RESOLUTION
+       ---------------------------------------------------------
+
+       ticket_data.json has no usable
+       Time to Resolution values.
+
+       Therefore we intentionally use:
+       "See analytics"
+
+       instead of showing a false number.
+    */
 
     if (resolutionElement) {
         resolutionElement.textContent =
             "See analytics";
     }
+
+
+    /* ---------------------------------------------------------
+       FILTER STATUS
+    */
 
     if (statusElement) {
         const total =
@@ -1002,14 +1102,14 @@ function updateFilteredDashboard() {
 ========================================================= */
 
 function resetFilters() {
-    const filters = [
+    const filterIds = [
         "priority-filter",
         "type-filter",
         "channel-filter",
         "segment-filter-main"
     ];
 
-    filters.forEach(id => {
+    filterIds.forEach(id => {
         const element =
             getElement(id);
 
@@ -1023,20 +1123,15 @@ function resetFilters() {
 
 
 /* =========================================================
-   LOAD RESOLUTION ANALYTICS
+   RESOLUTION ANALYTICS
 ========================================================= */
 
 async function loadResolutionData() {
     /*
-     * IMPORTANT:
+     * Load all three files independently.
      *
-     * These are three DIFFERENT files.
-     *
-     * 1. resolution_by_priority.json
-     * 2. resolution_by_type.json
-     * 3. resolution_by_channel.json
-     *
-     * They are all inside the data/ folder.
+     * This prevents one failed file from stopping
+     * the other charts.
      */
 
     const results =
@@ -1053,36 +1148,6 @@ async function loadResolutionData() {
                 FILES.resolutionChannel
             )
         ]);
-
-    if (
-        results[0].status ===
-        "rejected"
-    ) {
-        console.error(
-            "Priority resolution file failed:",
-            results[0].reason
-        );
-    }
-
-    if (
-        results[1].status ===
-        "rejected"
-    ) {
-        console.error(
-            "Ticket type resolution file failed:",
-            results[1].reason
-        );
-    }
-
-    if (
-        results[2].status ===
-        "rejected"
-    ) {
-        console.error(
-            "Channel resolution file failed:",
-            results[2].reason
-        );
-    }
 
     return {
         priority:
@@ -1107,7 +1172,7 @@ async function loadResolutionData() {
 
 
 /* =========================================================
-   EXTRACT DATA ARRAY
+   EXTRACT RESOLUTION ROWS
 ========================================================= */
 
 function extractResolutionRows(data) {
@@ -1115,28 +1180,15 @@ function extractResolutionRows(data) {
         return [];
     }
 
-    /*
-     * Supports:
-     *
-     * [
-     *   {...},
-     *   {...}
-     * ]
-     *
-     * and:
-     *
-     * {
-     *   "data": [
-     *      {...}
-     *   ]
-     * }
-     */
-
     if (Array.isArray(data)) {
         return data;
     }
 
-    if (Array.isArray(data.data)) {
+    if (
+        Array.isArray(
+            data.data
+        )
+    ) {
         return data.data;
     }
 
@@ -1145,27 +1197,51 @@ function extractResolutionRows(data) {
 
 
 /* =========================================================
-   VALIDATE CHART VALUES
+   GET VALID RESOLUTION VALUE
 ========================================================= */
 
-function validResolutionValue(value) {
-    const number =
-        Number(value);
+function getResolutionValue(row) {
+    const possibleValues = [
+        row.average_resolution_hours,
+        row.averageResolutionHours,
+        row["Average Resolution Hours"],
+        row.average_resolution,
+        row["Average Resolution"]
+    ];
 
-    return Number.isFinite(
-        number
-    )
-        ? number
-        : null;
+    for (
+        const rawValue of possibleValues
+    ) {
+        if (
+            rawValue === null ||
+            rawValue === undefined ||
+            rawValue === ""
+        ) {
+            continue;
+        }
+
+        const value =
+            Number(rawValue);
+
+        if (
+            Number.isFinite(value)
+        ) {
+            return value;
+        }
+    }
+
+    return null;
 }
 
 
 /* =========================================================
-   DESTROY OLD CHART
+   DESTROY EXISTING CHART
 ========================================================= */
 
 function destroyChart(chartKey) {
-    if (charts[chartKey]) {
+    if (
+        charts[chartKey]
+    ) {
         charts[chartKey].destroy();
         charts[chartKey] = null;
     }
@@ -1173,7 +1249,7 @@ function destroyChart(chartKey) {
 
 
 /* =========================================================
-   CREATE RESOLUTION CHART
+   CREATE CHART
 ========================================================= */
 
 function createResolutionChart(
@@ -1188,24 +1264,23 @@ function createResolutionChart(
 
     if (!container) {
         console.error(
-            `Chart container not found: ${containerId}`
+            `Missing chart container: ${containerId}`
         );
 
         return;
     }
 
-    /*
-     * Destroy any previous Chart.js instance.
-     */
-
     destroyChart(chartKey);
 
     /*
      * Remove "Loading data..."
-     * and create a fresh canvas.
      */
 
     container.innerHTML = "";
+
+    /*
+     * Create canvas dynamically.
+     */
 
     const canvas =
         document.createElement(
@@ -1235,7 +1310,7 @@ function createResolutionChart(
         "undefined"
     ) {
         console.error(
-            "Chart.js is not loaded."
+            "Chart.js is not available."
         );
 
         container.innerHTML = `
@@ -1248,24 +1323,23 @@ function createResolutionChart(
     }
 
     /*
-     * Validate data.
+     * Validate chart data.
      */
 
     if (
-        !labels.length ||
-        !values.length
+        labels.length === 0 ||
+        values.length === 0
     ) {
-        container.innerHTML = `
-            <div class="chart-error">
-                No resolution data available.
-            </div>
-        `;
+        showChartError(
+            containerId,
+            "No resolution data available."
+        );
 
         return;
     }
 
     /*
-     * Create Chart.js bar chart.
+     * Create Chart.js chart.
      */
 
     charts[chartKey] =
@@ -1292,11 +1366,8 @@ function createResolutionChart(
                 options: {
                     responsive: true,
 
-                    /*
-                     * The CSS .chart-wrapper provides
-                     * the chart height.
-                     */
-                    maintainAspectRatio: false,
+                    maintainAspectRatio:
+                        false,
 
                     animation: {
                         duration: 500
@@ -1319,11 +1390,13 @@ function createResolutionChart(
                                     function (
                                         context
                                     ) {
+                                        const value =
+                                            context.parsed.y;
+
                                         return (
                                             " " +
-                                            context.parsed.y.toFixed(
-                                                2
-                                            ) +
+                                            Number(value)
+                                                .toFixed(2) +
                                             " hrs"
                                         );
                                     }
@@ -1359,7 +1432,7 @@ function createResolutionChart(
 
 
 /* =========================================================
-   RENDER PRIORITY CHART
+   PRIORITY CHART
 ========================================================= */
 
 function renderPriorityChart(data) {
@@ -1387,10 +1460,8 @@ function renderPriorityChart(data) {
             "Unknown";
 
         const value =
-            validResolutionValue(
-                row.average_resolution_hours ??
-                row.averageResolutionHours ??
-                row["Average Resolution Hours"]
+            getResolutionValue(
+                row
             );
 
         if (
@@ -1421,7 +1492,7 @@ function renderPriorityChart(data) {
 
 
 /* =========================================================
-   RENDER TICKET TYPE CHART
+   TICKET TYPE CHART
 ========================================================= */
 
 function renderTypeChart(data) {
@@ -1450,10 +1521,8 @@ function renderTypeChart(data) {
             "Unknown";
 
         const value =
-            validResolutionValue(
-                row.average_resolution_hours ??
-                row.averageResolutionHours ??
-                row["Average Resolution Hours"]
+            getResolutionValue(
+                row
             );
 
         if (
@@ -1484,7 +1553,7 @@ function renderTypeChart(data) {
 
 
 /* =========================================================
-   RENDER CHANNEL CHART
+   CHANNEL CHART
 ========================================================= */
 
 function renderChannelChart(data) {
@@ -1513,10 +1582,8 @@ function renderChannelChart(data) {
             "Unknown";
 
         const value =
-            validResolutionValue(
-                row.average_resolution_hours ??
-                row.averageResolutionHours ??
-                row["Average Resolution Hours"]
+            getResolutionValue(
+                row
             );
 
         if (
@@ -1547,31 +1614,31 @@ function renderChannelChart(data) {
 
 
 /* =========================================================
-   RENDER ALL RESOLUTION CHARTS
+   RENDER ALL THREE RESOLUTION CHARTS
 ========================================================= */
 
-function renderResolutionCharts(data) {
+function renderResolutionCharts(
+    resolutionData
+) {
     console.log(
-        "Rendering resolution charts:",
-        data
+        "Resolution analytics loaded:",
+        resolutionData
     );
 
     /*
-     * Render each chart independently.
-     *
-     * If one file fails, the other two can still render.
+     * Each chart is rendered independently.
      */
 
     renderPriorityChart(
-        data.priority
+        resolutionData.priority
     );
 
     renderTypeChart(
-        data.type
+        resolutionData.type
     );
 
     renderChannelChart(
-        data.channel
+        resolutionData.channel
     );
 }
 
@@ -1606,7 +1673,7 @@ function showChartError(
 async function initializeDashboard() {
     try {
         /*
-         * Load dashboard data.
+         * Load dashboard information.
          */
 
         const [
@@ -1621,8 +1688,9 @@ async function initializeDashboard() {
             loadResolutionData()
         ]);
 
+
         /*
-         * Render normal dashboard.
+         * Render dashboard.
          */
 
         renderMetrics(
@@ -1637,17 +1705,19 @@ async function initializeDashboard() {
             satisfaction
         );
 
+
         /*
-         * Render all three resolution charts.
+         * Render resolution charts.
          */
 
         renderResolutionCharts(
             resolution
         );
 
+
         /*
-         * Load ticket-level data for
-         * interactive filters.
+         * Load ticket data for
+         * interactive filtering.
          */
 
         await loadTicketData();
