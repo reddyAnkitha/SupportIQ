@@ -142,8 +142,9 @@ Exported Analytics
 Interactive Dashboard
           ↓
 GitHub Pages
-Customer segment results are connected to ticket records using:
 
+
+Customer segment results are connected to ticket records using:
 ticket_segment_mapping.json
 🛠️ Technology Stack
 Machine Learning
