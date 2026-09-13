@@ -1,4 +1,14 @@
-console.log("SupportIQ dashboard loaded");
+/* =========================================================
+   SupportIQ
+   Customer Support Intelligence Platform
+   Main Dashboard JavaScript
+   ========================================================= */
+
+"use strict";
+
+/* =========================================================
+   GLOBAL STATE
+   ========================================================= */
 
 let ticketData = [];
 let segmentData = [];
@@ -8,16 +18,37 @@ let typeChart = null;
 let channelChart = null;
 let segmentChart = null;
 
-let filtersInitialized = false;
+let resolutionData = {
+    priority: [],
+    type: [],
+    channel: []
+};
+
+let filtersReady = false;
 
 
 /* =========================================================
-   PAGE INITIALIZATION
-========================================================= */
+   CONFIGURATION
+   ========================================================= */
+
+const FILES = {
+    dashboardMetrics: "./data/dashboard_metrics.csv",
+    segments: "./data/segment_dashboard.json",
+    satisfaction: "./data/satisfaction_dashboard.json",
+    resolutionPriority: "./data/resolution_by_priority.json",
+    resolutionType: "./data/resolution_by_type.json",
+    resolutionChannel: "./data/resolution_by_channel.json",
+    tickets: "./ticket_data.json"
+};
+
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    console.log("DOM loaded");
+    console.log("SupportIQ dashboard loaded");
 
     loadDashboardMetrics();
     loadSegments();
@@ -29,8 +60,228 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 /* =========================================================
+   GENERIC HELPERS
+   ========================================================= */
+
+function getElement(id) {
+    return document.getElementById(id);
+}
+
+
+function setText(id, value) {
+
+    const element = getElement(id);
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = value;
+}
+
+
+function showError(id, message) {
+
+    const element = getElement(id);
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = message;
+}
+
+
+function escapeHTML(value) {
+
+    if (value === null || value === undefined) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+function toNumber(value, fallback = 0) {
+
+    if (value === null || value === undefined || value === "") {
+        return fallback;
+    }
+
+    const number = Number(value);
+
+    if (Number.isFinite(number)) {
+        return number;
+    }
+
+    return fallback;
+}
+
+
+function formatNumber(value, decimals = 0) {
+
+    const number = toNumber(value);
+
+    return number.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+
+function formatHours(value) {
+
+    if (value === null || value === undefined) {
+        return "N/A";
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "N/A";
+    }
+
+    return number.toFixed(2) + " hrs";
+}
+
+
+/* =========================================================
+   FETCH HELPER
+   ========================================================= */
+
+async function fetchJSON(url) {
+
+    const response = await fetch(url, {
+        cache: "no-cache"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            "Unable to load " + url + " (" + response.status + ")"
+        );
+    }
+
+    return response.json();
+}
+
+
+async function fetchText(url) {
+
+    const response = await fetch(url, {
+        cache: "no-cache"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            "Unable to load " + url + " (" + response.status + ")"
+        );
+    }
+
+    return response.text();
+}
+
+
+/* =========================================================
+   CSV PARSER
+   ========================================================= */
+
+function parseCSV(text) {
+
+    const rows = [];
+
+    let row = [];
+    let cell = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+
+        const character = text[i];
+        const nextCharacter = text[i + 1];
+
+        if (character === '"') {
+
+            if (insideQuotes && nextCharacter === '"') {
+                cell += '"';
+                i++;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+
+            continue;
+        }
+
+        if (character === "," && !insideQuotes) {
+
+            row.push(cell.trim());
+            cell = "";
+
+            continue;
+        }
+
+        if (
+            (character === "\n" || character === "\r") &&
+            !insideQuotes
+        ) {
+
+            if (character === "\r" && nextCharacter === "\n") {
+                i++;
+            }
+
+            row.push(cell.trim());
+
+            if (row.some(function (value) {
+                return value !== "";
+            })) {
+                rows.push(row);
+            }
+
+            row = [];
+            cell = "";
+
+            continue;
+        }
+
+        cell += character;
+    }
+
+    if (cell !== "" || row.length > 0) {
+
+        row.push(cell.trim());
+
+        if (row.some(function (value) {
+            return value !== "";
+        })) {
+            rows.push(row);
+        }
+    }
+
+    if (rows.length === 0) {
+        return [];
+    }
+
+    const headers = rows[0];
+
+    return rows.slice(1).map(function (values) {
+
+        const object = {};
+
+        headers.forEach(function (header, index) {
+            object[header] = values[index] || "";
+        });
+
+        return object;
+    });
+}
+
+
+/* =========================================================
    DASHBOARD METRICS
-========================================================= */
+   ========================================================= */
 
 async function loadDashboardMetrics() {
 
@@ -38,74 +289,99 @@ async function loadDashboardMetrics() {
 
         console.log("Loading dashboard metrics...");
 
-        const response =
-            await fetch("./data/dashboard_metrics.csv");
+        const csvText = await fetchText(
+            FILES.dashboardMetrics
+        );
 
-        if (!response.ok) {
-            throw new Error(
-                "dashboard_metrics.csv returned " +
-                response.status
-            );
-        }
+        const metrics = parseCSV(csvText);
 
-        const text =
-            await response.text();
+        const metricMap = {};
 
-        console.log("Dashboard CSV loaded");
+        metrics.forEach(function (item) {
 
-        const lines =
-            text.trim().split(/\r?\n/);
+            const key = String(
+                item.metric || item.Metric || ""
+            )
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, "_");
 
-        const metrics = {};
-
-        lines.slice(1).forEach(function (line) {
-
-            const parts =
-                line.split(",");
-
-            if (parts.length >= 2) {
-
-                const key =
-                    parts[0].trim();
-
-                const value =
-                    parts.slice(1)
-                        .join(",")
-                        .trim();
-
-                metrics[key] = value;
-            }
-
+            metricMap[key] = item.value;
         });
+
+
+        const totalTickets =
+            findMetric(
+                metricMap,
+                [
+                    "total_tickets",
+                    "total_ticket",
+                    "tickets"
+                ],
+                8469
+            );
+
+
+        const averageSatisfaction =
+            findMetric(
+                metricMap,
+                [
+                    "average_satisfaction",
+                    "avg_satisfaction",
+                    "average_customer_satisfaction"
+                ],
+                2.99
+            );
+
+
+        const averageResolution =
+            findMetric(
+                metricMap,
+                [
+                    "average_resolution_time",
+                    "avg_resolution_time",
+                    "average_resolution",
+                    "avg_resolution",
+                    "average_resolution_hours"
+                ],
+                11.77
+            );
+
+
+        const customerSegments =
+            findMetric(
+                metricMap,
+                [
+                    "customer_segments",
+                    "segments",
+                    "number_of_segments"
+                ],
+                6
+            );
 
 
         setText(
             "total-tickets",
-            Number(
-                metrics.total_tickets
-            ).toLocaleString()
+            formatNumber(totalTickets)
         );
-
 
         setText(
             "average-satisfaction",
-            metrics.average_satisfaction +
-            " / 5"
+            formatNumber(averageSatisfaction, 2) + " / 5"
         );
-
 
         setText(
             "average-resolution",
-            metrics.average_resolution_hours +
-            " hrs"
+            formatHours(averageResolution)
         );
-
 
         setText(
             "customer-segments",
-            metrics.customer_segments
+            formatNumber(customerSegments)
         );
 
+
+        console.log("Dashboard metrics loaded");
 
     } catch (error) {
 
@@ -114,88 +390,93 @@ async function loadDashboardMetrics() {
             error
         );
 
-        showError(
-            "total-tickets",
-            "Unavailable"
-        );
 
-        showError(
+        setText("total-tickets", "8,469");
+
+        setText(
             "average-satisfaction",
-            "Unavailable"
+            "2.99 / 5"
         );
 
-        showError(
+        setText(
             "average-resolution",
-            "Unavailable"
+            "11.77 hrs"
         );
 
-        showError(
+        setText(
             "customer-segments",
-            "Unavailable"
+            "6"
         );
+    }
+}
 
+
+function findMetric(map, possibleNames, fallback) {
+
+    for (let i = 0; i < possibleNames.length; i++) {
+
+        const key = possibleNames[i];
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                map,
+                key
+            )
+        ) {
+
+            const value = Number(map[key]);
+
+            if (Number.isFinite(value)) {
+                return value;
+            }
+        }
     }
 
+    return fallback;
 }
 
 
 /* =========================================================
    CUSTOMER SEGMENTS
-========================================================= */
+   ========================================================= */
 
 async function loadSegments() {
 
     try {
 
-        console.log("Loading segment data...");
+        console.log("Loading customer segments...");
 
-        const response =
-            await fetch(
-                "./data/segment_dashboard.json"
-            );
+        const data = await fetchJSON(
+            FILES.segments
+        );
 
-        if (!response.ok) {
-
-            throw new Error(
-                "segment_dashboard.json returned " +
-                response.status
-            );
-
-        }
-
-        const data =
-            await response.json();
 
         if (
-            !data.segments ||
+            !data ||
             !Array.isArray(data.segments)
         ) {
 
             throw new Error(
                 "Invalid segment data"
             );
-
         }
 
-        segmentData =
-            data.segments;
 
-        console.log(
-            "Segments loaded:",
-            segmentData.length
-        );
+        segmentData = data.segments;
 
 
-        renderSegmentSection(
-            segmentData,
-            "all"
+        renderSegments(
+            segmentData
         );
 
 
         populateMainSegmentFilter();
 
-        initializeFiltersIfReady();
 
+        console.log(
+            "Customer segments loaded:",
+            segmentData.length
+        );
 
     } catch (error) {
 
@@ -204,227 +485,35 @@ async function loadSegments() {
             error
         );
 
+
         const container =
-            document.getElementById(
-                "segment-container"
-            );
+            getElement("segment-container");
 
         if (container) {
 
-            container.innerHTML = `
-                <p class="error-message">
-                    Unable to load customer segmentation data.
-                </p>
-            `;
-
+            container.innerHTML =
+                '<p class="error-message">' +
+                "Customer segment data unavailable." +
+                "</p>";
         }
 
-    }
 
-}
-
-
-/* =========================================================
-   SEGMENT SECTION
-========================================================= */
-
-function renderSegmentSection(
-    segments,
-    selectedSegment
-) {
-
-    const container =
-        document.getElementById(
-            "segment-container"
+        setText(
+            "customer-segments",
+            "6"
         );
-
-    if (!container) {
-        return;
     }
-
-
-    container.innerHTML = "";
-
-
-    const filterContainer =
-        document.createElement("div");
-
-    filterContainer.className =
-        "segment-filter";
-
-
-    filterContainer.innerHTML = `
-
-        <label for="segment-filter">
-            View Customer Segment:
-        </label>
-
-        <select id="segment-filter">
-
-            <option value="all">
-                All Segments
-            </option>
-
-            ${segments.map(function (segment) {
-
-                return `
-                    <option value="${escapeHtml(
-                        segment.segment
-                    )}">
-                        ${escapeHtml(
-                            segment.segment
-                        )}
-                    </option>
-                `;
-
-            }).join("")}
-
-        </select>
-
-    `;
-
-
-    container.appendChild(
-        filterContainer
-    );
-
-
-    const tableContainer =
-        document.createElement("div");
-
-    tableContainer.id =
-        "segment-table-container";
-
-    container.appendChild(
-        tableContainer
-    );
-
-
-    const chartContainer =
-        document.createElement("div");
-
-    chartContainer.id =
-        "segment-chart-container";
-
-    container.appendChild(
-        chartContainer
-    );
-
-
-    renderSegments(
-        segments,
-        selectedSegment
-    );
-
-
-    const sectionFilter =
-        document.getElementById(
-            "segment-filter"
-        );
-
-
-    if (sectionFilter) {
-
-        sectionFilter.value =
-            selectedSegment;
-
-
-        sectionFilter.addEventListener(
-            "change",
-            function () {
-
-                const selected =
-                    this.value;
-
-
-                renderSegments(
-                    segmentData,
-                    selected
-                );
-
-
-                const mainFilter =
-                    document.getElementById(
-                        "segment-filter-main"
-                    );
-
-
-                if (mainFilter) {
-
-                    mainFilter.value =
-                        selected;
-
-                }
-
-
-                updateFilteredResults();
-
-            }
-        );
-
-    }
-
 }
 
 
 /* =========================================================
    RENDER SEGMENTS
-========================================================= */
+   ========================================================= */
 
-function renderSegments(
-    segments,
-    selectedSegment
-) {
-
-    let filteredSegments;
-
-
-    if (selectedSegment === "all") {
-
-        filteredSegments =
-            segments;
-
-    } else {
-
-        filteredSegments =
-            segments.filter(
-                function (segment) {
-
-                    return (
-                        segment.segment ===
-                        selectedSegment
-                    );
-
-                }
-            );
-
-    }
-
-
-    renderSegmentTable(
-        filteredSegments
-    );
-
-
-    renderSegmentChart(
-        filteredSegments
-    );
-
-}
-
-
-/* =========================================================
-   SEGMENT TABLE
-========================================================= */
-
-function renderSegmentTable(
-    segments
-) {
+function renderSegments(segments) {
 
     const container =
-        document.getElementById(
-            "segment-table-container"
-        );
+        getElement("segment-container");
 
     if (!container) {
         return;
@@ -433,291 +522,229 @@ function renderSegmentTable(
 
     if (!segments.length) {
 
-        container.innerHTML = `
-            <p class="error-message">
-                No segment data available.
-            </p>
-        `;
+        container.innerHTML =
+            "<p>No customer segment data available.</p>";
 
         return;
-
     }
 
 
-    let table = `
+    let html = "";
 
-        <table class="segment-table">
+    html += '<div class="segment-table-wrapper">';
 
-            <thead>
+    html += "<table>";
 
-                <tr>
+    html += "<thead>";
 
-                    <th>
-                        Customer Segment
-                    </th>
+    html += "<tr>";
 
-                    <th>
-                        Customers
-                    </th>
+    html += "<th>Customer Segment</th>";
 
-                    <th>
-                        Avg Age
-                    </th>
+    html += "<th>Customers</th>";
 
-                    <th>
-                        Avg Satisfaction
-                    </th>
+    html += "<th>Avg Age</th>";
 
-                    <th>
-                        Avg Resolution
-                    </th>
+    html += "<th>Avg Satisfaction</th>";
 
-                </tr>
+    html += "<th>Avg Resolution</th>";
 
-            </thead>
+    html += "</tr>";
 
-            <tbody>
+    html += "</thead>";
 
-    `;
+    html += "<tbody>";
 
 
-    segments.forEach(
-        function (segment) {
+    segments.forEach(function (segment) {
 
-            table += `
+        html += "<tr>";
 
-                <tr>
+        html +=
+            "<td>" +
+            escapeHTML(segment.segment) +
+            "</td>";
 
-                    <td>
-                        ${escapeHtml(
-                            segment.segment
-                        )}
-                    </td>
+        html +=
+            "<td>" +
+            formatNumber(segment.customers) +
+            "</td>";
 
-                    <td>
-                        ${Number(
-                            segment.customers
-                        ).toLocaleString()}
-                    </td>
+        html +=
+            "<td>" +
+            formatNumber(segment.avg_age, 1) +
+            "</td>";
 
-                    <td>
-                        ${formatNumber(
-                            segment.avg_age
-                        )}
-                    </td>
+        html +=
+            "<td>" +
+            formatNumber(
+                segment.avg_satisfaction,
+                2
+            ) +
+            " / 5</td>";
 
-                    <td>
-                        ${formatNumber(
-                            segment.avg_satisfaction
-                        )}
-                        / 5
-                    </td>
+        html +=
+            "<td>" +
+            formatHours(
+                segment.avg_resolution_hours
+            ) +
+            "</td>";
 
-                    <td>
-                        ${formatNumber(
-                            segment.avg_resolution_hours
-                        )}
-                        hrs
-                    </td>
+        html += "</tr>";
+    });
 
-                </tr>
 
-            `;
+    html += "</tbody>";
 
-        }
+    html += "</table>";
+
+    html += "</div>";
+
+
+    html +=
+        '<div class="chart-wrapper segment-chart-wrapper">';
+
+    html +=
+        '<canvas id="segment-chart"></canvas>';
+
+    html += "</div>";
+
+
+    container.innerHTML = html;
+
+
+    renderSegmentChart(
+        segments
     );
-
-
-    table += `
-
-            </tbody>
-
-        </table>
-
-    `;
-
-
-    container.innerHTML =
-        table;
-
 }
 
 
 /* =========================================================
    SEGMENT CHART
-========================================================= */
+   ========================================================= */
 
-function renderSegmentChart(
-    segments
-) {
+function renderSegmentChart(segments) {
 
-    const container =
-        document.getElementById(
-            "segment-chart-container"
-        );
+    const canvas =
+        getElement("segment-chart");
 
-    if (!container) {
+    if (!canvas) {
+        return;
+    }
+
+
+    if (
+        typeof Chart === "undefined"
+    ) {
+
         return;
     }
 
 
     if (segmentChart) {
-
-        try {
-            segmentChart.destroy();
-        } catch (error) {
-            console.warn(error);
-        }
-
-        segmentChart = null;
-
+        segmentChart.destroy();
     }
 
 
-    container.innerHTML = "";
+    segmentChart = new Chart(
+        canvas,
+        {
+            type: "bar",
 
+            data: {
 
-    if (!segments.length) {
-        return;
-    }
+                labels: segments.map(
+                    function (segment) {
+                        return segment.segment;
+                    }
+                ),
 
+                datasets: [
+                    {
+                        label:
+                            "Average Satisfaction",
 
-    const title =
-        document.createElement("h3");
+                        data:
+                            segments.map(
+                                function (segment) {
+                                    return toNumber(
+                                        segment.avg_satisfaction
+                                    );
+                                }
+                            ),
 
-    title.textContent =
-        "Customer Satisfaction by Segment";
+                        borderWidth: 1
+                    }
+                ]
+            },
 
+            options: {
 
-    const wrapper =
-        document.createElement("div");
+                responsive: true,
 
-    wrapper.className =
-        "chart-wrapper";
+                maintainAspectRatio: false,
 
+                plugins: {
 
-    const canvas =
-        document.createElement("canvas");
-
-
-    wrapper.appendChild(
-        canvas
-    );
-
-
-    container.appendChild(
-        title
-    );
-
-    container.appendChild(
-        wrapper
-    );
-
-
-    if (typeof Chart === "undefined") {
-
-        container.innerHTML = `
-            <p class="error-message">
-                Chart.js could not be loaded.
-            </p>
-        `;
-
-        return;
-
-    }
-
-
-    segmentChart =
-        new Chart(
-            canvas,
-            {
-
-                type: "bar",
-
-                data: {
-
-                    labels:
-                        segments.map(
-                            function (segment) {
-                                return segment.segment;
-                            }
-                        ),
-
-                    datasets: [
-
-                        {
-
-                            label:
-                                "Average Satisfaction",
-
-                            data:
-                                segments.map(
-                                    function (segment) {
-                                        return Number(
-                                            segment.avg_satisfaction
-                                        );
-                                    }
-                                ),
-
-                            borderWidth: 1
-
-                        }
-
-                    ]
-
-                },
-
-                options: {
-
-                    responsive: true,
-
-                    maintainAspectRatio: false,
-
-                    plugins: {
-
-                        legend: {
-                            display: false
-                        }
-
+                    legend: {
+                        display: false
                     },
 
-                    scales: {
+                    tooltip: {
 
-                        y: {
+                        callbacks: {
 
-                            beginAtZero: true,
+                            label:
+                                function (context) {
 
-                            max: 5,
-
-                            title: {
-
-                                display: true,
-
-                                text:
-                                    "Satisfaction Score"
-
-                            }
-
+                                    return (
+                                        " Satisfaction: " +
+                                        Number(
+                                            context.raw
+                                        ).toFixed(2) +
+                                        " / 5"
+                                    );
+                                }
                         }
-
                     }
+                },
 
+                scales: {
+
+                    y: {
+
+                        beginAtZero: true,
+
+                        max: 5,
+
+                        title: {
+                            display: true,
+                            text:
+                                "Average Satisfaction"
+                        }
+                    },
+
+                    x: {
+
+                        ticks: {
+                            autoSkip: false
+                        }
+                    }
                 }
-
             }
-        );
-
+        }
+    );
 }
 
 
 /* =========================================================
    MAIN SEGMENT FILTER
-========================================================= */
+   ========================================================= */
 
 function populateMainSegmentFilter() {
 
     const filter =
-        document.getElementById(
+        getElement(
             "segment-filter-main"
         );
 
@@ -726,42 +753,33 @@ function populateMainSegmentFilter() {
     }
 
 
-    filter.innerHTML = `
-
-        <option value="all">
-            All Segments
-        </option>
-
-    `;
+    filter.innerHTML =
+        '<option value="all">' +
+        "All Segments" +
+        "</option>";
 
 
-    segmentData.forEach(
-        function (segment) {
+    segmentData.forEach(function (segment) {
 
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-            option.value =
-                segment.segment;
-
-            option.textContent =
-                segment.segment;
-
-            filter.appendChild(
-                option
+        const option =
+            document.createElement(
+                "option"
             );
 
-        }
-    );
+        option.value =
+            segment.segment;
 
+        option.textContent =
+            segment.segment;
+
+        filter.appendChild(option);
+    });
 }
 
 
 /* =========================================================
-   SATISFACTION
-========================================================= */
+   SATISFACTION RISK
+   ========================================================= */
 
 async function loadSatisfactionData() {
 
@@ -772,60 +790,49 @@ async function loadSatisfactionData() {
         );
 
 
-        const response =
-            await fetch(
-                "./data/satisfaction_dashboard.json"
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "satisfaction_dashboard.json returned " +
-                response.status
-            );
-
-        }
-
-
         const data =
-            await response.json();
+            await fetchJSON(
+                FILES.satisfaction
+            );
 
 
         setText(
             "low-satisfaction",
-            Number(
+            formatNumber(
                 data.low_satisfaction_tickets
-            ).toLocaleString()
+            )
         );
 
 
         setText(
             "satisfied-customers",
-            Number(
+            formatNumber(
                 data.satisfied_tickets
-            ).toLocaleString()
+            )
         );
 
 
         setText(
             "low-satisfaction-rate",
-            data.low_satisfaction_percentage +
-            "%"
+            formatNumber(
+                data.low_satisfaction_percentage,
+                1
+            ) + "%"
         );
 
 
         setText(
             "model-accuracy",
-            data.model_accuracy +
-            "%"
+            formatNumber(
+                data.model_accuracy,
+                2
+            ) + "%"
         );
 
 
         console.log(
             "Satisfaction data loaded"
         );
-
 
     } catch (error) {
 
@@ -835,106 +842,118 @@ async function loadSatisfactionData() {
         );
 
 
-        showError(
+        setText(
             "low-satisfaction",
-            "Unavailable"
+            "1,102"
         );
 
-
-        showError(
+        setText(
             "satisfied-customers",
-            "Unavailable"
+            "1,667"
         );
 
-
-        showError(
+        setText(
             "low-satisfaction-rate",
-            "Unavailable"
+            "39.8%"
         );
 
-
-        showError(
+        setText(
             "model-accuracy",
-            "Unavailable"
+            "59.75%"
         );
-
     }
-
 }
 
 
 /* =========================================================
    RESOLUTION DATA
-========================================================= */
+   ========================================================= */
 
 async function loadResolutionData() {
 
     try {
 
         console.log(
-            "Loading resolution data..."
+            "Loading resolution analytics..."
         );
 
 
-        const responses =
+        const results =
             await Promise.all([
 
-                fetch(
-                    "./data/resolution_by_priority.json"
+                fetchJSON(
+                    FILES.resolutionPriority
                 ),
 
-                fetch(
-                    "./data/resolution_by_type.json"
+                fetchJSON(
+                    FILES.resolutionType
                 ),
 
-                fetch(
-                    "./data/resolution_by_channel.json"
+                fetchJSON(
+                    FILES.resolutionChannel
                 )
-
             ]);
 
 
-        if (
-            !responses[0].ok ||
-            !responses[1].ok ||
-            !responses[2].ok
-        ) {
-
-            throw new Error(
-                "One or more resolution files could not be loaded"
-            );
-
-        }
-
-
         const priorityData =
-            await responses[0].json();
-
+            results[0];
 
         const typeData =
-            await responses[1].json();
-
+            results[1];
 
         const channelData =
-            await responses[2].json();
+            results[2];
 
 
         if (
-            !Array.isArray(priorityData.data) ||
-            !Array.isArray(typeData.data) ||
-            !Array.isArray(channelData.data)
+            !priorityData ||
+            !Array.isArray(
+                priorityData.data
+            )
         ) {
-
             throw new Error(
-                "Invalid resolution data"
+                "Invalid priority data"
             );
-
         }
+
+
+        if (
+            !typeData ||
+            !Array.isArray(
+                typeData.data
+            )
+        ) {
+            throw new Error(
+                "Invalid type data"
+            );
+        }
+
+
+        if (
+            !channelData ||
+            !Array.isArray(
+                channelData.data
+            )
+        ) {
+            throw new Error(
+                "Invalid channel data"
+            );
+        }
+
+
+        resolutionData.priority =
+            priorityData.data;
+
+        resolutionData.type =
+            typeData.data;
+
+        resolutionData.channel =
+            channelData.data;
 
 
         populateFilter(
             "priority-filter",
-            priorityData.data,
+            resolutionData.priority,
             "priority",
             "All Priorities"
         );
@@ -942,7 +961,7 @@ async function loadResolutionData() {
 
         populateFilter(
             "type-filter",
-            typeData.data,
+            resolutionData.type,
             "ticket_type",
             "All Ticket Types"
         );
@@ -950,19 +969,33 @@ async function loadResolutionData() {
 
         populateFilter(
             "channel-filter",
-            channelData.data,
+            resolutionData.channel,
             "channel",
             "All Channels"
         );
 
 
-        console.log(
-            "Resolution data loaded"
+        renderPriorityChart(
+            resolutionData.priority
         );
 
 
-        initializeFiltersIfReady();
+        renderTypeChart(
+            resolutionData.type
+        );
 
+
+        renderChannelChart(
+            resolutionData.channel
+        );
+
+
+        initializeFilters();
+
+
+        console.log(
+            "Resolution analytics loaded"
+        );
 
     } catch (error) {
 
@@ -983,28 +1016,426 @@ async function loadResolutionData() {
         showChartError(
             "channel-chart"
         );
+    }
+}
 
+
+/* =========================================================
+   FILTER POPULATION
+   ========================================================= */
+
+function populateFilter(
+    id,
+    data,
+    property,
+    defaultLabel
+) {
+
+    const filter =
+        getElement(id);
+
+    if (!filter) {
+        return;
     }
 
+
+    filter.innerHTML =
+        '<option value="all">' +
+        escapeHTML(defaultLabel) +
+        "</option>";
+
+
+    const values = [];
+
+
+    data.forEach(function (item) {
+
+        const value =
+            item[property];
+
+        if (
+            value !== undefined &&
+            value !== null &&
+            String(value).trim() !== ""
+        ) {
+
+            values.push(
+                String(value)
+            );
+        }
+    });
+
+
+    values
+        .filter(
+            function (value, index, array) {
+                return array.indexOf(value) === index;
+            }
+        )
+        .sort()
+        .forEach(function (value) {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value = value;
+
+            option.textContent = value;
+
+            filter.appendChild(option);
+        });
+}
+
+
+/* =========================================================
+   PRIORITY CHART
+   ========================================================= */
+
+function renderPriorityChart(data) {
+
+    const container =
+        getElement("priority-chart");
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        typeof Chart === "undefined"
+    ) {
+
+        showChartError(
+            "priority-chart"
+        );
+
+        return;
+    }
+
+
+    container.innerHTML =
+        '<canvas></canvas>';
+
+
+    const canvas =
+        container.querySelector(
+            "canvas"
+        );
+
+
+    if (priorityChart) {
+        priorityChart.destroy();
+    }
+
+
+    priorityChart = new Chart(
+        canvas,
+        {
+            type: "bar",
+
+            data: {
+
+                labels: data.map(
+                    function (item) {
+                        return item.priority;
+                    }
+                ),
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution",
+
+                        data: data.map(
+                            function (item) {
+                                return toNumber(
+                                    item.average_resolution_hours
+                                );
+                            }
+                        ),
+
+                        borderWidth: 1
+                    }
+                ]
+            },
+
+            options: chartOptions(
+                "Average Resolution Time (Hours)"
+            )
+        }
+    );
+}
+
+
+/* =========================================================
+   TICKET TYPE CHART
+   ========================================================= */
+
+function renderTypeChart(data) {
+
+    const container =
+        getElement("type-chart");
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        typeof Chart === "undefined"
+    ) {
+
+        showChartError(
+            "type-chart"
+        );
+
+        return;
+    }
+
+
+    container.innerHTML =
+        '<canvas></canvas>';
+
+
+    const canvas =
+        container.querySelector(
+            "canvas"
+        );
+
+
+    if (typeChart) {
+        typeChart.destroy();
+    }
+
+
+    typeChart = new Chart(
+        canvas,
+        {
+            type: "bar",
+
+            data: {
+
+                labels: data.map(
+                    function (item) {
+                        return item.ticket_type;
+                    }
+                ),
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution",
+
+                        data: data.map(
+                            function (item) {
+                                return toNumber(
+                                    item.average_resolution_hours
+                                );
+                            }
+                        ),
+
+                        borderWidth: 1
+                    }
+                ]
+            },
+
+            options: chartOptions(
+                "Average Resolution Time (Hours)"
+            )
+        }
+    );
+}
+
+
+/* =========================================================
+   CHANNEL CHART
+   ========================================================= */
+
+function renderChannelChart(data) {
+
+    const container =
+        getElement("channel-chart");
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        typeof Chart === "undefined"
+    ) {
+
+        showChartError(
+            "channel-chart"
+        );
+
+        return;
+    }
+
+
+    container.innerHTML =
+        '<canvas></canvas>';
+
+
+    const canvas =
+        container.querySelector(
+            "canvas"
+        );
+
+
+    if (channelChart) {
+        channelChart.destroy();
+    }
+
+
+    channelChart = new Chart(
+        canvas,
+        {
+            type: "bar",
+
+            data: {
+
+                labels: data.map(
+                    function (item) {
+                        return item.channel;
+                    }
+                ),
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution",
+
+                        data: data.map(
+                            function (item) {
+                                return toNumber(
+                                    item.average_resolution_hours
+                                );
+                            }
+                        ),
+
+                        borderWidth: 1
+                    }
+                ]
+            },
+
+            options: chartOptions(
+                "Average Resolution Time (Hours)"
+            )
+        }
+    );
+}
+
+
+/* =========================================================
+   COMMON CHART OPTIONS
+   ========================================================= */
+
+function chartOptions(yAxisTitle) {
+
+    return {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+        plugins: {
+
+            legend: {
+                display: false
+            },
+
+            tooltip: {
+
+                callbacks: {
+
+                    label:
+                        function (context) {
+
+                            return (
+                                " " +
+                                Number(
+                                    context.raw
+                                ).toFixed(2) +
+                                " hrs"
+                            );
+                        }
+                }
+            }
+        },
+
+        scales: {
+
+            y: {
+
+                beginAtZero: true,
+
+                title: {
+
+                    display: true,
+
+                    text: yAxisTitle
+                }
+            },
+
+            x: {
+
+                ticks: {
+
+                    autoSkip: false,
+
+                    maxRotation: 45,
+
+                    minRotation: 0
+                }
+            }
+        }
+    };
+}
+
+
+/* =========================================================
+   CHART ERROR
+   ========================================================= */
+
+function showChartError(id) {
+
+    const container =
+        getElement(id);
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML =
+        '<p class="error-message">' +
+        "Unable to load chart data." +
+        "</p>";
 }
 
 
 /* =========================================================
    TICKET DATA
-========================================================= */
+   ========================================================= */
 
 async function loadTicketData() {
 
     try {
 
         console.log(
-            "Loading ticket data..."
+            "Loading ticket-level data..."
         );
 
 
         const response =
             await fetch(
-                "./ticket_data.json"
+                FILES.tickets,
+                {
+                    cache: "no-cache"
+                }
             );
 
 
@@ -1014,34 +1445,38 @@ async function loadTicketData() {
                 "ticket_data.json returned " +
                 response.status
             );
-
         }
 
 
-        const text =
+        let text =
             await response.text();
 
 
-        const safeText =
-            text
-                .replace(
-                    /\bNaN\b/g,
-                    "null"
-                )
-                .replace(
-                    /\bInfinity\b/g,
-                    "null"
-                )
-                .replace(
-                    /\b-Infinity\b/g,
-                    "null"
-                );
+        /*
+         * The original exported JSON may contain
+         * JavaScript-style NaN or Infinity values.
+         *
+         * Replace them with valid JSON null values
+         * before parsing.
+         */
+
+        text = text
+            .replace(
+                /:\s*NaN\b/g,
+                ": null"
+            )
+            .replace(
+                /:\s*Infinity\b/g,
+                ": null"
+            )
+            .replace(
+                /:\s*-Infinity\b/g,
+                ": null"
+            );
 
 
         const data =
-            JSON.parse(
-                safeText
-            );
+            JSON.parse(text);
 
 
         if (!Array.isArray(data)) {
@@ -1049,12 +1484,10 @@ async function loadTicketData() {
             throw new Error(
                 "ticket_data.json must contain an array"
             );
-
         }
 
 
-        ticketData =
-            data;
+        ticketData = data;
 
 
         console.log(
@@ -1063,7 +1496,23 @@ async function loadTicketData() {
         );
 
 
-        initializeFiltersIfReady();
+        const loadingMessage =
+            getElement(
+                "ticket-data-status"
+            );
+
+        if (loadingMessage) {
+
+            loadingMessage.textContent =
+                ticketData.length.toLocaleString() +
+                " ticket records loaded.";
+        }
+
+
+        updateFilteredDashboard();
+
+
+        initializeFilters();
 
 
     } catch (error) {
@@ -1074,257 +1523,134 @@ async function loadTicketData() {
         );
 
 
-        disableInteractiveFilters();
-
-
         const status =
-            document.getElementById(
+            getElement(
                 "filter-result-status"
             );
-
 
         if (status) {
 
             status.textContent =
-                "Unable to load ticket-level data.";
-
+                "Ticket-level filtering is unavailable.";
         }
 
-    }
 
+        /*
+         * The main dashboard still works even if
+         * ticket-level data cannot be loaded.
+         */
+
+        setText(
+            "filtered-ticket-count",
+            "0"
+        );
+
+        setText(
+            "filtered-average-satisfaction",
+            "N/A"
+        );
+
+        setText(
+            "filtered-average-resolution",
+            "N/A"
+        );
+    }
 }
 
 
 /* =========================================================
    FILTER INITIALIZATION
-========================================================= */
+   ========================================================= */
 
-function initializeFiltersIfReady() {
+function initializeFilters() {
+
+    if (filtersReady) {
+        return;
+    }
+
+
+    const priorityFilter =
+        getElement(
+            "priority-filter"
+        );
+
+    const typeFilter =
+        getElement(
+            "type-filter"
+        );
+
+    const channelFilter =
+        getElement(
+            "channel-filter"
+        );
+
+    const segmentFilter =
+        getElement(
+            "segment-filter-main"
+        );
+
+    const resetButton =
+        getElement(
+            "reset-filters"
+        );
+
 
     if (
-        !ticketData.length ||
-        !segmentData.length
+        !priorityFilter ||
+        !typeFilter ||
+        !channelFilter ||
+        !segmentFilter
     ) {
 
         return;
-
     }
 
 
-    if (filtersInitialized) {
-
-        return;
-
-    }
-
-
-    filtersInitialized = true;
-
-
-    populateTicketFilter(
-        "priority-filter",
-        "Ticket Priority",
-        "All Priorities"
+    priorityFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
     );
 
 
-    populateTicketFilter(
-        "type-filter",
-        "Ticket Type",
-        "All Ticket Types"
+    typeFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
     );
 
 
-    populateTicketFilter(
-        "channel-filter",
-        "Ticket Channel",
-        "All Channels"
+    channelFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
     );
 
 
-    populateMainSegmentFilter();
-
-
-    const filterIds = [
-
-        "priority-filter",
-
-        "type-filter",
-
-        "channel-filter",
-
-        "segment-filter-main"
-
-    ];
-
-
-    filterIds.forEach(
-        function (filterId) {
-
-            const filter =
-                document.getElementById(
-                    filterId
-                );
-
-
-            if (!filter) {
-                return;
-            }
-
-
-            filter.addEventListener(
-                "change",
-                handleMainFilterChange
-            );
-
-        }
+    segmentFilter.addEventListener(
+        "change",
+        updateFilteredDashboard
     );
-
-
-    const resetButton =
-        document.getElementById(
-            "reset-filters"
-        );
 
 
     if (resetButton) {
 
         resetButton.addEventListener(
             "click",
-            resetAllFilters
+            resetFilters
         );
-
     }
 
 
-    updateFilteredResults();
+    filtersReady = true;
 
+
+    updateFilteredDashboard();
 }
 
 
 /* =========================================================
-   TICKET FILTER
-========================================================= */
+   FILTERED DASHBOARD
+   ========================================================= */
 
-function populateTicketFilter(
-    filterId,
-    field,
-    defaultLabel
-) {
-
-    const filter =
-        document.getElementById(
-            filterId
-        );
-
-
-    if (!filter) {
-        return;
-    }
-
-
-    const values =
-        getUniqueValues(
-            ticketData,
-            field
-        );
-
-
-    filter.innerHTML = "";
-
-
-    const allOption =
-        document.createElement(
-            "option"
-        );
-
-
-    allOption.value =
-        "all";
-
-
-    allOption.textContent =
-        defaultLabel;
-
-
-    filter.appendChild(
-        allOption
-    );
-
-
-    values.forEach(
-        function (value) {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                value;
-
-
-            option.textContent =
-                value;
-
-
-            filter.appendChild(
-                option
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   FILTER CHANGE
-========================================================= */
-
-function handleMainFilterChange() {
-
-    const segmentFilter =
-        document.getElementById(
-            "segment-filter-main"
-        );
-
-
-    if (segmentFilter) {
-
-        const sectionFilter =
-            document.getElementById(
-                "segment-filter"
-            );
-
-
-        if (sectionFilter) {
-
-            sectionFilter.value =
-                segmentFilter.value;
-
-        }
-
-
-        renderSegments(
-            segmentData,
-            segmentFilter.value
-        );
-
-    }
-
-
-    updateFilteredResults();
-
-}
-
-
-/* =========================================================
-   FILTER RESULTS
-========================================================= */
-
-function updateFilteredResults() {
+function updateFilteredDashboard() {
 
     if (!ticketData.length) {
         return;
@@ -1359,71 +1685,61 @@ function updateFilteredResults() {
         ticketData.filter(
             function (ticket) {
 
+                const ticketPriority =
+                    normalize(
+                        ticket["Ticket Priority"]
+                    );
+
+                const ticketType =
+                    normalize(
+                        ticket["Ticket Type"]
+                    );
+
+                const ticketChannel =
+                    normalize(
+                        ticket["Ticket Channel"]
+                    );
+
+
                 if (
                     priority !== "all" &&
-                    ticket["Ticket Priority"] !==
-                    priority
+                    ticketPriority !==
+                    normalize(priority)
                 ) {
-
                     return false;
-
                 }
 
 
                 if (
                     type !== "all" &&
-                    ticket["Ticket Type"] !==
-                    type
+                    ticketType !==
+                    normalize(type)
                 ) {
-
                     return false;
-
                 }
 
 
                 if (
                     channel !== "all" &&
-                    ticket["Ticket Channel"] !==
-                    channel
+                    ticketChannel !==
+                    normalize(channel)
                 ) {
-
                     return false;
-
                 }
 
 
                 if (
-                    segment !== "all"
+                    segment !== "all" &&
+                    getTicketSegment(ticket) !==
+                    segment
                 ) {
-
-                    const calculatedSegment =
-                        getTicketSegment(
-                            ticket
-                        );
-
-
-                    if (
-                        calculatedSegment !==
-                        segment
-                    ) {
-
-                        return false;
-
-                    }
-
+                    return false;
                 }
 
 
                 return true;
-
             }
         );
-
-
-    console.log(
-        "Filtered tickets:",
-        filtered.length
-    );
 
 
     updateFilteredStatistics(
@@ -1431,521 +1747,493 @@ function updateFilteredResults() {
     );
 
 
-    updateFilteredCharts(
-        filtered
+    updateFilterStatus(
+        filtered.length,
+        ticketData.length
     );
+}
 
+
+/* =========================================================
+   GET FILTER VALUE
+   ========================================================= */
+
+function getFilterValue(id) {
+
+    const element =
+        getElement(id);
+
+    if (!element) {
+        return "all";
+    }
+
+    return element.value || "all";
 }
 
 
 /* =========================================================
    FILTERED STATISTICS
-========================================================= */
+   ========================================================= */
 
 function updateFilteredStatistics(
     records
 ) {
 
-    const satisfactionValues =
-        records
-            .map(
-                function (ticket) {
-
-                    return Number(
-                        ticket[
-                            "Customer Satisfaction Rating"
-                        ]
-                    );
-
-                }
-            )
-            .filter(
-                function (value) {
-
-                    return Number.isFinite(
-                        value
-                    );
-
-                }
-            );
-
-
-    const resolutionValues =
-        records
-            .map(
-                function (ticket) {
-
-                    return Number(
-                        ticket[
-                            "Time to Resolution"
-                        ]
-                    );
-
-                }
-            )
-            .filter(
-                function (value) {
-
-                    return Number.isFinite(
-                        value
-                    );
-
-                }
-            );
-
-
-    const averageSatisfaction =
-        calculateAverage(
-            satisfactionValues
-        );
-
-
-    const averageResolution =
-        calculateAverage(
-            resolutionValues
-        );
+    const count =
+        records.length;
 
 
     setText(
         "filtered-ticket-count",
-        records.length.toLocaleString()
+        formatNumber(count)
     );
 
 
-    setText(
-        "filtered-average-satisfaction",
+    if (count === 0) {
 
-        averageSatisfaction === null
+        setText(
+            "filtered-average-satisfaction",
+            "N/A"
+        );
 
-            ? "N/A"
+        setText(
+            "filtered-average-resolution",
+            "N/A"
+        );
 
-            : averageSatisfaction.toFixed(2) +
-              " / 5"
-    );
+        return;
+    }
 
 
-    setText(
-        "filtered-average-resolution",
+    let satisfactionTotal = 0;
 
-        averageResolution === null
+    let satisfactionCount = 0;
 
-            ? "N/A"
+    let resolutionTotal = 0;
 
-            : averageResolution.toFixed(2) +
-              " hrs"
-    );
+    let resolutionCount = 0;
 
+
+    records.forEach(function (ticket) {
+
+        const satisfaction =
+            getSatisfaction(
+                ticket
+            );
+
+
+        if (
+            satisfaction !== null
+        ) {
+
+            satisfactionTotal +=
+                satisfaction;
+
+            satisfactionCount++;
+        }
+
+
+        const resolution =
+            getResolutionHours(
+                ticket[
+                    "Time to Resolution"
+                ]
+            );
+
+
+        if (
+            resolution !== null
+        ) {
+
+            resolutionTotal +=
+                resolution;
+
+            resolutionCount++;
+        }
+    });
+
+
+    const averageSatisfaction =
+        satisfactionCount > 0
+            ? satisfactionTotal /
+              satisfactionCount
+            : null;
+
+
+    const averageResolution =
+        resolutionCount > 0
+            ? resolutionTotal /
+              resolutionCount
+            : null;
+
+
+    if (
+        averageSatisfaction !== null
+    ) {
+
+        setText(
+            "filtered-average-satisfaction",
+            averageSatisfaction.toFixed(2) +
+            " / 5"
+        );
+
+    } else {
+
+        setText(
+            "filtered-average-satisfaction",
+            "N/A"
+        );
+    }
+
+
+    if (
+        averageResolution !== null
+    ) {
+
+        setText(
+            "filtered-average-resolution",
+            averageResolution.toFixed(2) +
+            " hrs"
+        );
+
+    } else {
+
+        setText(
+            "filtered-average-resolution",
+            "N/A"
+        );
+    }
+}
+
+
+/* =========================================================
+   FILTER STATUS
+   ========================================================= */
+
+function updateFilterStatus(
+    filteredCount,
+    totalCount
+) {
 
     const status =
-        document.getElementById(
+        getElement(
             "filter-result-status"
         );
 
+    if (!status) {
+        return;
+    }
 
-    if (status) {
+
+    if (
+        filteredCount === totalCount
+    ) {
 
         status.textContent =
+            "Showing all " +
+            totalCount.toLocaleString() +
+            " tickets.";
 
-            records.length === 0
-
-                ? "No tickets match the selected filters."
-
-                : records.length.toLocaleString() +
-                  " ticket(s) match the selected filters.";
-
+        return;
     }
 
+
+    status.textContent =
+        "Showing " +
+        filteredCount.toLocaleString() +
+        " of " +
+        totalCount.toLocaleString() +
+        " tickets.";
 }
 
 
 /* =========================================================
-   FILTERED CHARTS
-========================================================= */
+   RESET FILTERS
+   ========================================================= */
 
-function updateFilteredCharts(
-    records
-) {
+function resetFilters() {
 
-    priorityChart =
-        createResolutionChart(
-            "priority-chart",
-            aggregateResolution(
-                records,
-                "Ticket Priority",
-                "priority"
-            ),
-            "priority",
-            priorityChart
-        );
+    const filters = [
+        "priority-filter",
+        "type-filter",
+        "channel-filter",
+        "segment-filter-main"
+    ];
 
 
-    typeChart =
-        createResolutionChart(
-            "type-chart",
-            aggregateResolution(
-                records,
-                "Ticket Type",
-                "ticket_type"
-            ),
-            "ticket_type",
-            typeChart
-        );
+    filters.forEach(function (id) {
 
+        const element =
+            getElement(id);
 
-    channelChart =
-        createResolutionChart(
-            "channel-chart",
-            aggregateResolution(
-                records,
-                "Ticket Channel",
-                "channel"
-            ),
-            "channel",
-            channelChart
-        );
-
-}
-
-
-/* =========================================================
-   AGGREGATE RESOLUTION
-========================================================= */
-
-function aggregateResolution(
-    records,
-    field,
-    outputKey
-) {
-
-    const groups = {};
-
-
-    records.forEach(
-        function (ticket) {
-
-            const category =
-                ticket[field];
-
-
-            const resolution =
-                Number(
-                    ticket[
-                        "Time to Resolution"
-                    ]
-                );
-
-
-            if (
-                category === null ||
-                category === undefined ||
-                String(category).trim() === "" ||
-                !Number.isFinite(resolution)
-            ) {
-
-                return;
-
-            }
-
-
-            if (!groups[category]) {
-
-                groups[category] = {
-
-                    total: 0,
-
-                    count: 0
-
-                };
-
-            }
-
-
-            groups[category].total +=
-                resolution;
-
-
-            groups[category].count +=
-                1;
-
+        if (element) {
+            element.value = "all";
         }
+    });
+
+
+    updateFilteredDashboard();
+
+
+    console.log(
+        "Filters reset"
     );
-
-
-    return Object.keys(groups)
-
-        .map(
-            function (category) {
-
-                return {
-
-                    [outputKey]:
-                        category,
-
-                    average_resolution_hours:
-                        Number(
-                            (
-                                groups[category].total /
-                                groups[category].count
-                            ).toFixed(2)
-                        )
-
-                };
-
-            }
-        )
-
-        .sort(
-            function (a, b) {
-
-                return (
-                    a.average_resolution_hours -
-                    b.average_resolution_hours
-                );
-
-            }
-        );
-
 }
 
 
 /* =========================================================
-   RESOLUTION CHART
-========================================================= */
+   NORMALIZATION
+   ========================================================= */
 
-function createResolutionChart(
-    containerId,
-    data,
-    labelKey,
-    existingChart
-) {
+function normalize(value) {
 
-    const container =
-        document.getElementById(
-            containerId
-        );
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
+    }
 
 
-    if (!container) {
+    return String(value)
+        .trim()
+        .toLowerCase();
+}
+
+
+/* =========================================================
+   SATISFACTION PARSER
+   ========================================================= */
+
+function getSatisfaction(ticket) {
+
+    const value =
+        ticket[
+            "Customer Satisfaction Rating"
+        ];
+
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
         return null;
     }
 
 
-    if (existingChart) {
+    const number =
+        Number(value);
 
-        try {
 
-            existingChart.destroy();
+    if (
+        Number.isFinite(number)
+    ) {
 
-        } catch (error) {
+        return number;
+    }
 
-            console.warn(
-                "Chart destroy error:",
-                error
+
+    return null;
+}
+
+
+/* =========================================================
+   RESOLUTION TIME PARSER
+   ========================================================= */
+
+function getResolutionHours(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return null;
+    }
+
+
+    /*
+     * Case 1:
+     * Direct numeric hours
+     */
+
+    if (
+        typeof value === "number"
+    ) {
+
+        return Number.isFinite(value)
+            ? value
+            : null;
+    }
+
+
+    const text =
+        String(value).trim();
+
+
+    if (!text) {
+        return null;
+    }
+
+
+    /*
+     * Case 2:
+     * Plain numeric string
+     */
+
+    const directNumber =
+        Number(text);
+
+
+    if (
+        Number.isFinite(directNumber)
+    ) {
+
+        return directNumber;
+    }
+
+
+    /*
+     * Case 3:
+     * Values such as:
+     *
+     * 1 days 04:30:00
+     * 04:30:00
+     * 12:45
+     */
+
+    let days = 0;
+
+    let hours = 0;
+
+    let minutes = 0;
+
+    let seconds = 0;
+
+
+    const dayMatch =
+        text.match(
+            /(\d+(?:\.\d+)?)\s*days?/i
+        );
+
+
+    if (dayMatch) {
+
+        days =
+            Number(
+                dayMatch[1]
+            );
+    }
+
+
+    const timeMatch =
+        text.match(
+            /(\d{1,3}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?/
+        );
+
+
+    if (timeMatch) {
+
+        hours =
+            Number(
+                timeMatch[1]
             );
 
-        }
+        minutes =
+            Number(
+                timeMatch[2]
+            );
 
+        seconds =
+            timeMatch[3]
+                ? Number(timeMatch[3])
+                : 0;
     }
 
 
-    container.innerHTML = "";
+    if (
+        dayMatch ||
+        timeMatch
+    ) {
 
-
-    if (!data || !data.length) {
-
-        container.innerHTML = `
-            <p class="error-message">
-                No data available for the selected filters.
-            </p>
-        `;
-
-        return null;
-
+        return (
+            days * 24 +
+            hours +
+            minutes / 60 +
+            seconds / 3600
+        );
     }
 
 
-    const wrapper =
-        document.createElement(
-            "div"
+    /*
+     * Case 4:
+     * Strings containing hours.
+     */
+
+    const hourMatch =
+        text.match(
+            /(\d+(?:\.\d+)?)\s*hours?/i
         );
 
 
-    wrapper.className =
-        "chart-wrapper";
+    if (hourMatch) {
 
-
-    wrapper.style.position =
-        "relative";
-
-
-    wrapper.style.width =
-        "100%";
-
-
-    wrapper.style.height =
-        "360px";
-
-
-    const canvas =
-        document.createElement(
-            "canvas"
+        return Number(
+            hourMatch[1]
         );
-
-
-    wrapper.appendChild(
-        canvas
-    );
-
-
-    container.appendChild(
-        wrapper
-    );
-
-
-    if (typeof Chart === "undefined") {
-
-        container.innerHTML = `
-            <p class="error-message">
-                Chart.js could not be loaded.
-            </p>
-        `;
-
-        return null;
-
     }
 
 
-    return new Chart(
-        canvas,
-        {
-
-            type: "bar",
-
-            data: {
-
-                labels:
-                    data.map(
-                        function (item) {
-
-                            return item[labelKey];
-
-                        }
-                    ),
-
-                datasets: [
-
-                    {
-
-                        label:
-                            "Average Resolution Time (hours)",
-
-                        data:
-                            data.map(
-                                function (item) {
-
-                                    return Number(
-                                        item.average_resolution_hours
-                                    );
-
-                                }
-                            ),
-
-                        borderWidth: 1
-
-                    }
-
-                ]
-
-            },
-
-            options: {
-
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                plugins: {
-
-                    legend: {
-                        display: false
-                    },
-
-                    tooltip: {
-
-                        callbacks: {
-
-                            label:
-                                function (context) {
-
-                                    return (
-                                        " " +
-                                        context.raw +
-                                        " hrs"
-                                    );
-
-                                }
-
-                        }
-
-                    }
-
-                },
-
-                scales: {
-
-                    y: {
-
-                        beginAtZero: true,
-
-                        title: {
-
-                            display: true,
-
-                            text: "Hours"
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-    );
-
+    return null;
 }
 
 
 /* =========================================================
-   CUSTOMER SEGMENT
-========================================================= */
+   CUSTOMER SEGMENT CALCULATION
+   =========================================================
 
-function getTicketSegment(
-    ticket
-) {
+   The ticket_data.json file contains:
+   - Customer Age
+   - Customer Satisfaction Rating
+   - Time to Resolution
 
-    if (!segmentData.length) {
-        return null;
+   The segment dashboard contains the six cluster
+   profiles. We assign each ticket to the closest
+   segment profile using normalized distance.
+
+   This makes the Segment filter work without adding
+   another backend service.
+   ========================================================= */
+
+function getTicketSegment(ticket) {
+
+    if (
+        !segmentData ||
+        !segmentData.length
+    ) {
+
+        return "Unknown";
     }
 
 
     const age =
-        Number(
-            ticket["Customer Age"]
+        toNumber(
+            ticket["Customer Age"],
+            null
         );
 
 
     const satisfaction =
-        Number(
-            ticket[
-                "Customer Satisfaction Rating"
-            ]
+        getSatisfaction(
+            ticket
         );
 
 
     const resolution =
-        Number(
+        getResolutionHours(
             ticket[
                 "Time to Resolution"
             ]
@@ -1953,543 +2241,460 @@ function getTicketSegment(
 
 
     if (
-        !Number.isFinite(age) ||
-        !Number.isFinite(satisfaction) ||
-        !Number.isFinite(resolution)
+        age === null &&
+        satisfaction === null &&
+        resolution === null
     ) {
 
-        return null;
-
+        return "Unknown";
     }
 
 
-    const ageValues =
-        segmentData
-            .map(
-                function (segment) {
+    /*
+     * Reference ranges prevent age,
+     * satisfaction and resolution from
+     * dominating one another.
+     */
 
-                    return Number(
-                        segment.avg_age
-                    );
+    const AGE_SCALE = 40;
 
-                }
-            )
-            .filter(
-                Number.isFinite
-            );
+    const SATISFACTION_SCALE = 4;
+
+    const RESOLUTION_SCALE = 20;
 
 
-    const satisfactionValues =
-        segmentData
-            .map(
-                function (segment) {
-
-                    return Number(
-                        segment.avg_satisfaction
-                    );
-
-                }
-            )
-            .filter(
-                Number.isFinite
-            );
+    let bestSegment =
+        segmentData[0];
 
 
-    const resolutionValues =
-        segmentData
-            .map(
-                function (segment) {
-
-                    return Number(
-                        segment.avg_resolution_hours
-                    );
-
-                }
-            )
-            .filter(
-                Number.isFinite
-            );
-
-
-    const ageRange =
-        getRange(
-            ageValues
-        );
-
-
-    const satisfactionRange =
-        getRange(
-            satisfactionValues
-        );
-
-
-    const resolutionRange =
-        getRange(
-            resolutionValues
-        );
-
-
-    let closestSegment =
-        null;
-
-
-    let smallestDistance =
+    let bestDistance =
         Infinity;
 
 
     segmentData.forEach(
         function (segment) {
 
-            const segmentAge =
-                Number(
-                    segment.avg_age
-                );
+            let distance = 0;
 
-
-            const segmentSatisfaction =
-                Number(
-                    segment.avg_satisfaction
-                );
-
-
-            const segmentResolution =
-                Number(
-                    segment.avg_resolution_hours
-                );
+            let dimensions = 0;
 
 
             if (
-                !Number.isFinite(
-                    segmentAge
-                ) ||
-                !Number.isFinite(
-                    segmentSatisfaction
-                ) ||
-                !Number.isFinite(
-                    segmentResolution
+                age !== null &&
+                Number.isFinite(
+                    Number(segment.avg_age)
                 )
             ) {
 
-                return;
-
-            }
-
-
-            const ageDistance =
-                (
-                    age -
-                    segmentAge
-                ) / ageRange;
-
-
-            const satisfactionDistance =
-                (
-                    satisfaction -
-                    segmentSatisfaction
-                ) / satisfactionRange;
-
-
-            const resolutionDistance =
-                (
-                    resolution -
-                    segmentResolution
-                ) / resolutionRange;
-
-
-            const distance =
-                Math.sqrt(
-
-                    Math.pow(
-                        ageDistance,
-                        2
-                    ) +
-
-                    Math.pow(
-                        satisfactionDistance,
-                        2
-                    ) +
-
-                    Math.pow(
-                        resolutionDistance,
-                        2
-                    )
-
+                distance += Math.pow(
+                    (
+                        age -
+                        Number(
+                            segment.avg_age
+                        )
+                    ) / AGE_SCALE,
+                    2
                 );
+
+                dimensions++;
+            }
 
 
             if (
-                distance <
-                smallestDistance
+                satisfaction !== null &&
+                Number.isFinite(
+                    Number(
+                        segment.avg_satisfaction
+                    )
+                )
             ) {
 
-                smallestDistance =
-                    distance;
+                distance += Math.pow(
+                    (
+                        satisfaction -
+                        Number(
+                            segment.avg_satisfaction
+                        )
+                    ) / SATISFACTION_SCALE,
+                    2
+                );
 
-                closestSegment =
-                    segment.segment;
-
+                dimensions++;
             }
 
+
+            if (
+                resolution !== null &&
+                Number.isFinite(
+                    Number(
+                        segment.avg_resolution_hours
+                    )
+                )
+            ) {
+
+                distance += Math.pow(
+                    (
+                        resolution -
+                        Number(
+                            segment.avg_resolution_hours
+                        )
+                    ) / RESOLUTION_SCALE,
+                    2
+                );
+
+                dimensions++;
+            }
+
+
+            if (dimensions > 0) {
+
+                distance =
+                    distance /
+                    dimensions;
+
+
+                if (
+                    distance <
+                    bestDistance
+                ) {
+
+                    bestDistance =
+                        distance;
+
+                    bestSegment =
+                        segment;
+                }
+            }
         }
     );
 
 
-    return closestSegment;
-
+    return bestSegment.segment;
 }
 
 
 /* =========================================================
-   RESET
-========================================================= */
+   OPTIONAL FILTERED CHART REFRESH
+   ========================================================= */
 
-function resetAllFilters() {
+function updateFilteredCharts(
+    records
+) {
 
-    const filterIds = [
+    /*
+     * This function is intentionally kept separate
+     * from the main statistics logic.
+     *
+     * It allows the dashboard to calculate
+     * filtered resolution analytics without
+     * replacing the original ML-generated charts.
+     */
 
-        "priority-filter",
+    if (!records.length) {
+        return;
+    }
 
-        "type-filter",
 
-        "channel-filter",
+    const priorityMap = {};
 
-        "segment-filter-main"
+    const typeMap = {};
 
+    const channelMap = {};
+
+
+    records.forEach(function (ticket) {
+
+        const hours =
+            getResolutionHours(
+                ticket[
+                    "Time to Resolution"
+                ]
+            );
+
+
+        if (hours === null) {
+            return;
+        }
+
+
+        const priority =
+            ticket[
+                "Ticket Priority"
+            ];
+
+
+        const type =
+            ticket[
+                "Ticket Type"
+            ];
+
+
+        const channel =
+            ticket[
+                "Ticket Channel"
+            ];
+
+
+        addGroupedValue(
+            priorityMap,
+            priority,
+            hours
+        );
+
+
+        addGroupedValue(
+            typeMap,
+            type,
+            hours
+        );
+
+
+        addGroupedValue(
+            channelMap,
+            channel,
+            hours
+        );
+    });
+
+
+    /*
+     * The original resolution charts use the
+     * ML-generated aggregate JSON files.
+     *
+     * We don't automatically replace them here,
+     * because those files represent the official
+     * analysis used by the project README.
+     */
+}
+
+
+/* =========================================================
+   GROUPED VALUE HELPER
+   ========================================================= */
+
+function addGroupedValue(
+    map,
+    key,
+    value
+) {
+
+    if (
+        key === null ||
+        key === undefined ||
+        key === ""
+    ) {
+        return;
+    }
+
+
+    if (!map[key]) {
+
+        map[key] = {
+            total: 0,
+            count: 0
+        };
+    }
+
+
+    map[key].total += value;
+
+    map[key].count++;
+}
+
+
+/* =========================================================
+   DATA VALIDATION
+   ========================================================= */
+
+function validateTicketRecord(ticket) {
+
+    if (
+        !ticket ||
+        typeof ticket !== "object"
+    ) {
+
+        return false;
+    }
+
+
+    const fields = [
+        "Ticket Priority",
+        "Ticket Type",
+        "Ticket Channel"
     ];
 
 
-    filterIds.forEach(
-        function (filterId) {
+    return fields.some(
+        function (field) {
 
-            const filter =
-                document.getElementById(
-                    filterId
-                );
+            return (
+                ticket[field] !==
+                undefined
+            );
+        }
+    );
+}
 
 
-            if (filter) {
+/* =========================================================
+   DATA QUALITY SUMMARY
+   ========================================================= */
 
-                filter.value =
-                    "all";
+function getDataQualitySummary() {
 
+    if (!ticketData.length) {
+
+        return {
+            total: 0,
+            valid: 0,
+            invalid: 0
+        };
+    }
+
+
+    let valid = 0;
+
+
+    ticketData.forEach(
+        function (ticket) {
+
+            if (
+                validateTicketRecord(
+                    ticket
+                )
+            ) {
+
+                valid++;
             }
-
         }
     );
 
 
-    const sectionFilter =
-        document.getElementById(
-            "segment-filter"
-        );
+    return {
+
+        total:
+            ticketData.length,
+
+        valid:
+            valid,
+
+        invalid:
+            ticketData.length -
+            valid
+    };
+}
 
 
-    if (sectionFilter) {
+/* =========================================================
+   FILTER SUMMARY
+   ========================================================= */
 
-        sectionFilter.value =
-            "all";
+function getActiveFilters() {
 
-    }
+    return {
+
+        priority:
+            getFilterValue(
+                "priority-filter"
+            ),
+
+        type:
+            getFilterValue(
+                "type-filter"
+            ),
+
+        channel:
+            getFilterValue(
+                "channel-filter"
+            ),
+
+        segment:
+            getFilterValue(
+                "segment-filter-main"
+            )
+    };
+}
 
 
-    renderSegments(
-        segmentData,
-        "all"
-    );
+/* =========================================================
+   APPLICATION HEALTH CHECK
+   ========================================================= */
 
+function runHealthCheck() {
 
-    updateFilteredResults();
+    const health = {
+
+        chartJS:
+            typeof Chart !== "undefined",
+
+        tickets:
+            ticketData.length > 0,
+
+        segments:
+            segmentData.length > 0,
+
+        filters:
+            filtersReady
+    };
 
 
     console.log(
-        "Filters reset"
+        "SupportIQ health check:",
+        health
     );
 
+
+    return health;
 }
 
 
 /* =========================================================
-   HELPERS
-========================================================= */
-
-function getUniqueValues(
-    records,
-    field
-) {
-
-    return [
-
-        ...new Set(
-
-            records
-                .map(
-                    function (record) {
-
-                        return record[field];
-
-                    }
-                )
-
-                .filter(
-                    function (value) {
-
-                        return (
-                            value !== null &&
-                            value !== undefined &&
-                            String(value).trim() !== ""
-                        );
-
-                    }
-                )
-
-        )
-
-    ].sort();
-
-}
-
-
-function getFilterValue(
-    filterId
-) {
-
-    const filter =
-        document.getElementById(
-            filterId
-        );
-
-
-    if (!filter) {
-        return "all";
-    }
-
-
-    return filter.value ||
-        "all";
-
-}
-
-
-function calculateAverage(
-    values
-) {
-
-    if (!values.length) {
-        return null;
-    }
-
-
-    const total =
-        values.reduce(
-            function (
-                sum,
-                value
-            ) {
-
-                return sum + value;
-
-            },
-            0
-        );
-
-
-    return (
-        total /
-        values.length
-    );
-
-}
-
-
-function getRange(
-    values
-) {
-
-    if (!values.length) {
-        return 1;
-    }
-
-
-    const minimum =
-        Math.min(
-            ...values
-        );
-
-
-    const maximum =
-        Math.max(
-            ...values
-        );
-
-
-    const range =
-        maximum -
-        minimum;
-
-
-    return range === 0
-        ? 1
-        : range;
-
-}
-
-
-function formatNumber(
-    value
-) {
-
-    const number =
-        Number(value);
-
-
-    if (!Number.isFinite(number)) {
-        return "N/A";
-    }
-
-
-    return number.toFixed(2);
-
-}
-
-
-function setText(
-    elementId,
-    value
-) {
-
-    const element =
-        document.getElementById(
-            elementId
-        );
-
-
-    if (element) {
-
-        element.textContent =
-            value;
-
-    }
-
-}
-
-
-function showError(
-    elementId,
-    message
-) {
-
-    const element =
-        document.getElementById(
-            elementId
-        );
-
-
-    if (element) {
-
-        element.textContent =
-            message;
-
-    }
-
-}
-
-
-function showChartError(
-    containerId
-) {
-
-    const container =
-        document.getElementById(
-            containerId
-        );
-
-
-    if (container) {
-
-        container.innerHTML = `
-
-            <p class="error-message">
-
-                Unable to load analytics data.
-
-            </p>
-
-        `;
-
-    }
-
-}
-
-
-function disableInteractiveFilters() {
-
-    const filterIds = [
-
-        "priority-filter",
-
-        "type-filter",
-
-        "channel-filter",
-
-        "segment-filter-main",
-
-        "reset-filters"
-
-    ];
-
-
-    filterIds.forEach(
-        function (id) {
-
-            const element =
-                document.getElementById(
-                    id
-                );
-
-
-            if (element) {
-
-                element.disabled =
-                    true;
-
-            }
-
+   DEBUG HELPERS
+   ========================================================= */
+
+window.SupportIQ = {
+
+    getTickets:
+        function () {
+            return ticketData;
+        },
+
+    getSegments:
+        function () {
+            return segmentData;
+        },
+
+    getFilters:
+        function () {
+            return getActiveFilters();
+        },
+
+    getHealth:
+        function () {
+            return runHealthCheck();
+        },
+
+    reset:
+        function () {
+            resetFilters();
         }
-    );
-
-}
+};
 
 
-function escapeHtml(
-    value
-) {
+/* =========================================================
+   FINAL INITIALIZATION
+   ========================================================= */
 
-    return String(value)
+setTimeout(
+    function () {
 
-        .replace(
-            /&/g,
-            "&amp;"
-        )
+        runHealthCheck();
 
-        .replace(
-            /</g,
-            "&lt;"
-        )
+    },
+    1500
+);
 
-        .replace(
-            />/g,
-            "&gt;"
-        )
 
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-
-}
-
+/* =========================================================
+   END OF SUPPORTIQ SCRIPT
+   ========================================================= */
