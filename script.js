@@ -1,4 +1,3 @@
-```javascript
 console.log("SupportIQ dashboard loaded");
 
 let ticketData = [];
@@ -2493,4 +2492,4 @@ function escapeHtml(
         );
 
 }
-```
+
