@@ -376,6 +376,40 @@ footer {
     .segment-chart .chart-wrapper {
         height: 280px;
     }
+    /* =========================================================
+   FILTERED RESULTS - SIDE BY SIDE
+========================================================= */
+
+#filtered-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    margin-top: 25px;
+}
+
+#filtered-stats .card {
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+
+/* Filtered result values */
+
+#filtered-stats .card .value {
+    font-size: 26px;
+    font-weight: 700;
+}
+
+
+/* Responsive */
+
+@media (max-width: 800px) {
+    #filtered-stats {
+        grid-template-columns: 1fr;
+    }
+}
 
     .value {
         font-size: 27px;
