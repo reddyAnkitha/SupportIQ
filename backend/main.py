@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from schemas.ticket import TicketRequest
 from services.nlp import extract_keywords
 from services.analytics import get_segments, get_satisfaction
+from services.prediction import predict_satisfaction_risk
 
 
 app = FastAPI(
@@ -63,9 +64,23 @@ def satisfaction():
 def analyze_ticket(ticket: TicketRequest):
     keywords = extract_keywords(ticket.description)
 
+    try:
+        prediction = predict_satisfaction_risk(
+            customer_age=ticket.customer_age,
+            priority=ticket.priority,
+            ticket_type=ticket.ticket_type,
+            channel=ticket.channel,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
+
     return {
         "ticket_type": ticket.ticket_type,
         "priority": ticket.priority,
         "channel": ticket.channel,
-        "keywords": keywords
+        "keywords": keywords,
+        "prediction": prediction,
     }
