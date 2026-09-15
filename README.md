@@ -100,6 +100,53 @@ Users can filter support tickets by:
 
 ---
 
+## 🔌 Backend API
+
+SupportIQ includes a FastAPI backend for ticket analysis and customer satisfaction risk prediction.
+
+### API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/` | API status |
+| GET | `/health` | Health check |
+| GET | `/segments` | Customer segment analytics |
+| GET | `/satisfaction` | Satisfaction analytics |
+| POST | `/analyze` | Analyze a support ticket |
+
+The `/analyze` endpoint accepts:
+
+* Customer age
+* Ticket priority
+* Ticket type
+* Support channel
+* Ticket description
+
+It returns:
+
+* Ticket information
+* Extracted keywords
+* TF-IDF text analysis
+* Satisfaction risk prediction
+* Risk probability
+
+### Backend Technology
+
+* FastAPI
+* Pydantic
+* Pandas
+* Scikit-learn
+* Joblib
+* TF-IDF
+* Pytest
+* GitHub Actions
+
+### Testing
+
+Backend tests are automatically executed using GitHub Actions on pushes and pull requests to the `main` branch.
+
+
+
 ## 📊 Dashboard Metrics
 
 | Metric                  |       Value |
