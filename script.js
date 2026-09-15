@@ -1,6 +1,84 @@
 const API_BASE_URL = "http://localhost:8000";
 
-async function analyzeTicketWithAPI(ticket) {
+async function analyzeTicketWithAPI(ticket) {function setupAPIAnalysis() {
+    const button = document.getElementById(
+        "analyzeTicketBtn"
+    );
+
+    const result = document.getElementById(
+        "apiAnalysisResult"
+    );
+
+    if (!button || !result) {
+        return;
+    }
+
+    button.addEventListener(
+        "click",
+        async function () {
+
+            if (
+                !window.supportIQTickets ||
+                window.supportIQTickets.length === 0
+            ) {
+                result.textContent =
+                    "Ticket data is not available yet.";
+
+                return;
+            }
+
+            const ticket =
+                window.supportIQTickets[0];
+
+            result.textContent =
+                "Analyzing ticket...";
+
+            button.disabled = true;
+
+            try {
+
+                const analysis =
+                    await analyzeTicketWithAPI(
+                        ticket
+                    );
+
+                result.innerHTML = `
+                    <strong>Analysis Complete</strong>
+                    <br>
+                    Risk:
+                    ${analysis.prediction.risk_label}
+                    <br>
+                    Risk Probability:
+                    ${analysis.prediction.risk_probability}
+                    <br>
+                    Important Terms:
+                    ${analysis.text_analysis.important_terms
+                        .map(
+                            item =>
+                                `${item.term} (${item.frequency})`
+                        )
+                        .join(", ")}
+                `;
+
+            } catch (error) {
+
+                console.error(
+                    "Ticket analysis error:",
+                    error
+                );
+
+                result.textContent =
+                    "Unable to analyze the ticket. Please try again.";
+
+            } finally {
+
+                button.disabled = false;
+
+            }
+        }
+    );
+}
+    
     const response = await fetch(
         `${API_BASE_URL}/analyze`,
         {
