@@ -47,3 +47,18 @@ def test_analyze_validation_error():
     )
 
     assert response.status_code == 422
+
+
+def test_analyze_rejects_short_description():
+    response = client.post(
+        "/analyze",
+        json={
+            "customer_age": 30,
+            "priority": "High",
+            "ticket_type": "Technical issue",
+            "channel": "Email",
+            "description": "Hi",
+        },
+    )
+
+    assert response.status_code == 422
