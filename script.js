@@ -81,9 +81,14 @@ function setupAPIAnalysis() {
         "click",
         async function () {
 
+            const tickets =
+                window.supportIQTickets;
+
+
             if (
-                !window.supportIQTickets ||
-                window.supportIQTickets.length === 0
+                !tickets ||
+                !Array.isArray(tickets) ||
+                tickets.length === 0
             ) {
 
                 result.textContent =
@@ -94,8 +99,15 @@ function setupAPIAnalysis() {
             }
 
 
+            /*
+             * Temporary selection:
+             * Analyze the first available ticket.
+             * We can connect this to the dashboard
+             * ticket selection later.
+             */
+
             const ticket =
-                window.supportIQTickets[0];
+                tickets[0];
 
 
             result.textContent =
@@ -115,26 +127,31 @@ function setupAPIAnalysis() {
 
                 const terms =
                     analysis
-                        .text_analysis
-                        .important_terms
-                        .map(
+                        ?.text_analysis
+                        ?.important_terms
+                        ?.map(
                             item =>
                                 `${item.term} (${item.frequency})`
                         )
                         .join(", ");
 
 
+                const prediction =
+                    analysis?.prediction;
+
+
                 result.innerHTML = `
                     <strong>Analysis Complete</strong>
+
                     <br><br>
 
                     <strong>Risk:</strong>
-                    ${analysis.prediction.risk_label}
+                    ${prediction?.risk_label || "Unavailable"}
 
                     <br>
 
                     <strong>Risk Probability:</strong>
-                    ${analysis.prediction.risk_probability}
+                    ${prediction?.risk_probability ?? "Unavailable"}
 
                     <br><br>
 
@@ -164,3 +181,4 @@ function setupAPIAnalysis() {
         }
     );
 }
+
