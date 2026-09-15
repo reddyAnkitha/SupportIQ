@@ -19,9 +19,7 @@
 
 </head>
 
-
 <body>
-
 
     <!-- =====================================================
          HEADER
@@ -62,6 +60,10 @@
             Resolution Analytics
         </a>
 
+        <a href="#ai-analysis">
+            AI Ticket Analysis
+        </a>
+
         <a href="#about">
             About
         </a>
@@ -74,7 +76,6 @@
     ====================================================== -->
 
     <main>
-
 
         <!-- =================================================
              DASHBOARD STATUS
@@ -116,7 +117,6 @@
         ================================================== -->
 
         <div class="cards">
-
 
             <!-- TOTAL TICKETS -->
 
@@ -192,7 +192,6 @@
                 </div>
 
             </div>
-
 
         </div>
 
@@ -719,6 +718,49 @@
 
                 </div>
 
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             AI TICKET ANALYSIS
+        ================================================== -->
+
+        <section id="ai-analysis">
+
+            <h2>
+                AI Ticket Analysis
+            </h2>
+
+            <p>
+                Analyze an individual support ticket using the
+                SupportIQ backend API to identify important terms
+                and predict customer satisfaction risk.
+            </p>
+
+
+            <div class="api-analysis-panel">
+
+                <button
+                    id="analyzeTicketBtn"
+                    type="button">
+
+                    Analyze Selected Ticket
+
+                </button>
+
+
+                <div
+                    id="apiAnalysisResult"
+                    class="api-analysis-result"
+                    role="status"
+                    aria-live="polite">
+
+                    Select a ticket and click the button to analyze it.
+
+                </div>
 
             </div>
 
