@@ -14,22 +14,27 @@ VECTORIZER_FILE = (
 
 def load_vectorizer():
     if not VECTORIZER_FILE.exists():
-        raise FileNotFoundError(
-            "TF-IDF vectorizer not found."
-        )
+        return None
 
     return joblib.load(VECTORIZER_FILE)
 
 
 def analyze_text(text: str):
-    vectorizer = load_vectorizer()
-
     cleaned_text = text.strip()
 
     if not cleaned_text:
         raise ValueError(
             "Ticket description cannot be empty."
         )
+
+    vectorizer = load_vectorizer()
+
+    if vectorizer is None:
+        return {
+            "status": "vectorizer_not_available",
+            "text_length": len(cleaned_text),
+            "important_terms": [],
+        }
 
     matrix = vectorizer.transform([cleaned_text])
 
@@ -52,6 +57,7 @@ def analyze_text(text: str):
     ]
 
     return {
+        "status": "success",
         "text_length": len(cleaned_text),
         "important_terms": important_terms,
     }
