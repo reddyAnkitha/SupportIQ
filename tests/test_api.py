@@ -33,3 +33,17 @@ def test_analyze_validation():
     )
 
     assert response.status_code in [200, 500]
+
+def test_analyze_validation_error():
+    response = client.post(
+        "/analyze",
+        json={
+            "customer_age": 10,
+            "priority": "High",
+            "ticket_type": "Technical issue",
+            "channel": "Email",
+            "description": "Unable to access the application.",
+        },
+    )
+
+    assert response.status_code == 422
