@@ -100,10 +100,10 @@ function setupAPIAnalysis() {
 
 
             /*
-             * Temporary selection:
-             * Analyze the first available ticket.
-             * We can connect this to the dashboard
-             * ticket selection later.
+             * Temporary ticket selection.
+             * The first ticket is analyzed.
+             * This can later be connected to
+             * an interactive ticket selector.
              */
 
             const ticket =
