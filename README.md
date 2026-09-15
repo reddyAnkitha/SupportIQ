@@ -226,24 +226,57 @@ Customer segment results are connected to ticket records using:
 
 ## 📁 Project Structure
 
-```text
 SupportIQ/
+│
+├── .github/
+│   └── workflows/
+│       └── backend-tests.yml
+│
+├── backend/
+│   ├── models/
+│   │   └── metadata.json
+│   │
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   └── ticket.py
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── analytics.py
+│   │   ├── errors.py
+│   │   ├── nlp.py
+│   │   ├── nlp_prediction.py
+│   │   └── prediction.py
+│   │
+│   ├── __init__.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── README.md
+│
+├── data/
+│   ├── dashboard_metrics.csv
+│   ├── segment_dashboard.json
+│   ├── satisfaction_dashboard.json
+│   ├── resolution_by_priority.json
+│   ├── resolution_by_type.json
+│   └── resolution_by_channel.json
+│
+├── ml/
+│   ├── __init__.py
+│   ├── train_model.py
+│   └── train_nlp.py
+│
+├── tests/
+│   ├── test_api.py
+│   └── test_prediction.py
 │
 ├── index.html
 ├── style.css
 ├── script.js
 ├── ticket_data.json
 ├── ticket_segment_mapping.json
-├── README.md
-│
-└── data/
-    ├── dashboard_metrics.csv
-    ├── segment_dashboard.json
-    ├── satisfaction_dashboard.json
-    ├── resolution_by_priority.json
-    ├── resolution_by_type.json
-    └── resolution_by_channel.json
-```
+├── .gitignore
+└── README.md
 
 ---
 
