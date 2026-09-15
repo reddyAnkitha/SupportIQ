@@ -6,6 +6,7 @@ from services.nlp import extract_keywords
 from services.analytics import get_segments, get_satisfaction
 from services.prediction import predict_satisfaction_risk
 from services.errors import handle_service_error
+from services.nlp_prediction import analyze_text
 
 
 app = FastAPI(
@@ -60,6 +61,10 @@ def analyze_ticket(ticket: TicketRequest):
     try:
         keywords = extract_keywords(ticket.description)
 
+        text_analysis = analyze_text(
+            ticket.description
+        )
+
         prediction = predict_satisfaction_risk(
             customer_age=ticket.customer_age,
             priority=ticket.priority,
@@ -72,6 +77,7 @@ def analyze_ticket(ticket: TicketRequest):
             "priority": ticket.priority,
             "channel": ticket.channel,
             "keywords": keywords,
+            "text_analysis": text_analysis,
             "prediction": prediction,
         }
 
