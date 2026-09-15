@@ -1,5 +1,35 @@
 const API_BASE_URL = "http://localhost:8000";
 
+async function analyzeTicketWithAPI(ticket) {
+    const response = await fetch(
+        `${API_BASE_URL}/analyze`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                customer_age: Number(ticket["Customer Age"]),
+                priority: ticket["Ticket Priority"],
+                ticket_type: ticket["Ticket Type"],
+                channel: ticket["Ticket Channel"],
+                description:
+                    ticket["Description"] ||
+                    ticket["Ticket Subject"] ||
+                    "Customer support request"
+            })
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `API request failed: ${response.status}`
+        );
+    }
+
+    return await response.json();
+}
+
 const DATA_PATH = "data/";
 
 const FILES = {
