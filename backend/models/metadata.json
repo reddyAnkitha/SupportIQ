@@ -1,0 +1,11 @@
+{
+  "model": "RandomForestClassifier",
+  "target": "Satisfaction Risk",
+  "risk_definition": "Rating <= 2",
+  "features": [
+    "Ticket Priority",
+    "Ticket Type",
+    "Ticket Channel",
+    "Customer Age"
+  ]
+}
