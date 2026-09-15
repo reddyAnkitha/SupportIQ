@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas.ticket import TicketRequest
 from services.nlp import extract_keywords
 from services.analytics import get_segments, get_satisfaction
 from services.prediction import predict_satisfaction_risk
+from services.errors import handle_service_error
 
 
 app = FastAPI(
@@ -42,45 +43,37 @@ def health():
 def segments():
     try:
         return get_segments()
-    except FileNotFoundError as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
+    except Exception as error:
+        raise handle_service_error(error)
 
 
 @app.get("/satisfaction")
 def satisfaction():
     try:
         return get_satisfaction()
-    except FileNotFoundError as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
+    except Exception as error:
+        raise handle_service_error(error)
 
 
 @app.post("/analyze")
 def analyze_ticket(ticket: TicketRequest):
-    keywords = extract_keywords(ticket.description)
-
     try:
+        keywords = extract_keywords(ticket.description)
+
         prediction = predict_satisfaction_risk(
             customer_age=ticket.customer_age,
             priority=ticket.priority,
             ticket_type=ticket.ticket_type,
             channel=ticket.channel,
         )
-    except FileNotFoundError as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
 
-    return {
-        "ticket_type": ticket.ticket_type,
-        "priority": ticket.priority,
-        "channel": ticket.channel,
-        "keywords": keywords,
-        "prediction": prediction,
-    }
+        return {
+            "ticket_type": ticket.ticket_type,
+            "priority": ticket.priority,
+            "channel": ticket.channel,
+            "keywords": keywords,
+            "prediction": prediction,
+        }
+
+    except Exception as error:
+        raise handle_service_error(error)
