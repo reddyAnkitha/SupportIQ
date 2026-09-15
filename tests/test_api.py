@@ -62,3 +62,13 @@ def test_analyze_rejects_short_description():
     )
 
     assert response.status_code == 422
+
+def test_health_response_structure():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "status" in data
+    assert data["status"] == "healthy"
