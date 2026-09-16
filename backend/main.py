@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas.ticket import TicketRequest
-from services.nlp import extract_keywords
-from services.analytics import get_segments, get_satisfaction
-from services.prediction import predict_satisfaction_risk
-from services.errors import handle_service_error
-from services.nlp_prediction import analyze_text
+from backend.schemas.ticket import TicketRequest
+from backend.services.nlp import extract_keywords
+from backend.services.analytics import get_segments, get_satisfaction
+from backend.services.prediction import predict_satisfaction_risk
+from backend.services.errors import handle_service_error
+from backend.services.nlp_prediction import analyze_text
 
 
 app = FastAPI(
