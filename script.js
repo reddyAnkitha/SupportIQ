@@ -39,36 +39,38 @@ let filtersInitialized = false;
 
 async function analyzeTicketWithAPI(ticket) {
 
-    const response = await fetch(
-        `${API_BASE_URL}/analyze`,
-        {
-            method: "POST",
+    const response =
+        await fetch(
+            `${API_BASE_URL}/analyze`,
+            {
+                method: "POST",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-            body: JSON.stringify({
-                customer_age: Number(
-                    ticket["Customer Age"]
-                ),
+                body: JSON.stringify({
+                    customer_age:
+                        Number(
+                            ticket["Customer Age"]
+                        ),
 
-                priority:
-                    ticket["Ticket Priority"],
+                    priority:
+                        ticket["Ticket Priority"],
 
-                ticket_type:
-                    ticket["Ticket Type"],
+                    ticket_type:
+                        ticket["Ticket Type"],
 
-                channel:
-                    ticket["Ticket Channel"],
+                    channel:
+                        ticket["Ticket Channel"],
 
-                description:
-                    ticket["Description"] ||
-                    ticket["Ticket Subject"] ||
-                    "Customer support request"
-            })
-        }
-    );
+                    description:
+                        ticket["Description"] ||
+                        ticket["Ticket Subject"] ||
+                        "Customer support request"
+                })
+            }
+        );
 
 
     if (!response.ok) {
@@ -156,7 +158,9 @@ function setupAPIAnalysis() {
                         ?.important_terms
                         ?.map(
                             item =>
-                                `${item.term} (${item.frequency})`
+                                `${escapeHtml(
+                                    item.term
+                                )} (${item.frequency})`
                         )
                         .join(", ");
 
@@ -165,23 +169,37 @@ function setupAPIAnalysis() {
                     analysis?.prediction;
 
 
+                const riskProbability =
+                    prediction?.risk_probability !== undefined
+                        ? `${(
+                            Number(
+                                prediction.risk_probability
+                            ) * 100
+                        ).toFixed(2)}%`
+                        : "Unavailable";
+
+
                 result.innerHTML = `
                     <strong>Analysis Complete</strong>
 
                     <br><br>
 
                     <strong>Risk:</strong>
-                    ${prediction?.risk_label || "Unavailable"}
+                    ${escapeHtml(
+                        prediction?.risk_label ||
+                        "Unavailable"
+                    )}
 
                     <br>
 
                     <strong>Risk Probability:</strong>
-                    ${prediction?.risk_probability ?? "Unavailable"}
+                    ${riskProbability}
 
                     <br><br>
 
                     <strong>Important Terms:</strong>
-                    ${terms || "No important terms found."}
+                    ${terms ||
+                        "No important terms found."}
                 `;
 
 
@@ -215,7 +233,9 @@ function setupAPIAnalysis() {
 document.addEventListener(
     "DOMContentLoaded",
     () => {
+
         initializeDashboard();
+
     }
 );
 
@@ -2683,4 +2703,3 @@ function showTicketDataWarning() {
         "Resolution filters require this file."
     );
 }
-
