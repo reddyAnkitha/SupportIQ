@@ -1,0 +1,36 @@
+name: Train SupportIQ Model
+
+on:
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn joblib
+
+      - name: Train satisfaction model
+        run: |
+          python ml/train_model.py
+
+      - name: Check generated model
+        run: |
+          ls -lh backend/models/
+
+      - name: Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: satisfaction-model
+          path: backend/models/satisfaction_model.pkl
