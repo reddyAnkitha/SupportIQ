@@ -104,38 +104,280 @@ function setupAPIAnalysis() {
         );
 
 
-    if (!button || !result) {
+    const ticketSelector =
+        document.getElementById(
+            "ticket-selector"
+        );
+
+
+    const preview =
+        document.getElementById(
+            "selected-ticket-preview"
+        );
+
+
+    if (
+        !button ||
+        !result ||
+        !ticketSelector ||
+        !preview
+    ) {
 
         return;
 
     }
 
 
-    button.addEventListener(
-        "click",
-        async function () {
+    const tickets =
+        window.supportIQTickets;
 
-            const tickets =
-                window.supportIQTickets;
 
+    if (
+        !tickets ||
+        !Array.isArray(tickets) ||
+        tickets.length === 0
+    ) {
+
+        ticketSelector.innerHTML =
+            `
+                <option value="">
+                    No tickets available
+                </option>
+            `;
+
+
+        preview.textContent =
+            "Ticket data is not available.";
+
+
+        button.disabled =
+            true;
+
+
+        return;
+
+    }
+
+
+    /*
+     * No ticket is selected initially.
+     */
+
+    window.selectedSupportIQTicket =
+        null;
+
+
+    /*
+     * Populate ticket selector.
+     */
+
+    ticketSelector.innerHTML =
+        `
+            <option value="">
+                Select a ticket...
+            </option>
+        `;
+
+
+    tickets.forEach(
+        (
+            ticket,
+            index
+        ) => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                String(index);
+
+
+            const ticketId =
+                ticket["Ticket ID"] ||
+                `Ticket ${index + 1}`;
+
+
+            const priority =
+                ticket["Ticket Priority"] ||
+                "Unknown";
+
+
+            const type =
+                ticket["Ticket Type"] ||
+                "Support Ticket";
+
+
+            option.textContent =
+                `${ticketId} — ${priority} — ${type}`;
+
+
+            ticketSelector.appendChild(
+                option
+            );
+
+        }
+    );
+
+
+    /*
+     * Keep Analyze disabled until
+     * the user selects a ticket.
+     */
+
+    button.disabled =
+        true;
+
+
+    /* =====================================================
+       TICKET SELECTION
+    ====================================================== */
+
+    ticketSelector.addEventListener(
+        "change",
+        function () {
+
+            const index =
+                Number(
+                    ticketSelector.value
+                );
+
+
+            /*
+             * No ticket selected.
+             */
 
             if (
-                !tickets ||
-                !Array.isArray(tickets) ||
-                tickets.length === 0
+                !Number.isInteger(index) ||
+                !tickets[index]
             ) {
 
+                window.selectedSupportIQTicket =
+                    null;
+
+
+                preview.textContent =
+                    "Select a ticket to view its details.";
+
+
                 result.textContent =
-                    "Ticket data is not available yet.";
+                    "Select a ticket and click Analyze Selected Ticket.";
+
+
+                button.disabled =
+                    true;
+
 
                 return;
 
             }
 
 
-            /* =================================================
-               USE THE CURRENTLY SELECTED TICKET
-            ================================================= */
+            /*
+             * Store the selected ticket globally.
+             */
+
+            const selectedTicket =
+                tickets[index];
+
+
+            window.selectedSupportIQTicket =
+                selectedTicket;
+
+
+            /*
+             * Read ticket fields.
+             */
+
+            const subject =
+                selectedTicket["Ticket Subject"] ||
+                "No subject available";
+
+
+            const description =
+                selectedTicket["Description"] ||
+                "No description available";
+
+
+            const priority =
+                selectedTicket["Ticket Priority"] ||
+                "Unknown";
+
+
+            const type =
+                selectedTicket["Ticket Type"] ||
+                "Unknown";
+
+
+            const channel =
+                selectedTicket["Ticket Channel"] ||
+                "Unknown";
+
+
+            const customerAge =
+                selectedTicket["Customer Age"] ||
+                "Unknown";
+
+
+            /*
+             * Show selected ticket details.
+             */
+
+            preview.innerHTML = `
+                <strong>Selected Ticket</strong>
+
+                <br><br>
+
+                <strong>Subject:</strong>
+                ${escapeHtml(subject)}
+
+                <br>
+
+                <strong>Priority:</strong>
+                ${escapeHtml(priority)}
+
+                <br>
+
+                <strong>Type:</strong>
+                ${escapeHtml(type)}
+
+                <br>
+
+                <strong>Channel:</strong>
+                ${escapeHtml(channel)}
+
+                <br>
+
+                <strong>Customer Age:</strong>
+                ${escapeHtml(customerAge)}
+
+                <br><br>
+
+                <strong>Description:</strong>
+                ${escapeHtml(description)}
+            `;
+
+
+            result.textContent =
+                "Ticket selected. Click Analyze Selected Ticket.";
+
+
+            button.disabled =
+                false;
+
+        }
+    );
+
+
+    /* =====================================================
+       ANALYZE SELECTED TICKET
+    ====================================================== */
+
+    button.addEventListener(
+        "click",
+        async function () {
 
             const selectedTicket =
                 window.selectedSupportIQTicket;
@@ -146,29 +388,31 @@ function setupAPIAnalysis() {
                 result.textContent =
                     "Please select a ticket before analyzing.";
 
+
                 return;
 
             }
-
-
-            const ticket =
-                selectedTicket;
 
 
             result.textContent =
                 "Analyzing ticket...";
 
 
-            button.disabled = true;
+            button.disabled =
+                true;
 
 
             try {
 
                 const analysis =
                     await analyzeTicketWithAPI(
-                        ticket
+                        selectedTicket
                     );
 
+
+                /*
+                 * Extract important terms.
+                 */
 
                 const terms =
                     analysis
@@ -183,9 +427,18 @@ function setupAPIAnalysis() {
                         .join(", ");
 
 
+                /*
+                 * Extract prediction.
+                 */
+
                 const prediction =
                     analysis?.prediction;
 
+
+                /*
+                 * Convert probability
+                 * into percentage.
+                 */
 
                 const riskProbability =
                     prediction?.risk_probability !== undefined
@@ -196,6 +449,10 @@ function setupAPIAnalysis() {
                         ).toFixed(2)}%`
                         : "Unavailable";
 
+
+                /*
+                 * Display API result.
+                 */
 
                 result.innerHTML = `
                     <strong>Analysis Complete</strong>
@@ -232,10 +489,10 @@ function setupAPIAnalysis() {
                 result.textContent =
                     "Unable to analyze the ticket. Please try again.";
 
-
             } finally {
 
-                button.disabled = false;
+                button.disabled =
+                    false;
 
             }
 
@@ -290,7 +547,7 @@ async function initializeDashboard() {
 
     /*
      * Connect the AI Ticket Analysis
-     * button after ticket data is loaded.
+     * section after ticket data is loaded.
      */
 
     setupAPIAnalysis();
@@ -666,11 +923,6 @@ async function loadDashboardMetrics() {
         );
 
 
-        /*
-         * Known project values are used
-         * only as a visual fallback.
-         */
-
         setText(
             "total-tickets",
             "8,469"
@@ -929,17 +1181,6 @@ function renderSegmentSection() {
                     </div>
                 </div>
             `;
-
-
-            if (
-                (index + 1) % 3 === 0
-            ) {
-
-                /*
-                 * Grid layout handles rows automatically.
-                 */
-
-            }
 
         }
     );
@@ -1359,12 +1600,6 @@ function initializeInteractiveFilters() {
             "reset-filters"
         );
 
-
-    /*
-     * The filter controls are optional.
-     * This keeps the script compatible
-     * with older versions of index.html.
-     */
 
     if (
         !priorityFilter &&
@@ -1807,17 +2042,6 @@ function getFilteredTickets() {
    SEGMENT MATCHING
 ========================================================= */
 
-/*
-   ticket_data.json contains the variables
-   needed for the dashboard:
-   age, satisfaction, and resolution time.
-
-   The original K-Means model was trained
-   separately. For interactive filtering,
-   this function maps each ticket to the
-   closest published segment profile.
-*/
-
 function inferSegment(
     ticket
 ) {
@@ -1874,11 +2098,6 @@ function inferSegment(
             )
         );
 
-
-    /*
-     * Missing fields cannot be reliably
-     * mapped to a cluster.
-     */
 
     if (
         age === null &&
@@ -2486,10 +2705,6 @@ function updateFilteredStats() {
         getFilteredTickets();
 
 
-    /*
-     * Optional elements.
-     */
-
     if (
         !ticketData.length
     ) {
@@ -2721,3 +2936,4 @@ function showTicketDataWarning() {
         "Resolution filters require this file."
     );
 }
+
