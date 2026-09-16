@@ -64,7 +64,7 @@ keywords = extract_keywords(
 ticket.description
 )
 
-```
+
     text_analysis = analyze_text(
         ticket.description
     )
@@ -87,4 +87,4 @@ ticket.description
 
 except Exception as error:
     raise handle_service_error(error)
-```
+
