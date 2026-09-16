@@ -1,828 +1,884 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
 
-    <meta charset="UTF-8">
+```
+<meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0">
 
-    <title>
-        SupportIQ - Customer Support Intelligence
-    </title>
+<title>
+    SupportIQ - Customer Support Intelligence
+</title>
 
-    <link
-        rel="stylesheet"
-        href="style.css">
+<link
+    rel="stylesheet"
+    href="style.css">
+```
 
 </head>
 
 <body>
 
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
+```
+<!-- =====================================================
+     HEADER
+====================================================== -->
 
-    <header>
+<header>
 
-        <h1>
-            SupportIQ
-        </h1>
+    <h1>
+        SupportIQ
+    </h1>
+
+    <p>
+        Customer Support Intelligence Platform
+    </p>
+
+</header>
+
+
+<!-- =====================================================
+     NAVIGATION
+====================================================== -->
+
+<nav>
+
+    <a href="#dashboard">
+        Dashboard
+    </a>
+
+    <a href="#segments">
+        Customer Segmentation
+    </a>
+
+    <a href="#satisfaction">
+        Satisfaction Risk
+    </a>
+
+    <a href="#resolution">
+        Resolution Analytics
+    </a>
+
+    <a href="#ai-analysis">
+        AI Ticket Analysis
+    </a>
+
+    <a href="#about">
+        About
+    </a>
+
+</nav>
+
+
+<!-- =====================================================
+     MAIN CONTENT
+====================================================== -->
+
+<main>
+
+    <!-- =================================================
+         DASHBOARD STATUS
+    ================================================== -->
+
+    <div
+        id="dashboard-status"
+        class="dashboard-status"
+        role="status"
+        aria-live="polite"
+        style="display: none;">
+
+    </div>
+
+
+    <!-- =================================================
+         DASHBOARD
+    ================================================== -->
+
+    <section
+        class="welcome"
+        id="dashboard">
+
+        <h2>
+            Customer Support Dashboard
+        </h2>
 
         <p>
-            Customer Support Intelligence Platform
+            Monitor customer satisfaction, ticket resolution,
+            and customer segments using machine learning
+            and customer support analytics.
         </p>
 
-    </header>
+    </section>
 
 
-    <!-- =====================================================
-         NAVIGATION
-    ====================================================== -->
+    <!-- =================================================
+         DASHBOARD CARDS
+    ================================================== -->
 
-    <nav>
+    <div class="cards">
 
-        <a href="#dashboard">
-            Dashboard
-        </a>
+        <!-- TOTAL TICKETS -->
 
-        <a href="#segments">
+        <div class="card">
+
+            <h3>
+                Total Tickets
+            </h3>
+
+            <div
+                class="value"
+                id="total-tickets">
+
+                Loading...
+
+            </div>
+
+        </div>
+
+
+        <!-- AVERAGE SATISFACTION -->
+
+        <div class="card">
+
+            <h3>
+                Average Satisfaction
+            </h3>
+
+            <div
+                class="value"
+                id="average-satisfaction">
+
+                Loading...
+
+            </div>
+
+        </div>
+
+
+        <!-- AVERAGE RESOLUTION -->
+
+        <div class="card">
+
+            <h3>
+                Avg Resolution Time
+            </h3>
+
+            <div
+                class="value"
+                id="average-resolution">
+
+                Loading...
+
+            </div>
+
+        </div>
+
+
+        <!-- CUSTOMER SEGMENTS -->
+
+        <div class="card">
+
+            <h3>
+                Customer Segments
+            </h3>
+
+            <div
+                class="value"
+                id="customer-segments">
+
+                Loading...
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         CUSTOMER SEGMENTATION
+    ================================================== -->
+
+    <section id="segments">
+
+        <h2>
             Customer Segmentation
-        </a>
+        </h2>
 
-        <a href="#satisfaction">
-            Satisfaction Risk
-        </a>
-
-        <a href="#resolution">
-            Resolution Analytics
-        </a>
-
-        <a href="#ai-analysis">
-            AI Ticket Analysis
-        </a>
-
-        <a href="#about">
-            About
-        </a>
-
-    </nav>
-
-
-    <!-- =====================================================
-         MAIN CONTENT
-    ====================================================== -->
-
-    <main>
-
-        <!-- =================================================
-             DASHBOARD STATUS
-        ================================================== -->
-
-        <div
-            id="dashboard-status"
-            class="dashboard-status"
-            role="status"
-            aria-live="polite"
-            style="display: none;">
-
-        </div>
+        <p>
+            Six customer segments were identified using
+            K-Means clustering on customer-level features
+            including age, average satisfaction, and
+            average resolution time. Segment labels were
+            generated from the resulting cluster profiles.
+        </p>
 
 
         <!-- =================================================
-             DASHBOARD
+             ML SEGMENT OVERVIEW
         ================================================== -->
 
-        <section
-            class="welcome"
-            id="dashboard">
-
-            <h2>
-                Customer Support Dashboard
-            </h2>
-
-            <p>
-                Monitor customer satisfaction, ticket resolution,
-                and customer segments using machine learning
-                and customer support analytics.
-            </p>
-
-        </section>
-
-
-        <!-- =================================================
-             DASHBOARD CARDS
-        ================================================== -->
-
-        <div class="cards">
-
-            <!-- TOTAL TICKETS -->
-
-            <div class="card">
-
-                <h3>
-                    Total Tickets
-                </h3>
-
-                <div
-                    class="value"
-                    id="total-tickets">
-
-                    Loading...
-
-                </div>
-
-            </div>
-
-
-            <!-- AVERAGE SATISFACTION -->
-
-            <div class="card">
-
-                <h3>
-                    Average Satisfaction
-                </h3>
-
-                <div
-                    class="value"
-                    id="average-satisfaction">
-
-                    Loading...
-
-                </div>
-
-            </div>
-
-
-            <!-- AVERAGE RESOLUTION -->
-
-            <div class="card">
-
-                <h3>
-                    Avg Resolution Time
-                </h3>
-
-                <div
-                    class="value"
-                    id="average-resolution">
-
-                    Loading...
-
-                </div>
-
-            </div>
-
-
-            <!-- CUSTOMER SEGMENTS -->
-
-            <div class="card">
-
-                <h3>
-                    Customer Segments
-                </h3>
-
-                <div
-                    class="value"
-                    id="customer-segments">
-
-                    Loading...
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- =================================================
-             CUSTOMER SEGMENTATION
-        ================================================== -->
-
-        <section id="segments">
-
-            <h2>
-                Customer Segmentation
-            </h2>
-
-            <p>
-                Six customer segments were identified using
-                K-Means clustering on customer-level features
-                including age, average satisfaction, and
-                average resolution time. Segment labels were
-                generated from the resulting cluster profiles.
-            </p>
+        <div class="segment-dashboard">
 
 
             <!-- =================================================
-                 ML SEGMENT OVERVIEW
+                 SEGMENT TABLE
             ================================================== -->
 
-            <div class="segment-dashboard">
+            <div class="segment-table-card">
 
+                <div class="section-heading">
 
-                <!-- =================================================
-                     SEGMENT TABLE
-                ================================================== -->
+                    <div>
 
-                <div class="segment-table-card">
+                        <h3>
+                            Customer Segment Profiles
+                        </h3>
 
-                    <div class="section-heading">
-
-                        <div>
-
-                            <h3>
-                                Customer Segment Profiles
-                            </h3>
-
-                            <p>
-                                ML-generated customer groups based on
-                                behavioral and support characteristics.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div id="segment-container">
-
-                        <div class="loading-message">
-
-                            Loading customer segments...
-
-                        </div>
+                        <p>
+                            ML-generated customer groups based on
+                            behavioral and support characteristics.
+                        </p>
 
                     </div>
 
                 </div>
 
 
-                <!-- =================================================
-                     SEGMENT DISTRIBUTION
-                ================================================== -->
+                <div id="segment-container">
 
-                <div class="segment-chart-card">
+                    <div class="loading-message">
 
-                    <h3>
-                        Segment Distribution
-                    </h3>
-
-                    <p>
-                        Customer distribution across the six
-                        machine-learning segments.
-                    </p>
-
-
-                    <div class="segment-chart-wrapper">
-
-                        <canvas
-                            id="segment-distribution-chart"
-                            aria-label="Customer segment distribution chart"
-                            role="img">
-
-                        </canvas>
-
-                    </div>
-
-                    <!-- Chart legend generated by JavaScript -->
-
-                    <div
-                        id="segment-chart-legend"
-                        class="segment-chart-legend">
+                        Loading customer segments...
 
                     </div>
 
                 </div>
-
 
             </div>
-
-        </section>
-
-
-        <!-- =================================================
-             SATISFACTION RISK
-        ================================================== -->
-
-        <section id="satisfaction">
-
-            <h2>
-                Satisfaction Risk
-            </h2>
-
-            <p>
-                Customer satisfaction risk was analyzed using
-                closed support tickets. Ratings of 1 or 2 were
-                classified as low satisfaction.
-            </p>
-
-
-            <div class="cards">
-
-
-                <!-- LOW SATISFACTION -->
-
-                <div class="card">
-
-                    <h3>
-                        Low Satisfaction
-                    </h3>
-
-                    <div
-                        class="value"
-                        id="low-satisfaction">
-
-                        Loading...
-
-                    </div>
-
-                </div>
-
-
-                <!-- SATISFIED CUSTOMERS -->
-
-                <div class="card">
-
-                    <h3>
-                        Satisfied Customers
-                    </h3>
-
-                    <div
-                        class="value"
-                        id="satisfied-customers">
-
-                        Loading...
-
-                    </div>
-
-                </div>
-
-
-                <!-- LOW SATISFACTION RATE -->
-
-                <div class="card">
-
-                    <h3>
-                        Low Satisfaction Rate
-                    </h3>
-
-                    <div
-                        class="value"
-                        id="low-satisfaction-rate">
-
-                        Loading...
-
-                    </div>
-
-                </div>
-
-
-                <!-- MODEL ACCURACY -->
-
-                <div class="card">
-
-                    <h3>
-                        Model Accuracy
-                    </h3>
-
-                    <div
-                        class="value"
-                        id="model-accuracy">
-
-                        Loading...
-
-                    </div>
-
-                </div>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             RESOLUTION ANALYTICS
-        ================================================== -->
-
-        <section id="resolution">
-
-            <h2>
-                Resolution Analytics
-            </h2>
-
-            <p>
-                Analyze resolution performance interactively by
-                priority, ticket type, support channel, and
-                customer segment.
-            </p>
 
 
             <!-- =================================================
-                 INTERACTIVE FILTERS
+                 SEGMENT DISTRIBUTION
             ================================================== -->
 
-            <div class="filter-panel">
+            <div class="segment-chart-card">
 
                 <h3>
-                    Interactive Filters
+                    Segment Distribution
                 </h3>
 
-
-                <div class="filter-grid">
-
-
-                    <!-- PRIORITY -->
-
-                    <div class="filter-group">
-
-                        <label for="priority-filter">
-
-                            Priority
-
-                        </label>
-
-
-                        <select
-                            id="priority-filter">
-
-                            <option value="">
-
-                                All Priorities
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- TICKET TYPE -->
-
-                    <div class="filter-group">
-
-                        <label for="type-filter">
-
-                            Ticket Type
-
-                        </label>
-
-
-                        <select
-                            id="type-filter">
-
-                            <option value="">
-
-                                All Ticket Types
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- SUPPORT CHANNEL -->
-
-                    <div class="filter-group">
-
-                        <label for="channel-filter">
-
-                            Support Channel
-
-                        </label>
-
-
-                        <select
-                            id="channel-filter">
-
-                            <option value="">
-
-                                All Channels
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- CUSTOMER SEGMENT -->
-
-                    <div class="filter-group">
-
-                        <label for="segment-filter-main">
-
-                            Customer Segment
-
-                        </label>
-
-
-                        <select
-                            id="segment-filter-main">
-
-                            <option value="">
-
-                                All Segments
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                </div>
-
-
-                <!-- =================================================
-                     FILTERED RESULTS
-                ================================================== -->
-
-                <div
-                    class="cards"
-                    id="filtered-stats">
-
-
-                    <!-- FILTERED TICKETS -->
-
-                    <div class="card">
-
-                        <h3>
-                            Filtered Tickets
-                        </h3>
-
-
-                        <div
-                            class="value"
-                            id="filtered-ticket-count">
-
-                            0
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- FILTERED SATISFACTION -->
-
-                    <div class="card">
-
-                        <h3>
-                            Filtered Satisfaction
-                        </h3>
-
-
-                        <div
-                            class="value"
-                            id="filtered-average-satisfaction">
-
-                            N/A
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- FILTERED RESOLUTION -->
-
-                    <div class="card">
-
-                        <h3>
-                            Filtered Resolution
-                        </h3>
-
-
-                        <div
-                            class="value"
-                            id="filtered-average-resolution">
-
-                            See analytics
-
-                        </div>
-
-
-                        <small>
-
-                            Ticket-level resolution values are
-                            unavailable in the source data.
-                            See the resolution charts below for
-                            aggregate resolution analytics.
-
-                        </small>
-
-                    </div>
-
-
-                </div>
-
-
-                <!-- =================================================
-                     FILTER STATUS
-                ================================================== -->
-
-                <p id="filter-result-status">
-
-                    Loading ticket data...
-
+                <p>
+                    Customer distribution across the six
+                    machine-learning segments.
                 </p>
 
 
-                <!-- =================================================
-                     RESET FILTERS
-                ================================================== -->
+                <div class="segment-chart-wrapper">
 
-                <button
-                    id="reset-filters"
-                    type="button">
+                    <canvas
+                        id="segment-distribution-chart"
+                        aria-label="Customer segment distribution chart"
+                        role="img">
 
-                    Reset Filters
+                    </canvas>
 
-                </button>
+                </div>
+
+                <!-- Chart legend generated by JavaScript -->
+
+                <div
+                    id="segment-chart-legend"
+                    class="segment-chart-legend">
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+    <!-- =================================================
+         SATISFACTION RISK
+    ================================================== -->
+
+    <section id="satisfaction">
+
+        <h2>
+            Satisfaction Risk
+        </h2>
+
+        <p>
+            Customer satisfaction risk was analyzed using
+            closed support tickets. Ratings of 1 or 2 were
+            classified as low satisfaction.
+        </p>
+
+
+        <div class="cards">
+
+
+            <!-- LOW SATISFACTION -->
+
+            <div class="card">
+
+                <h3>
+                    Low Satisfaction
+                </h3>
+
+                <div
+                    class="value"
+                    id="low-satisfaction">
+
+                    Loading...
+
+                </div>
+
+            </div>
+
+
+            <!-- SATISFIED CUSTOMERS -->
+
+            <div class="card">
+
+                <h3>
+                    Satisfied Customers
+                </h3>
+
+                <div
+                    class="value"
+                    id="satisfied-customers">
+
+                    Loading...
+
+                </div>
+
+            </div>
+
+
+            <!-- LOW SATISFACTION RATE -->
+
+            <div class="card">
+
+                <h3>
+                    Low Satisfaction Rate
+                </h3>
+
+                <div
+                    class="value"
+                    id="low-satisfaction-rate">
+
+                    Loading...
+
+                </div>
+
+            </div>
+
+
+            <!-- MODEL ACCURACY -->
+
+            <div class="card">
+
+                <h3>
+                    Model Accuracy
+                </h3>
+
+                <div
+                    class="value"
+                    id="model-accuracy">
+
+                    Loading...
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+    <!-- =================================================
+         RESOLUTION ANALYTICS
+    ================================================== -->
+
+    <section id="resolution">
+
+        <h2>
+            Resolution Analytics
+        </h2>
+
+        <p>
+            Analyze resolution performance interactively by
+            priority, ticket type, support channel, and
+            customer segment.
+        </p>
+
+
+        <!-- =================================================
+             INTERACTIVE FILTERS
+        ================================================== -->
+
+        <div class="filter-panel">
+
+            <h3>
+                Interactive Filters
+            </h3>
+
+
+            <div class="filter-grid">
+
+
+                <!-- PRIORITY -->
+
+                <div class="filter-group">
+
+                    <label for="priority-filter">
+
+                        Priority
+
+                    </label>
+
+
+                    <select
+                        id="priority-filter">
+
+                        <option value="">
+
+                            All Priorities
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- TICKET TYPE -->
+
+                <div class="filter-group">
+
+                    <label for="type-filter">
+
+                        Ticket Type
+
+                    </label>
+
+
+                    <select
+                        id="type-filter">
+
+                        <option value="">
+
+                            All Ticket Types
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- SUPPORT CHANNEL -->
+
+                <div class="filter-group">
+
+                    <label for="channel-filter">
+
+                        Support Channel
+
+                    </label>
+
+
+                    <select
+                        id="channel-filter">
+
+                        <option value="">
+
+                            All Channels
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- CUSTOMER SEGMENT -->
+
+                <div class="filter-group">
+
+                    <label for="segment-filter-main">
+
+                        Customer Segment
+
+                    </label>
+
+
+                    <select
+                        id="segment-filter-main">
+
+                        <option value="">
+
+                            All Segments
+
+                        </option>
+
+                    </select>
+
+                </div>
 
 
             </div>
 
 
             <!-- =================================================
-                 RESOLUTION CHARTS
+                 FILTERED RESULTS
             ================================================== -->
 
-            <div class="analytics-grid">
+            <div
+                class="cards"
+                id="filtered-stats">
 
 
-                <!-- =================================================
-                     PRIORITY
-                ================================================== -->
+                <!-- FILTERED TICKETS -->
 
-                <div class="chart-card">
+                <div class="card">
 
                     <h3>
-                        Resolution by Priority
+                        Filtered Tickets
                     </h3>
 
 
                     <div
-                        id="priority-chart"
-                        class="chart-wrapper">
+                        class="value"
+                        id="filtered-ticket-count">
 
-                        Loading data...
+                        0
 
                     </div>
 
                 </div>
 
 
-                <!-- =================================================
-                     TICKET TYPE
-                ================================================== -->
+                <!-- FILTERED SATISFACTION -->
 
-                <div class="chart-card">
+                <div class="card">
 
                     <h3>
-                        Resolution by Ticket Type
+                        Filtered Satisfaction
                     </h3>
 
 
                     <div
-                        id="type-chart"
-                        class="chart-wrapper">
+                        class="value"
+                        id="filtered-average-satisfaction">
 
-                        Loading data...
+                        N/A
 
                     </div>
 
                 </div>
 
 
-                <!-- =================================================
-                     CHANNEL
-                ================================================== -->
+                <!-- FILTERED RESOLUTION -->
 
-                <div class="chart-card">
+                <div class="card">
 
                     <h3>
-                        Resolution by Channel
+                        Filtered Resolution
                     </h3>
 
 
                     <div
-                        id="channel-chart"
-                        class="chart-wrapper">
+                        class="value"
+                        id="filtered-average-resolution">
 
-                        Loading data...
+                        See analytics
 
                     </div>
+
+
+                    <small>
+
+                        Ticket-level resolution values are
+                        unavailable in the source data.
+                        See the resolution charts below for
+                        aggregate resolution analytics.
+
+                    </small>
 
                 </div>
 
 
             </div>
 
-        </section>
 
+            <!-- =================================================
+                 FILTER STATUS
+            ================================================== -->
 
-        <!-- =================================================
-             AI TICKET ANALYSIS
-        ================================================== -->
+            <p id="filter-result-status">
 
-        <section id="ai-analysis">
+                Loading ticket data...
 
-            <h2>
-                AI Ticket Analysis
-            </h2>
-
-            <p>
-                Analyze an individual support ticket using the
-                SupportIQ backend API to identify important terms
-                and predict customer satisfaction risk.
             </p>
 
 
-            <div class="api-analysis-panel">
+            <!-- =================================================
+                 RESET FILTERS
+            ================================================== -->
 
-                <button
-                    id="analyzeTicketBtn"
-                    type="button">
+            <button
+                id="reset-filters"
+                type="button">
 
-                    Analyze Selected Ticket
+                Reset Filters
 
-                </button>
+            </button>
+
+
+        </div>
+
+
+        <!-- =================================================
+             RESOLUTION CHARTS
+        ================================================== -->
+
+        <div class="analytics-grid">
+
+
+            <!-- =================================================
+                 PRIORITY
+            ================================================== -->
+
+            <div class="chart-card">
+
+                <h3>
+                    Resolution by Priority
+                </h3>
 
 
                 <div
-                    id="apiAnalysisResult"
-                    class="api-analysis-result"
-                    role="status"
-                    aria-live="polite">
+                    id="priority-chart"
+                    class="chart-wrapper">
 
-                    Select a ticket and click the button to analyze it.
+                    Loading data...
 
                 </div>
 
             </div>
 
-        </section>
+
+            <!-- =================================================
+                 TICKET TYPE
+            ================================================== -->
+
+            <div class="chart-card">
+
+                <h3>
+                    Resolution by Ticket Type
+                </h3>
 
 
-        <!-- =================================================
-             ABOUT
-        ================================================== -->
+                <div
+                    id="type-chart"
+                    class="chart-wrapper">
 
-        <section id="about">
+                    Loading data...
 
-            <h2>
-                About SupportIQ
-            </h2>
+                </div>
 
-
-            <p>
-                SupportIQ uses machine learning and customer
-                support analytics to identify customer segments
-                and understand support performance.
-            </p>
+            </div>
 
 
-            <p>
-                The platform uses K-Means clustering for customer
-                segmentation and Random Forest classification for
-                satisfaction risk analysis.
-            </p>
+            <!-- =================================================
+                 CHANNEL
+            ================================================== -->
 
-        </section>
+            <div class="chart-card">
 
-
-    </main>
-
-
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
-    <footer>
-
-        SupportIQ | Customer Support Analytics & Machine Learning
-
-    </footer>
+                <h3>
+                    Resolution by Channel
+                </h3>
 
 
-    <!-- =====================================================
-         CHART.JS
-    ====================================================== -->
+                <div
+                    id="channel-chart"
+                    class="chart-wrapper">
 
-    <script
-        src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
-    </script>
+                    Loading data...
+
+                </div>
+
+            </div>
 
 
-    <!-- =====================================================
-         SUPPORTIQ JAVASCRIPT
-    ====================================================== -->
+        </div>
 
-    <script src="script.js"></script>
+    </section>
 
+
+    <!-- =================================================
+         AI TICKET ANALYSIS
+    ================================================== -->
+
+    <section id="ai-analysis">
+
+        <h2>
+            AI Ticket Analysis
+        </h2>
+
+        <p>
+            Select an individual support ticket and analyze it
+            using the SupportIQ backend API to identify
+            important terms and predict customer satisfaction
+            risk.
+        </p>
+
+
+        <div class="api-analysis-panel">
+
+
+            <!-- =================================================
+                 TICKET SELECTION
+            ================================================== -->
+
+            <div class="filter-group">
+
+                <label for="ticket-selector">
+
+                    Select Ticket
+
+                </label>
+
+
+                <select
+                    id="ticket-selector"
+                    aria-label="Select a support ticket">
+
+                    <option value="">
+
+                        Loading tickets...
+
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- =================================================
+                 SELECTED TICKET PREVIEW
+            ================================================== -->
+
+            <div
+                id="selected-ticket-preview"
+                class="selected-ticket-preview"
+                aria-live="polite">
+
+                Select a ticket to view its details.
+
+            </div>
+
+
+            <!-- =================================================
+                 ANALYZE BUTTON
+            ================================================== -->
+
+            <button
+                id="analyzeTicketBtn"
+                type="button">
+
+                Analyze Selected Ticket
+
+            </button>
+
+
+            <!-- =================================================
+                 API RESULT
+            ================================================== -->
+
+            <div
+                id="apiAnalysisResult"
+                class="api-analysis-result"
+                role="status"
+                aria-live="polite">
+
+                Select a ticket and click the button to analyze it.
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =================================================
+         ABOUT
+    ================================================== -->
+
+    <section id="about">
+
+        <h2>
+            About SupportIQ
+        </h2>
+
+
+        <p>
+            SupportIQ uses machine learning and customer
+            support analytics to identify customer segments
+            and understand support performance.
+        </p>
+
+
+        <p>
+            The platform uses K-Means clustering for customer
+            segmentation and Random Forest classification for
+            satisfaction risk analysis.
+        </p>
+
+    </section>
+
+
+</main>
+
+
+<!-- =====================================================
+     FOOTER
+====================================================== -->
+
+<footer>
+
+    SupportIQ | Customer Support Analytics & Machine Learning
+
+</footer>
+
+
+<!-- =====================================================
+     CHART.JS
+====================================================== -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
+</script>
+
+
+<!-- =====================================================
+     SUPPORTIQ JAVASCRIPT
+====================================================== -->
+
+<script src="script.js"></script>
+```
 
 </body>
 
