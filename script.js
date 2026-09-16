@@ -133,8 +133,26 @@ function setupAPIAnalysis() {
             }
 
 
+            /* =================================================
+               USE THE CURRENTLY SELECTED TICKET
+            ================================================= */
+
+            const selectedTicket =
+                window.selectedSupportIQTicket;
+
+
+            if (!selectedTicket) {
+
+                result.textContent =
+                    "Please select a ticket before analyzing.";
+
+                return;
+
+            }
+
+
             const ticket =
-                tickets[0];
+                selectedTicket;
 
 
             result.textContent =
