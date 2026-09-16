@@ -37,26 +37,26 @@ def health():
 
 @app.get("/segments")
 def segments():
-try:
-return get_segments()
-except Exception as error:
-raise handle_service_error(error)
+    try:
+       return get_segments()
+    except Exception as error:
+       raise handle_service_error(error)
 
 @app.get("/satisfaction")
 def satisfaction():
-try:
-return get_satisfaction()
-except Exception as error:
-raise handle_service_error(error)
+    try:
+       return get_satisfaction()
+    except Exception as error:
+        raise handle_service_error(error)
 
 @app.post("/analyze")
 def analyze_ticket(ticket: TicketRequest):
-try:
-keywords = extract_keywords(ticket.description)
+    try:
+        keywords = extract_keywords(ticket.description)
 
-    text_analysis = analyze_text(ticket.description)
+        text_analysis = analyze_text(ticket.description)
 
-    prediction = predict_satisfaction_risk(
+        prediction = predict_satisfaction_risk(
         customer_age=ticket.customer_age,
         priority=ticket.priority,
         ticket_type=ticket.ticket_type,
