@@ -48,10 +48,10 @@ def satisfaction():
        return get_satisfaction()
     except Exception as error:
         raise handle_service_error(error)
-
+        
 @app.post("/analyze")
 def analyze_ticket(ticket: TicketRequest):
-        try:
+    try:
         keywords = extract_keywords(ticket.description)
         text_analysis = analyze_text(ticket.description)
 
@@ -73,3 +73,4 @@ def analyze_ticket(ticket: TicketRequest):
 
     except Exception as error:
         raise handle_service_error(error)
+
