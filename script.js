@@ -19,9 +19,9 @@ const API_BASE_URL =
 ========================================================= */
 
 const DATA_FILES = {
-    metrics: "./data/dashboard_metrics.json",
-    segments: "./data/customer_segments.json",
-    satisfaction: "./data/satisfaction_analysis.json",
+    metrics: "./data/dashboard_metrics.csv",
+    segments: "./data/segment_dashboard.json",
+    satisfaction: "./data/satisfaction_dashboard.json",
     ticketData: "./ticket_data.json"
 };
 
@@ -159,17 +159,9 @@ function setupAPIAnalysis() {
     }
 
 
-    /*
-     * No ticket is selected initially.
-     */
-
     window.selectedSupportIQTicket =
         null;
 
-
-    /*
-     * Populate ticket selector.
-     */
 
     ticketSelector.innerHTML =
         `
@@ -222,11 +214,6 @@ function setupAPIAnalysis() {
     );
 
 
-    /*
-     * Keep Analyze disabled until
-     * the user selects a ticket.
-     */
-
     button.disabled =
         true;
 
@@ -244,10 +231,6 @@ function setupAPIAnalysis() {
                     ticketSelector.value
                 );
 
-
-            /*
-             * No ticket selected.
-             */
 
             if (
                 !Number.isInteger(index) ||
@@ -275,10 +258,6 @@ function setupAPIAnalysis() {
             }
 
 
-            /*
-             * Store the selected ticket globally.
-             */
-
             const selectedTicket =
                 tickets[index];
 
@@ -286,10 +265,6 @@ function setupAPIAnalysis() {
             window.selectedSupportIQTicket =
                 selectedTicket;
 
-
-            /*
-             * Read ticket fields.
-             */
 
             const subject =
                 selectedTicket["Ticket Subject"] ||
@@ -320,10 +295,6 @@ function setupAPIAnalysis() {
                 selectedTicket["Customer Age"] ||
                 "Unknown";
 
-
-            /*
-             * Show selected ticket details.
-             */
 
             preview.innerHTML = `
                 <strong>Selected Ticket</strong>
@@ -410,10 +381,6 @@ function setupAPIAnalysis() {
                     );
 
 
-                /*
-                 * Extract important terms.
-                 */
-
                 const terms =
                     analysis
                         ?.text_analysis
@@ -427,18 +394,9 @@ function setupAPIAnalysis() {
                         .join(", ");
 
 
-                /*
-                 * Extract prediction.
-                 */
-
                 const prediction =
                     analysis?.prediction;
 
-
-                /*
-                 * Convert probability
-                 * into percentage.
-                 */
 
                 const riskProbability =
                     prediction?.risk_probability !== undefined
@@ -449,10 +407,6 @@ function setupAPIAnalysis() {
                         ).toFixed(2)}%`
                         : "Unavailable";
 
-
-                /*
-                 * Display API result.
-                 */
 
                 result.innerHTML = `
                     <strong>Analysis Complete</strong>
@@ -524,12 +478,6 @@ async function initializeDashboard() {
     setInitialLoadingState();
 
 
-    /*
-     * Load each dataset independently so
-     * one missing file does not break
-     * the whole dashboard.
-     */
-
     await Promise.allSettled([
         loadDashboardMetrics(),
         loadSegments(),
@@ -544,19 +492,8 @@ async function initializeDashboard() {
 
     updateFilteredStats();
 
-
-    /*
-     * Connect the AI Ticket Analysis
-     * section after ticket data is loaded.
-     */
-
     setupAPIAnalysis();
 
-
-    /*
-     * If ticket-level data is unavailable,
-     * show a clear fallback message.
-     */
 
     if (!ticketData.length) {
 
@@ -595,14 +532,6 @@ async function fetchJson(path) {
         await response.text();
 
 
-    /*
-     * The generated ticket_data.json
-     * may contain NaN values.
-     *
-     * JSON.parse does not normally accept NaN,
-     * so safely convert them to null.
-     */
-
     const cleanedText =
         text
             .replace(
@@ -622,6 +551,166 @@ async function fetchJson(path) {
     return JSON.parse(
         cleanedText
     );
+}
+
+
+/* =========================================================
+   CSV LOADER
+========================================================= */
+
+async function fetchCsv(path) {
+
+    const response =
+        await fetch(
+            path,
+            {
+                cache: "no-store"
+            }
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            `Unable to load ${path} (${response.status})`
+        );
+
+    }
+
+
+    const text =
+        await response.text();
+
+
+    const lines =
+        text
+            .trim()
+            .split(/\r?\n/);
+
+
+    if (!lines.length) {
+
+        return [];
+
+    }
+
+
+    const headers =
+        parseCsvLine(
+            lines[0]
+        );
+
+
+    return lines
+        .slice(1)
+        .filter(
+            line =>
+                line.trim() !== ""
+        )
+        .map(
+            line => {
+
+                const values =
+                    parseCsvLine(
+                        line
+                    );
+
+
+                const record =
+                    {};
+
+
+                headers.forEach(
+                    (
+                        header,
+                        index
+                    ) => {
+
+                        record[header] =
+                            values[index] !== undefined
+                                ? values[index]
+                                : "";
+
+                    }
+                );
+
+
+                return record;
+
+            }
+        );
+}
+
+
+function parseCsvLine(line) {
+
+    const values = [];
+
+    let current = "";
+
+    let insideQuotes =
+        false;
+
+
+    for (
+        let i = 0;
+        i < line.length;
+        i++
+    ) {
+
+        const character =
+            line[i];
+
+
+        if (
+            character === '"'
+        ) {
+
+            if (
+                insideQuotes &&
+                line[i + 1] === '"'
+            ) {
+
+                current += '"';
+
+                i++;
+
+            } else {
+
+                insideQuotes =
+                    !insideQuotes;
+
+            }
+
+        } else if (
+            character === "," &&
+            !insideQuotes
+        ) {
+
+            values.push(
+                current.trim()
+            );
+
+            current =
+                "";
+
+        } else {
+
+            current +=
+                character;
+
+        }
+
+    }
+
+
+    values.push(
+        current.trim()
+    );
+
+
+    return values;
+
 }
 
 
@@ -817,7 +906,7 @@ async function loadDashboardMetrics() {
     try {
 
         const data =
-            await fetchJson(
+            await fetchCsv(
                 DATA_FILES.metrics
             );
 
@@ -1511,10 +1600,6 @@ async function loadTicketData() {
         }
 
 
-        /*
-         * Keep only valid objects.
-         */
-
         ticketData =
             ticketData.filter(
                 item =>
@@ -1522,11 +1607,6 @@ async function loadTicketData() {
                     typeof item === "object"
             );
 
-
-        /*
-         * Make ticket data available
-         * to the API analysis section.
-         */
 
         window.supportIQTickets =
             ticketData;
@@ -2936,4 +3016,3 @@ function showTicketDataWarning() {
         "Resolution filters require this file."
     );
 }
-
