@@ -1,20 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-try:
 from backend.schemas.ticket import TicketRequest
 from backend.services.nlp import extract_keywords
 from backend.services.analytics import get_segments, get_satisfaction
 from backend.services.prediction import predict_satisfaction_risk
 from backend.services.errors import handle_service_error
 from backend.services.nlp_prediction import analyze_text
-except ModuleNotFoundError:
-from schemas.ticket import TicketRequest
-from services.nlp import extract_keywords
-from services.analytics import get_segments, get_satisfaction
-from services.prediction import predict_satisfaction_risk
-from services.errors import handle_service_error
-from services.nlp_prediction import analyze_text
 
 app = FastAPI(
 title="SupportIQ API",
@@ -60,14 +52,10 @@ raise handle_service_error(error)
 @app.post("/analyze")
 def analyze_ticket(ticket: TicketRequest):
 try:
-keywords = extract_keywords(
-ticket.description
-)
+keywords = extract_keywords(ticket.description)
 
-
-    text_analysis = analyze_text(
-        ticket.description
-    )
+```
+    text_analysis = analyze_text(ticket.description)
 
     prediction = predict_satisfaction_risk(
         customer_age=ticket.customer_age,
@@ -87,4 +75,4 @@ ticket.description
 
 except Exception as error:
     raise handle_service_error(error)
-
+```
