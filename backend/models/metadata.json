@@ -2,6 +2,7 @@
   "model": "RandomForestClassifier",
   "target": "Satisfaction Risk",
   "risk_definition": "Rating <= 2",
+  "accuracy": 0.5072,
   "features": [
     "Ticket Priority",
     "Ticket Type",
