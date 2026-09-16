@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://supportiq-api-pg9k.onrender.com";
 
 
 /* =========================================================
@@ -98,13 +98,6 @@ function setupAPIAnalysis() {
 
             }
 
-
-            /*
-             * Temporary ticket selection.
-             * The first ticket is analyzed.
-             * This can later be connected to
-             * an interactive ticket selector.
-             */
 
             const ticket =
                 tickets[0];
