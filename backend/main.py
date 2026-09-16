@@ -24,15 +24,15 @@ allow_headers=["*"],
 
 @app.get("/")
 def root():
-return {
-"name": "SupportIQ API",
-"status": "running"
+    return {
+        "name": "SupportIQ API",
+        "status": "running"
 }
 
 @app.get("/health")
 def health():
-return {
-"status": "healthy"
+    return {
+        "status": "healthy"
 }
 
 @app.get("/segments")
@@ -54,7 +54,6 @@ def analyze_ticket(ticket: TicketRequest):
 try:
 keywords = extract_keywords(ticket.description)
 
-```
     text_analysis = analyze_text(ticket.description)
 
     prediction = predict_satisfaction_risk(
@@ -75,4 +74,4 @@ keywords = extract_keywords(ticket.description)
 
 except Exception as error:
     raise handle_service_error(error)
-```
+
