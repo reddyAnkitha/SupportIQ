@@ -51,27 +51,25 @@ def satisfaction():
 
 @app.post("/analyze")
 def analyze_ticket(ticket: TicketRequest):
-    try:
+        try:
         keywords = extract_keywords(ticket.description)
-
         text_analysis = analyze_text(ticket.description)
 
         prediction = predict_satisfaction_risk(
-        customer_age=ticket.customer_age,
-        priority=ticket.priority,
-        ticket_type=ticket.ticket_type,
-        channel=ticket.channel,
-    )
+            customer_age=ticket.customer_age,
+            priority=ticket.priority,
+            ticket_type=ticket.ticket_type,
+            channel=ticket.channel,
+        )
 
-    return {
-        "ticket_type": ticket.ticket_type,
-        "priority": ticket.priority,
-        "channel": ticket.channel,
-        "keywords": keywords,
-        "text_analysis": text_analysis,
-        "prediction": prediction,
-    }
+        return {
+            "ticket_type": ticket.ticket_type,
+            "priority": ticket.priority,
+            "channel": ticket.channel,
+            "keywords": keywords,
+            "text_analysis": text_analysis,
+            "prediction": prediction,
+        }
 
-except Exception as error:
-    raise handle_service_error(error)
-
+    except Exception as error:
+        raise handle_service_error(error)
