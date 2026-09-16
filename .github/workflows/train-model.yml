@@ -23,7 +23,7 @@ jobs:
 
       - name: Train satisfaction model
         run: |
-          python ml/train_model.py
+          python backend/ml/train_model.py
 
       - name: Check generated model
         run: |
