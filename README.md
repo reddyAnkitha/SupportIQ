@@ -16,44 +16,47 @@ https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intell
 
 ## 🎯 Key Features
 
-- Customer segmentation using K-Means clustering
-- Customer satisfaction risk analysis using Random Forest
-- Ticket resolution-time analytics
-- Interactive dashboard filters
-- Customer segment analysis
-- Priority, ticket type, and channel analysis
-- Data visualization using Chart.js
-- FastAPI backend for ticket analysis
-- NLP-based ticket analysis using TF-IDF
-- GitHub Pages deployment
+* Customer segmentation using K-Means clustering
+* Customer satisfaction risk analysis using Random Forest
+* Ticket resolution-time analytics
+* Interactive dashboard filters
+* Customer segment analysis
+* Priority, ticket type, and support channel analysis
+* Data visualization using Chart.js
+* FastAPI backend for ticket analysis
+* NLP-based ticket analysis using TF-IDF
+* GitHub Pages deployment
+* Automated backend testing with GitHub Actions
 
 ---
 
 ## 📦 Dataset
 
-**Customer Support Ticket Dataset**
+### Customer Support Ticket Dataset
 
-- 8,469 support tickets
-- 17 features
-- Customer demographics
-- Ticket information
-- Priority and support channel
-- Satisfaction ratings
-- Response and resolution information
+The project uses a customer support ticket dataset containing:
+
+* **8,469 support tickets**
+* **17 features**
+* Customer demographic information
+* Ticket information
+* Priority and support channel
+* Satisfaction ratings
+* Response and resolution information
 
 **Source:** Kaggle
 
 ---
 
-## 🤖 Machine Learning
+# 🤖 Machine Learning
 
-### Customer Segmentation
+## Customer Segmentation
 
 K-Means clustering is used to group customers based on:
 
-- Customer Age
-- Average Satisfaction
-- Average Resolution Time
+* Customer Age
+* Average Satisfaction
+* Average Resolution Time
 
 ### Customer Segments
 
@@ -66,115 +69,134 @@ K-Means clustering is used to group customers based on:
 
 **Silhouette Score:** 0.295
 
-### Satisfaction Risk Analysis
+### Ticket-to-Segment Mapping
+
+Customer segment results are connected to individual ticket records using:
+
+```text
+ticket_segment_mapping.json
+```
+
+---
+
+## Satisfaction Risk Analysis
 
 A Random Forest classifier is used to classify tickets into:
 
-- Low Satisfaction
-- Satisfied
+* Low Satisfaction
+* Satisfied
 
-Ratings of 1 or 2 are treated as low satisfaction.
+Ratings of **1 or 2** are treated as low satisfaction.
 
 **Model Accuracy:** 59.75%
 
 ---
 
-## 📈 Dashboard
+# 📈 Dashboard
 
 The SupportIQ dashboard provides:
 
-- Total ticket count
-- Average satisfaction
-- Average resolution time
-- Customer segment distribution
-- Satisfaction-risk analysis
-- Resolution analytics
-- Interactive filtering
-- Individual ticket analysis
+* Total ticket count
+* Average satisfaction
+* Average resolution time
+* Customer segment distribution
+* Satisfaction-risk analysis
+* Resolution analytics
+* Interactive filtering
+* Individual ticket analysis
 
-### Filters
+## Filters
 
 Users can filter support tickets by:
 
-- Priority
-- Ticket Type
-- Support Channel
-- Customer Segment
+* Priority
+* Ticket Type
+* Support Channel
+* Customer Segment
 
 ---
 
-## 🔌 Backend API
+# 🔌 Backend API
 
 SupportIQ includes a FastAPI backend for ticket analysis and customer satisfaction risk prediction.
 
-### API Endpoints
+## API Endpoints
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/` | API status |
-| GET | `/health` | Health check |
-| GET | `/segments` | Customer segment analytics |
-| GET | `/satisfaction` | Satisfaction analytics |
-| POST | `/analyze` | Analyze a support ticket |
+| Method | Endpoint        | Purpose                    |
+| ------ | --------------- | -------------------------- |
+| `GET`  | `/`             | API status                 |
+| `GET`  | `/health`       | Health check               |
+| `GET`  | `/segments`     | Customer segment analytics |
+| `GET`  | `/satisfaction` | Satisfaction analytics     |
+| `POST` | `/analyze`      | Analyze a support ticket   |
+
+## `/analyze` Endpoint
 
 The `/analyze` endpoint accepts:
 
-- Customer age
-- Ticket priority
-- Ticket type
-- Support channel
-- Ticket description
+* Customer age
+* Ticket priority
+* Ticket type
+* Support channel
+* Ticket description
 
 It returns:
 
-- Ticket information
-- Extracted keywords
-- TF-IDF text analysis
-- Satisfaction risk prediction
-- Risk probability
+* Ticket information
+* Extracted keywords
+* TF-IDF text analysis
+* Satisfaction risk prediction
+* Risk probability
 
-### Backend Technology
+## Backend Technology
 
-- FastAPI
-- Pydantic
-- Pandas
-- Scikit-learn
-- Joblib
-- TF-IDF
-- Pytest
-- GitHub Actions
-
-### Testing
-
-Backend tests are automatically executed using GitHub Actions on pushes and pull requests to the `main` branch.
+* FastAPI
+* Pydantic
+* Pandas
+* Scikit-learn
+* Joblib
+* TF-IDF
+* Pytest
+* GitHub Actions
 
 ---
 
-## 📊 Dashboard Metrics
+# 🧪 Testing
 
-| Metric | Value |
-|---|---:|
-| Total Tickets | 8,469 |
-| Closed Tickets | 2,769 |
-| Open Tickets | 2,819 |
-| Pending Tickets | 2,881 |
-| Average Satisfaction | 2.99 / 5 |
+Backend tests are automatically executed using GitHub Actions on:
+
+* Pushes to the `main` branch
+* Pull requests targeting the `main` branch
+
+The test suite includes API and satisfaction-prediction tests.
+
+---
+
+# 📊 Dashboard Metrics
+
+| Metric                  |       Value |
+| ----------------------- | ----------: |
+| Total Tickets           |       8,469 |
+| Closed Tickets          |       2,769 |
+| Open Tickets            |       2,819 |
+| Pending Tickets         |       2,881 |
+| Average Satisfaction    |    2.99 / 5 |
 | Average Resolution Time | 11.77 hours |
-| Customer Segments | 6 |
+| Customer Segments       |           6 |
 
 ---
 
-## 💡 Key Insights
+# 💡 Key Insights
 
-- Average customer satisfaction is **2.99 / 5**.
-- **39.8%** of rated closed tickets are classified as low satisfaction.
-- The highest-satisfaction segment has an average satisfaction of **4.44 / 5**.
-- The highest-risk slow segment has an average satisfaction of **1.52 / 5**.
-- Average resolution time is **11.77 hours**.
+* Average customer satisfaction is **2.99 / 5**.
+* **39.8%** of rated closed tickets are classified as low satisfaction.
+* The highest-satisfaction segment has an average satisfaction of **4.44 / 5**.
+* The highest-risk slow segment has an average satisfaction of **1.52 / 5**.
+* Average resolution time is **11.77 hours**.
 
 ---
 
-## 🔄 ML to Dashboard Workflow
+# 🔄 ML to Dashboard Workflow
 
 ```text
 Customer Support Dataset
@@ -187,49 +209,58 @@ Machine Learning
           ↓
 Customer Segmentation
           ↓
+Satisfaction Risk Analysis
+          ↓
 Exported Analytics
           ↓
 Interactive Dashboard
           ↓
 GitHub Pages
 ```
+
 ---
-## Customer segment results are connected to ticket records using:
-ticket_segment_mapping.json
 
-## 🛠️ Technology Stack
-Machine Learning
-Python
-Pandas
-NumPy
-Scikit-learn
-K-Means
-Random Forest
-Backend
-Python
-FastAPI
-Pydantic
-Scikit-learn
-Joblib
-TF-IDF
-Frontend
-HTML
-CSS
-JavaScript
-Chart.js
-Testing & Deployment
-Pytest
-GitHub Actions
-Kaggle
-Git
-GitHub
-GitHub Pages
+# 🛠️ Technology Stack
 
-----
+## Machine Learning
 
-##📁 Project Structure
+* Python
+* Pandas
+* NumPy
+* Scikit-learn
+* K-Means
+* Random Forest
+* TF-IDF
 
----- text
+## Backend
+
+* Python
+* FastAPI
+* Pydantic
+* Scikit-learn
+* Joblib
+
+## Frontend
+
+* HTML
+* CSS
+* JavaScript
+* Chart.js
+
+## Testing & Deployment
+
+* Pytest
+* GitHub Actions
+* Kaggle
+* Git
+* GitHub
+* GitHub Pages
+
+---
+
+# 📁 Project Structure
+
+```text
 SupportIQ/
 │
 ├── .github/
@@ -281,41 +312,50 @@ SupportIQ/
 ├── ticket_segment_mapping.json
 ├── .gitignore
 └── README.md
-----
-##🚀 Run Locally
-1. Clone the repository
+```
+
+---
+
+# 🚀 Run Locally
+
+## 1. Clone the repository
+
+```bash
 git clone https://github.com/reddyAnkitha/SupportIQ.git
-2. Open the project
+```
+
+## 2. Open the project
+
+```bash
 cd SupportIQ
-3. Start a local server
+```
+
+## 3. Start a local server
+
+```bash
 python -m http.server 8000
-4. Open the dashboard
-http://localhost:8000
+```
 
-##👩‍💻 Author
+## 4. Open the dashboard
 
-##Ankitha Reddy
-
-Software Development Engineer | Java Full Stack | Cloud & Machine Learning
-
-##GitHub:
-https://github.com/reddyAnkitha
-
-##Kaggle:
-https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
-
-
-### One important thing
-
-I removed the accidental text that appeared **after the README's actual content**:
-
-> `The critical fix is this part...`
-
-That was explanation text, not README content, so it should **not** be in your GitHub README.
-
-After replacing the file, commit it as:
+Open:
 
 ```text
-Fix README formatting and documentation
+http://localhost:8000
+```
 
-Then don't change anything else yet. Next we'll check your AI Ticket Analysis on the live dashboard.
+---
+
+# 👩‍💻 Author
+
+## Ankitha Reddy
+
+**Software Development Engineer | Java Full Stack | Cloud & Machine Learning**
+
+### GitHub
+
+https://github.com/reddyAnkitha
+
+### Kaggle
+
+https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
