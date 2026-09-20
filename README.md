@@ -192,4 +192,126 @@ Exported Analytics
 Interactive Dashboard
           ↓
 GitHub Pages
-```\text
+```
+---
+## Customer segment results are connected to ticket records using:
+ticket_segment_mapping.json
+
+## 🛠️ Technology Stack
+Machine Learning
+Python
+Pandas
+NumPy
+Scikit-learn
+K-Means
+Random Forest
+Backend
+Python
+FastAPI
+Pydantic
+Scikit-learn
+Joblib
+TF-IDF
+Frontend
+HTML
+CSS
+JavaScript
+Chart.js
+Testing & Deployment
+Pytest
+GitHub Actions
+Kaggle
+Git
+GitHub
+GitHub Pages
+##📁 Project Structure
+
+SupportIQ/
+│
+├── .github/
+│   └── workflows/
+│       └── backend-tests.yml
+│
+├── backend/
+│   ├── models/
+│   │   └── metadata.json
+│   │
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   └── ticket.py
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── analytics.py
+│   │   ├── errors.py
+│   │   ├── nlp.py
+│   │   ├── nlp_prediction.py
+│   │   └── prediction.py
+│   │
+│   ├── __init__.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── README.md
+│
+├── data/
+│   ├── dashboard_metrics.csv
+│   ├── segment_dashboard.json
+│   ├── satisfaction_dashboard.json
+│   ├── resolution_by_priority.json
+│   ├── resolution_by_type.json
+│   └── resolution_by_channel.json
+│
+├── ml/
+│   ├── __init__.py
+│   ├── train_model.py
+│   └── train_nlp.py
+│
+├── tests/
+│   ├── test_api.py
+│   └── test_prediction.py
+│
+├── index.html
+├── style.css
+├── script.js
+├── ticket_data.json
+├── ticket_segment_mapping.json
+├── .gitignore
+└── README.md
+
+##🚀 Run Locally
+1. Clone the repository
+git clone https://github.com/reddyAnkitha/SupportIQ.git
+2. Open the project
+cd SupportIQ
+3. Start a local server
+python -m http.server 8000
+4. Open the dashboard
+http://localhost:8000
+
+##👩‍💻 Author
+
+##Ankitha Reddy
+
+Software Development Engineer | Java Full Stack | Cloud & Machine Learning
+
+##GitHub:
+https://github.com/reddyAnkitha
+
+##Kaggle:
+https://www.kaggle.com/code/hanumathureddygari/supportiq-customer-support-intelligence-platform
+
+
+### One important thing
+
+I removed the accidental text that appeared **after the README's actual content**:
+
+> `The critical fix is this part...`
+
+That was explanation text, not README content, so it should **not** be in your GitHub README.
+
+After replacing the file, commit it as:
+
+```text
+Fix README formatting and documentation
+
+Then don't change anything else yet. Next we'll check your AI Ticket Analysis on the live dashboard.
