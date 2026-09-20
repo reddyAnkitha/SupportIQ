@@ -226,6 +226,7 @@ GitHub
 GitHub Pages
 ##📁 Project Structure
 
+---- text
 SupportIQ/
 │
 ├── .github/
@@ -277,7 +278,7 @@ SupportIQ/
 ├── ticket_segment_mapping.json
 ├── .gitignore
 └── README.md
-
+----
 ##🚀 Run Locally
 1. Clone the repository
 git clone https://github.com/reddyAnkitha/SupportIQ.git
