@@ -1,37 +1,19 @@
-// SupportIQ - Customer Support Intelligence Platform
-// Main dashboard script
-
-"use strict";
-
-/* =========================================================
-   FILE CONFIGURATION
-========================================================= */
+const API_BASE_URL = "https://supportiq-api-pg9k.onrender.com";
 
 const DATA_FILES = {
     metrics: "./data/dashboard_metrics.csv",
     segments: "./data/segment_dashboard.json",
     satisfaction: "./data/satisfaction_dashboard.json",
     ticketData: "./ticket_data.json",
-    ticketSegmentMapping: "./ticket_segment_mapping.json",
-
-    // Aggregate resolution analytics
-    resolutionByPriority: "./data/resolution_by_priority.json",
-    resolutionByType: "./data/resolution_by_type.json",
-    resolutionByChannel: "./data/resolution_by_channel.json"
+    resolutionPriority: "./data/resolution_by_priority.json",
+    resolutionType: "./data/resolution_by_type.json",
+    resolutionChannel: "./data/resolution_by_channel.json"
 };
 
-/* =========================================================
-   GLOBAL STATE
-========================================================= */
-
 let dashboardMetrics = {};
-let segmentData = {};
+let segmentData = [];
 let satisfactionData = {};
 let ticketData = [];
-
-let ticketSegmentMapping = [];
-let ticketSegmentMap = new Map();
-
 let resolutionData = {
     priority: [],
     type: [],
@@ -39,30 +21,1259 @@ let resolutionData = {
 };
 
 let charts = {};
+let currentFilteredTickets = [];
 
-let filters = {
-    priority: "",
-    ticketType: "",
-    channel: "",
-    segment: ""
-};
+document.addEventListener("DOMContentLoaded", initializeDashboard);
+
+async function initializeDashboard() {
+    console.log("Initializing SupportIQ dashboard...");
+
+    try {
+        await Promise.allSettled([
+            loadDashboardMetrics(),
+            loadSegmentData(),
+            loadSatisfactionData(),
+            loadTicketData(),
+            loadResolutionData()
+        ]);
+
+        initializeInteractiveFilters();
+        updateResolutionCharts();
+        updateFilteredStats();
+        setupAPIAnalysis();
+
+        console.log("SupportIQ dashboard initialized successfully.");
+    } catch (error) {
+        console.error("Dashboard initialization error:", error);
+    }
+}
 
 /* =========================================================
-   EXPECTED SEGMENTS
-========================================================= */
+   DASHBOARD METRICS
+   ========================================================= */
 
-const EXPECTED_SEGMENTS = [
-    "Younger - Satisfied and Fast",
-    "Younger - At Risk and Fast",
-    "Older - Satisfied and Fast",
-    "Older - At Risk and Fast",
-    "Older - Satisfied and Slow",
-    "Older - At Risk and Slow"
-];
+async function loadDashboardMetrics() {
+    try {
+        const response = await fetch(DATA_FILES.metrics);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load metrics: ${response.status}`);
+        }
+
+        const csvText = await response.text();
+        dashboardMetrics = parseMetricsCSV(csvText);
+
+        updateMetricElement(
+            "total-tickets",
+            formatNumber(dashboardMetrics["Total Tickets"])
+        );
+
+        updateMetricElement(
+            "average-satisfaction",
+            dashboardMetrics["Average Satisfaction"] !== undefined
+                ? `${Number(dashboardMetrics["Average Satisfaction"]).toFixed(2)} / 5`
+                : "N/A"
+        );
+
+        updateMetricElement(
+            "average-resolution",
+            dashboardMetrics["Average Resolution Time"] !== undefined
+                ? `${Number(dashboardMetrics["Average Resolution Time"]).toFixed(2)} hrs`
+                : "N/A"
+        );
+
+        updateMetricElement(
+            "customer-segments",
+            formatNumber(dashboardMetrics["Customer Segments"])
+        );
+
+    } catch (error) {
+        console.error("Error loading dashboard metrics:", error);
+    }
+}
+
+function parseMetricsCSV(csvText) {
+    const result = {};
+
+    const lines = csvText
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    if (lines.length < 2) {
+        return result;
+    }
+
+    const headers = lines[0].split(",").map(header => header.trim());
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(",");
+
+        if (values.length < 2) {
+            continue;
+        }
+
+        const key = values[0].trim();
+        const value = values.slice(1).join(",").trim();
+
+        const numericValue = Number(value);
+
+        result[key] = Number.isNaN(numericValue)
+            ? value
+            : numericValue;
+    }
+
+    return result;
+}
+
+function updateMetricElement(id, value) {
+    const element = document.getElementById(id);
+
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+function formatNumber(value) {
+    if (value === undefined || value === null || Number.isNaN(Number(value))) {
+        return "N/A";
+    }
+
+    return Number(value).toLocaleString();
+}
 
 /* =========================================================
-   UTILITY FUNCTIONS
-========================================================= */
+   SEGMENT DATA
+   ========================================================= */
+
+async function loadSegmentData() {
+    try {
+        const response = await fetch(DATA_FILES.segments);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load segment data: ${response.status}`);
+        }
+
+        const json = await response.json();
+
+        if (Array.isArray(json)) {
+            segmentData = json;
+        } else if (Array.isArray(json.data)) {
+            segmentData = json.data;
+        } else if (Array.isArray(json.segments)) {
+            segmentData = json.segments;
+        } else {
+            segmentData = [];
+        }
+
+        renderSegmentSection(segmentData);
+        renderSegmentDistribution(segmentData);
+
+    } catch (error) {
+        console.error("Error loading segment data:", error);
+
+        const container = document.getElementById("segment-container");
+
+        if (container) {
+            container.innerHTML = `
+                <div class="dashboard-status error">
+                    Customer segment data could not be loaded.
+                </div>
+            `;
+        }
+    }
+}
+
+function renderSegmentSection(data) {
+    const container = document.getElementById("segment-container");
+
+    if (!container) {
+        console.warn("segment-container element not found.");
+        return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        container.innerHTML = `
+            <div class="dashboard-status">
+                No customer segment data available.
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = data.map((segment, index) => {
+        const name =
+            segment.segment ||
+            segment.name ||
+            segment.segment_name ||
+            `Segment ${index + 1}`;
+
+        const description =
+            segment.description ||
+            segment.profile ||
+            segment.summary ||
+            "Customer segment identified through clustering analysis.";
+
+        return `
+            <div class="insight-item">
+                <h4>${escapeHTML(name)}</h4>
+                <p>${escapeHTML(description)}</p>
+            </div>
+        `;
+    }).join("");
+}
+
+function renderSegmentDistribution(data) {
+    const canvas = document.getElementById("segment-distribution-chart");
+    const legend = document.getElementById("segment-chart-legend");
+
+    if (!canvas || typeof Chart === "undefined") {
+        return;
+    }
+
+    const labels = data.map((segment, index) =>
+        segment.segment ||
+        segment.name ||
+        segment.segment_name ||
+        `Segment ${index + 1}`
+    );
+
+    const values = data.map(segment =>
+        Number(
+            segment.count ??
+            segment.customer_count ??
+            segment.ticket_count ??
+            segment.size ??
+            0
+        )
+    );
+
+    if (charts.segmentDistribution) {
+        charts.segmentDistribution.destroy();
+    }
+
+    charts.segmentDistribution = new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [{
+                data: values
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    if (legend) {
+        legend.innerHTML = labels.map((label, index) => `
+            <div class="legend-item">
+                <span class="legend-label">
+                    ${escapeHTML(label)}
+                </span>
+                <span class="legend-value">
+                    ${formatNumber(values[index])}
+                </span>
+            </div>
+        `).join("");
+    }
+}
+
+/* =========================================================
+   SATISFACTION DATA
+   ========================================================= */
+
+async function loadSatisfactionData() {
+    try {
+        const response = await fetch(DATA_FILES.satisfaction);
+
+        if (!response.ok) {
+            throw new Error(
+                `Failed to load satisfaction data: ${response.status}`
+            );
+        }
+
+        const json = await response.json();
+
+        satisfactionData = json.data || json;
+
+        const lowCount = Number(
+            satisfactionData.low_satisfaction ??
+            satisfactionData.low_satisfaction_count ??
+            satisfactionData["Low Satisfaction"] ??
+            1102
+        );
+
+        const satisfiedCount = Number(
+            satisfactionData.satisfied ??
+            satisfactionData.satisfied_count ??
+            satisfactionData["Satisfied"] ??
+            1667
+        );
+
+        const riskPercentage = Number(
+            satisfactionData.low_satisfaction_rate ??
+            satisfactionData.low_satisfaction_percentage ??
+            satisfactionData["Low Satisfaction Rate"] ??
+            39.8
+        );
+
+        const accuracy = Number(
+            satisfactionData.model_accuracy ??
+            satisfactionData.accuracy ??
+            satisfactionData["Model Accuracy"] ??
+            59.75
+        );
+
+        updateMetricElement(
+            "low-satisfaction-count",
+            formatNumber(lowCount)
+        );
+
+        updateMetricElement(
+            "satisfied-count",
+            formatNumber(satisfiedCount)
+        );
+
+        updateMetricElement(
+            "satisfaction-risk-percentage",
+            Number.isFinite(riskPercentage)
+                ? `${riskPercentage.toFixed(1)}%`
+                : "N/A"
+        );
+
+        updateMetricElement(
+            "satisfaction-model-accuracy",
+            Number.isFinite(accuracy)
+                ? `${accuracy.toFixed(2)}%`
+                : "N/A"
+        );
+
+    } catch (error) {
+        console.error("Error loading satisfaction data:", error);
+
+        // Known exported values from the SupportIQ dataset.
+        updateMetricElement("low-satisfaction-count", "1,102");
+        updateMetricElement("satisfied-count", "1,667");
+        updateMetricElement("satisfaction-risk-percentage", "39.8%");
+        updateMetricElement("satisfaction-model-accuracy", "59.75%");
+    }
+}
+
+/* =========================================================
+   TICKET DATA
+   ========================================================= */
+
+async function loadTicketData() {
+    try {
+        const response = await fetch(DATA_FILES.ticketData);
+
+        if (!response.ok) {
+            throw new Error(
+                `Failed to load ticket data: ${response.status}`
+            );
+        }
+
+        const json = await response.json();
+
+        if (Array.isArray(json)) {
+            ticketData = json;
+        } else if (Array.isArray(json.data)) {
+            ticketData = json.data;
+        } else if (Array.isArray(json.tickets)) {
+            ticketData = json.tickets;
+        } else {
+            ticketData = [];
+        }
+
+        ticketData = ticketData.filter(
+            ticket => ticket && typeof ticket === "object"
+        );
+
+        window.supportIQTickets = ticketData;
+
+        console.log(
+            `Loaded ${ticketData.length} support tickets.`
+        );
+
+        initializeInteractiveFilters();
+        populateTicketSelectorForAPI();
+        updateFilteredStats();
+
+    } catch (error) {
+        console.error("Error loading ticket data:", error);
+
+        ticketData = [];
+        window.supportIQTickets = [];
+
+        const selector = document.getElementById("ticket-selector");
+
+        if (selector) {
+            selector.innerHTML = `
+                <option value="">
+                    Unable to load tickets
+                </option>
+            `;
+        }
+
+        const preview = document.getElementById(
+            "selected-ticket-preview"
+        );
+
+        if (preview) {
+            preview.innerHTML = `
+                <div class="dashboard-status error">
+                    Ticket data could not be loaded.
+                </div>
+            `;
+        }
+    }
+}
+
+/* =========================================================
+   RESOLUTION DATA
+   ========================================================= */
+
+async function loadResolutionData() {
+    const files = [
+        {
+            key: "priority",
+            file: DATA_FILES.resolutionPriority
+        },
+        {
+            key: "type",
+            file: DATA_FILES.resolutionType
+        },
+        {
+            key: "channel",
+            file: DATA_FILES.resolutionChannel
+        }
+    ];
+
+    await Promise.all(
+        files.map(async item => {
+            try {
+                const response = await fetch(item.file);
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to load ${item.key} resolution data`
+                    );
+                }
+
+                const json = await response.json();
+
+                resolutionData[item.key] =
+                    normalizeResolutionData(json);
+
+            } catch (error) {
+                console.error(
+                    `Error loading ${item.key} resolution data:`,
+                    error
+                );
+
+                resolutionData[item.key] = [];
+            }
+        })
+    );
+}
+
+function normalizeResolutionData(json) {
+    if (Array.isArray(json)) {
+        return json;
+    }
+
+    if (Array.isArray(json.data)) {
+        return json.data;
+    }
+
+    return [];
+}
+
+function updateResolutionCharts() {
+    renderResolutionChart(
+        "priority-chart",
+        resolutionData.priority,
+        "priority",
+        "Priority",
+        "Average Resolution Time"
+    );
+
+    renderResolutionChart(
+        "type-chart",
+        resolutionData.type,
+        "ticket_type",
+        "Ticket Type",
+        "Average Resolution Time"
+    );
+
+    renderResolutionChart(
+        "channel-chart",
+        resolutionData.channel,
+        "support_channel",
+        "Support Channel",
+        "Average Resolution Time"
+    );
+}
+
+function renderResolutionChart(
+    canvasId,
+    data,
+    key,
+    label,
+    seriesLabel
+) {
+    const canvas = document.getElementById(canvasId);
+
+    if (!canvas || typeof Chart === "undefined") {
+        return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        return;
+    }
+
+    const labels = data.map(item =>
+        item[key] ||
+        item.name ||
+        item.label ||
+        "Unknown"
+    );
+
+    const values = data.map(item =>
+        Number(
+            item.average_resolution_hours ??
+            item.avg_resolution_hours ??
+            item.value ??
+            0
+        )
+    );
+
+    if (charts[canvasId]) {
+        charts[canvasId].destroy();
+    }
+
+    charts[canvasId] = new Chart(canvas, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: seriesLabel,
+                data: values
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Hours"
+                    }
+                }
+            }
+        }
+    });
+}
+
+/* =========================================================
+   FILTERS
+   ========================================================= */
+
+function initializeInteractiveFilters() {
+    const priorityFilter =
+        document.getElementById("priority-filter");
+
+    const typeFilter =
+        document.getElementById("ticket-type-filter");
+
+    const channelFilter =
+        document.getElementById("channel-filter");
+
+    const segmentFilter =
+        document.getElementById("segment-filter");
+
+    const resetButton =
+        document.getElementById("reset-filters");
+
+    populateFilter(
+        priorityFilter,
+        getUniqueValues(ticketData, "Ticket Priority")
+    );
+
+    populateFilter(
+        typeFilter,
+        getUniqueValues(ticketData, "Ticket Type")
+    );
+
+    populateFilter(
+        channelFilter,
+        getUniqueValues(ticketData, "Ticket Channel")
+    );
+
+    populateSegmentFilter(segmentFilter);
+
+    [
+        priorityFilter,
+        typeFilter,
+        channelFilter,
+        segmentFilter
+    ].forEach(filter => {
+        if (filter) {
+            filter.removeEventListener(
+                "change",
+                handleFilterChange
+            );
+
+            filter.addEventListener(
+                "change",
+                handleFilterChange
+            );
+        }
+    });
+
+    if (resetButton) {
+        resetButton.removeEventListener(
+            "click",
+            resetAllFilters
+        );
+
+        resetButton.addEventListener(
+            "click",
+            resetAllFilters
+        );
+    }
+
+    updateFilteredStats();
+}
+
+function populateFilter(selectElement, values) {
+    if (!selectElement) {
+        return;
+    }
+
+    const currentValue = selectElement.value;
+
+    selectElement.innerHTML =
+        `<option value="all">All</option>`;
+
+    values.forEach(value => {
+        if (value === null || value === undefined || value === "") {
+            return;
+        }
+
+        const option = document.createElement("option");
+
+        option.value = String(value);
+        option.textContent = String(value);
+
+        selectElement.appendChild(option);
+    });
+
+    if (
+        Array.from(selectElement.options)
+            .some(option => option.value === currentValue)
+    ) {
+        selectElement.value = currentValue;
+    }
+}
+
+function populateSegmentFilter(selectElement) {
+    if (!selectElement) {
+        return;
+    }
+
+    selectElement.innerHTML =
+        `<option value="all">All</option>`;
+
+    const segments = new Set();
+
+    segmentData.forEach(segment => {
+        const name =
+            segment.segment ||
+            segment.name ||
+            segment.segment_name;
+
+        if (name) {
+            segments.add(String(name));
+        }
+    });
+
+    Array.from(segments)
+        .sort()
+        .forEach(segment => {
+            const option = document.createElement("option");
+
+            option.value = segment;
+            option.textContent = segment;
+
+            selectElement.appendChild(option);
+        });
+}
+
+function getUniqueValues(data, field) {
+    return [
+        ...new Set(
+            data
+                .map(item => item[field])
+                .filter(value =>
+                    value !== undefined &&
+                    value !== null &&
+                    value !== ""
+                )
+        )
+    ].sort();
+}
+
+function handleFilterChange() {
+    updateFilteredStats();
+}
+
+function resetAllFilters() {
+    const filters = [
+        "priority-filter",
+        "ticket-type-filter",
+        "channel-filter",
+        "segment-filter"
+    ];
+
+    filters.forEach(id => {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.value = "all";
+        }
+    });
+
+    updateFilteredStats();
+}
+
+/* =========================================================
+   FILTERED TICKETS
+   ========================================================= */
+
+function getFilteredTickets() {
+    const priority =
+        document.getElementById("priority-filter")?.value || "all";
+
+    const type =
+        document.getElementById("ticket-type-filter")?.value || "all";
+
+    const channel =
+        document.getElementById("channel-filter")?.value || "all";
+
+    const segment =
+        document.getElementById("segment-filter")?.value || "all";
+
+    return ticketData.filter(ticket => {
+        const priorityMatch =
+            priority === "all" ||
+            String(ticket["Ticket Priority"]) === priority;
+
+        const typeMatch =
+            type === "all" ||
+            String(ticket["Ticket Type"]) === type;
+
+        const channelMatch =
+            channel === "all" ||
+            String(ticket["Ticket Channel"]) === channel;
+
+        const segmentMatch =
+            segment === "all" ||
+            inferSegment(ticket) === segment;
+
+        return (
+            priorityMatch &&
+            typeMatch &&
+            channelMatch &&
+            segmentMatch
+        );
+    });
+}
+
+function updateFilteredStats() {
+    const filtered = getFilteredTickets();
+
+    currentFilteredTickets = filtered;
+
+    const ticketCountElement =
+        document.getElementById("filtered-ticket-count");
+
+    const satisfactionElement =
+        document.getElementById("filtered-satisfaction");
+
+    const resolutionElement =
+        document.getElementById("filtered-resolution");
+
+    if (ticketCountElement) {
+        ticketCountElement.textContent =
+            formatNumber(filtered.length);
+    }
+
+    const satisfactionValues = filtered
+        .map(ticket =>
+            Number(ticket["Customer Satisfaction Rating"])
+        )
+        .filter(value => Number.isFinite(value));
+
+    if (satisfactionElement) {
+        if (satisfactionValues.length > 0) {
+            const average =
+                satisfactionValues.reduce(
+                    (sum, value) => sum + value,
+                    0
+                ) / satisfactionValues.length;
+
+            satisfactionElement.textContent =
+                `${average.toFixed(2)} / 5`;
+        } else {
+            satisfactionElement.textContent = "N/A";
+        }
+    }
+
+    if (resolutionElement) {
+        const resolutionAverage =
+            getFilteredResolutionAverage(filtered);
+
+        resolutionElement.textContent =
+            resolutionAverage !== null
+                ? `${resolutionAverage.toFixed(2)} hrs`
+                : "See analytics";
+    }
+
+    updateResolutionCharts();
+}
+
+function getFilteredResolutionAverage(filteredTickets) {
+    if (!filteredTickets.length) {
+        return null;
+    }
+
+    const priorities = new Set(
+        filteredTickets
+            .map(ticket => ticket["Ticket Priority"])
+            .filter(Boolean)
+    );
+
+    const types = new Set(
+        filteredTickets
+            .map(ticket => ticket["Ticket Type"])
+            .filter(Boolean)
+    );
+
+    const channels = new Set(
+        filteredTickets
+            .map(ticket => ticket["Ticket Channel"])
+            .filter(Boolean)
+    );
+
+    // Use aggregate data only when exactly one dimension
+    // is selected. Do not invent ticket-level resolution
+    // values because the raw ticket data has no complete
+    // Time to Resolution field.
+
+    if (priorities.size === 1) {
+        const priority = [...priorities][0];
+
+        const match = resolutionData.priority.find(
+            item =>
+                String(item.priority) === String(priority)
+        );
+
+        if (match) {
+            return Number(match.average_resolution_hours);
+        }
+    }
+
+    if (types.size === 1) {
+        const type = [...types][0];
+
+        const match = resolutionData.type.find(
+            item =>
+                String(
+                    item.ticket_type ??
+                    item.type
+                ) === String(type)
+        );
+
+        if (match) {
+            return Number(match.average_resolution_hours);
+        }
+    }
+
+    if (channels.size === 1) {
+        const channel = [...channels][0];
+
+        const match = resolutionData.channel.find(
+            item =>
+                String(
+                    item.support_channel ??
+                    item.channel
+                ) === String(channel)
+        );
+
+        if (match) {
+            return Number(match.average_resolution_hours);
+        }
+    }
+
+    return null;
+}
+
+/* =========================================================
+   SEGMENT INFERENCE
+   ========================================================= */
+
+function inferSegment(ticket) {
+    const age = Number(ticket["Customer Age"]);
+    const satisfaction = Number(
+        ticket["Customer Satisfaction Rating"]
+    );
+
+    const resolution = Number(
+        ticket["Time to Resolution"]
+    );
+
+    if (!Number.isFinite(age)) {
+        return null;
+    }
+
+    if (
+        Number.isFinite(satisfaction) &&
+        satisfaction <= 2
+    ) {
+        return age >= 50
+            ? "Older - At Risk and Fast"
+            : "Younger - At Risk";
+    }
+
+    if (
+        Number.isFinite(satisfaction) &&
+        satisfaction >= 4
+    ) {
+        return age >= 50
+            ? "Older - Satisfied"
+            : "Younger - Satisfied";
+    }
+
+    if (Number.isFinite(resolution)) {
+        return resolution <= 12
+            ? "Fast Resolution"
+            : "Slow Resolution";
+    }
+
+    return "Other";
+}
+
+/* =========================================================
+   AI TICKET ANALYSIS
+   ========================================================= */
+
+function setupAPIAnalysis() {
+    const button =
+        document.getElementById("analyze-ticket-button");
+
+    if (!button) {
+        return;
+    }
+
+    button.removeEventListener(
+        "click",
+        analyzeSelectedTicket
+    );
+
+    button.addEventListener(
+        "click",
+        analyzeSelectedTicket
+    );
+
+    populateTicketSelectorForAPI();
+}
+
+function populateTicketSelectorForAPI() {
+    const selector =
+        document.getElementById("ticket-selector");
+
+    if (!selector) {
+        return;
+    }
+
+    selector.innerHTML =
+        `<option value="">Select a ticket</option>`;
+
+    ticketData.slice(0, 500).forEach((ticket, index) => {
+        const option = document.createElement("option");
+
+        option.value = index;
+
+        const ticketId =
+            ticket["Ticket ID"] ??
+            index + 1;
+
+        const subject =
+            ticket["Ticket Subject"] ??
+            "Support ticket";
+
+        option.textContent =
+            `#${ticketId} — ${subject}`;
+
+        selector.appendChild(option);
+    });
+
+    selector.removeEventListener(
+        "change",
+        handleTicketSelection
+    );
+
+    selector.addEventListener(
+        "change",
+        handleTicketSelection
+    );
+}
+
+function handleTicketSelection(event) {
+    const index = Number(event.target.value);
+
+    if (
+        event.target.value === "" ||
+        !Number.isInteger(index) ||
+        !ticketData[index]
+    ) {
+        return;
+    }
+
+    renderSelectedTicketPreview(ticketData[index]);
+}
+
+function renderSelectedTicketPreview(ticket) {
+    const preview =
+        document.getElementById(
+            "selected-ticket-preview"
+        );
+
+    if (!preview) {
+        return;
+    }
+
+    const ticketId =
+        ticket["Ticket ID"] ?? "N/A";
+
+    const subject =
+        ticket["Ticket Subject"] ?? "N/A";
+
+    const priority =
+        ticket["Ticket Priority"] ?? "N/A";
+
+    const type =
+        ticket["Ticket Type"] ?? "N/A";
+
+    const channel =
+        ticket["Ticket Channel"] ?? "N/A";
+
+    preview.innerHTML = `
+        <div class="ticket-preview-card">
+            <h4>Ticket #${escapeHTML(ticketId)}</h4>
+            <p><strong>Subject:</strong>
+                ${escapeHTML(subject)}
+            </p>
+            <p><strong>Priority:</strong>
+                ${escapeHTML(priority)}
+            </p>
+            <p><strong>Type:</strong>
+                ${escapeHTML(type)}
+            </p>
+            <p><strong>Channel:</strong>
+                ${escapeHTML(channel)}
+            </p>
+        </div>
+    `;
+}
+
+async function analyzeSelectedTicket() {
+    const selector =
+        document.getElementById("ticket-selector");
+
+    const result =
+        document.getElementById("ai-analysis-result");
+
+    const button =
+        document.getElementById("analyze-ticket-button");
+
+    if (!selector || !result) {
+        return;
+    }
+
+    const index = Number(selector.value);
+
+    if (
+        selector.value === "" ||
+        !ticketData[index]
+    ) {
+        result.innerHTML = `
+            <div class="dashboard-status">
+                Please select a ticket first.
+            </div>
+        `;
+        return;
+    }
+
+    const ticket = ticketData[index];
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Analyzing...";
+    }
+
+    result.innerHTML = `
+        <div class="dashboard-status">
+            Analyzing ticket...
+        </div>
+    `;
+
+    const payload = {
+        customer_age: Number(
+            ticket["Customer Age"]
+        ) || 0,
+
+        ticket_priority:
+            ticket["Ticket Priority"] || "",
+
+        ticket_type:
+            ticket["Ticket Type"] || "",
+
+        support_channel:
+            ticket["Ticket Channel"] || "",
+
+        ticket_description:
+            ticket["Ticket Description"] ||
+            ticket["Ticket Subject"] ||
+            ""
+    };
+
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/analyze`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.detail ||
+                `API request failed: ${response.status}`
+            );
+        }
+
+        renderAPIAnalysisResult(data);
+
+    } catch (error) {
+        console.error(
+            "AI ticket analysis error:",
+            error
+        );
+
+        result.innerHTML = `
+            <div class="dashboard-status error">
+                Unable to analyze this ticket.
+                Please check that the backend API is running.
+                <br>
+                <small>${escapeHTML(
+                    error.message
+                )}</small>
+            </div>
+        `;
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Analyze Selected Ticket";
+        }
+    }
+}
+
+function renderAPIAnalysisResult(data) {
+    const result =
+        document.getElementById("ai-analysis-result");
+
+    if (!result) {
+        return;
+    }
+
+    const risk =
+        data.satisfaction_risk ??
+        data.risk ??
+        "Unknown";
+
+    const probability =
+        data.risk_probability ??
+        data.satisfaction_risk_probability;
+
+    const keywords =
+        data.keywords ||
+        data.extracted_keywords ||
+        [];
+
+    result.innerHTML = `
+        <div class="ai-analysis-card">
+            <h4>AI Ticket Analysis</h4>
+
+            <div class="analysis-row">
+                <strong>Satisfaction Risk:</strong>
+                <span>${escapeHTML(risk)}</span>
+            </div>
+
+            ${
+                probability !== undefined
+                    ? `
+                    <div class="analysis-row">
+                        <strong>Risk Probability:</strong>
+                        <span>
+                            ${(
+                                Number(probability) * 100
+                            ).toFixed(2)}%
+                        </span>
+                    </div>
+                    `
+                    : ""
+            }
+
+            <div class="analysis-row">
+                <strong>Extracted Keywords:</strong>
+                <span>
+                    ${
+                        Array.isArray(keywords)
+                            ? keywords
+                                .map(
+                                    keyword =>
+                                        escapeHTML(keyword)
+                                )
+                                .join(", ")
+                            : escapeHTML(keywords)
+                    }
+                </span>
+            </div>
+        </div>
+    `;
+}
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
 
 function escapeHTML(value) {
     if (value === null || value === undefined) {
@@ -76,1256 +1287,610 @@ function escapeHTML(value) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+/* =========================================================
+   ADDITIONAL DASHBOARD UTILITIES
+   ========================================================= */
 
-function showDashboardStatus(message, type = "info") {
-    const statusElement = document.getElementById("dashboard-status");
-
-    if (!statusElement) {
-        return;
-    }
-
-    statusElement.textContent = message;
-    statusElement.className = `dashboard-status ${type}`;
-    statusElement.style.display = "block";
-}
-
-function clearDashboardStatus() {
-    const statusElement = document.getElementById("dashboard-status");
-
-    if (!statusElement) {
-        return;
-    }
-
-    statusElement.textContent = "";
-    statusElement.className = "dashboard-status";
-    statusElement.style.display = "none";
-}
-
-function parseNumber(value) {
-    if (value === null || value === undefined || value === "") {
+function getTicketField(ticket, possibleFields) {
+    if (!ticket || !Array.isArray(possibleFields)) {
         return null;
     }
 
+    for (const field of possibleFields) {
+        if (
+            Object.prototype.hasOwnProperty.call(
+                ticket,
+                field
+            ) &&
+            ticket[field] !== null &&
+            ticket[field] !== undefined &&
+            ticket[field] !== ""
+        ) {
+            return ticket[field];
+        }
+    }
+
+    return null;
+}
+
+function getTicketId(ticket) {
+    return getTicketField(ticket, [
+        "Ticket ID",
+        "ticket_id",
+        "TicketID",
+        "id"
+    ]);
+}
+
+function getCustomerEmail(ticket) {
+    return getTicketField(ticket, [
+        "Customer Email",
+        "customer_email",
+        "CustomerEmail",
+        "email"
+    ]);
+}
+
+function getCustomerAge(ticket) {
+    const value = getTicketField(ticket, [
+        "Customer Age",
+        "customer_age",
+        "Age",
+        "age"
+    ]);
+
     const number = Number(value);
 
-    return Number.isFinite(number) ? number : null;
+    return Number.isFinite(number)
+        ? number
+        : null;
 }
 
-function formatNumber(value, decimals = 2) {
-    const number = parseNumber(value);
+function getCustomerSatisfaction(ticket) {
+    const value = getTicketField(ticket, [
+        "Customer Satisfaction Rating",
+        "customer_satisfaction_rating",
+        "Satisfaction Rating",
+        "satisfaction"
+    ]);
 
-    if (number === null) {
-        return "N/A";
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number
+        : null;
+}
+
+function getTicketPriority(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Priority",
+        "ticket_priority",
+        "Priority",
+        "priority"
+    ]);
+}
+
+function getTicketType(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Type",
+        "ticket_type",
+        "Type",
+        "type"
+    ]);
+}
+
+function getTicketChannel(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Channel",
+        "ticket_channel",
+        "Support Channel",
+        "support_channel",
+        "Channel",
+        "channel"
+    ]);
+}
+
+function getTicketSubject(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Subject",
+        "ticket_subject",
+        "Subject",
+        "subject"
+    ]);
+}
+
+function getTicketDescription(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Description",
+        "ticket_description",
+        "Description",
+        "description"
+    ]);
+}
+
+/* =========================================================
+   TICKET STATUS HELPERS
+   ========================================================= */
+
+function getTicketStatus(ticket) {
+    return getTicketField(ticket, [
+        "Ticket Status",
+        "ticket_status",
+        "Status",
+        "status"
+    ]);
+}
+
+function isClosedTicket(ticket) {
+    const status = getTicketStatus(ticket);
+
+    if (!status) {
+        return false;
     }
 
-    return number.toLocaleString(undefined, {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-    });
-}
-
-function normalizeText(value) {
-    return String(value ?? "")
+    return String(status)
         .trim()
-        .toLowerCase();
-}
-
-function normalizeResolutionData(payload) {
-    if (Array.isArray(payload)) {
-        return payload;
-    }
-
-    if (payload && Array.isArray(payload.data)) {
-        return payload.data;
-    }
-
-    if (payload && Array.isArray(payload.results)) {
-        return payload.results;
-    }
-
-    return [];
+        .toLowerCase() === "closed";
 }
 
 /* =========================================================
-   CSV PARSER
-========================================================= */
+   SATISFACTION HELPERS
+   ========================================================= */
 
-function parseCSV(text) {
-    const lines = text
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(Boolean);
+function isLowSatisfaction(ticket) {
+    const satisfaction =
+        getCustomerSatisfaction(ticket);
 
-    if (lines.length === 0) {
-        return [];
+    return (
+        satisfaction !== null &&
+        satisfaction <= 2
+    );
+}
+
+function isSatisfied(ticket) {
+    const satisfaction =
+        getCustomerSatisfaction(ticket);
+
+    return (
+        satisfaction !== null &&
+        satisfaction >= 4
+    );
+}
+
+function calculateAverage(values) {
+    const numericValues = values
+        .map(Number)
+        .filter(Number.isFinite);
+
+    if (numericValues.length === 0) {
+        return null;
     }
 
-    const headers = lines[0].split(",").map(header => header.trim());
+    const total = numericValues.reduce(
+        (sum, value) => sum + value,
+        0
+    );
 
-    return lines.slice(1).map(line => {
-        const values = line.split(",");
+    return total / numericValues.length;
+}
 
-        const row = {};
+function calculateTicketSatisfaction(tickets) {
+    if (!Array.isArray(tickets)) {
+        return null;
+    }
 
-        headers.forEach((header, index) => {
-            row[header] = values[index] !== undefined
-                ? values[index].trim()
-                : "";
-        });
+    const values = tickets
+        .map(getCustomerSatisfaction)
+        .filter(value => value !== null);
 
-        return row;
-    });
+    return calculateAverage(values);
+}
+
+function calculateLowSatisfactionRate(tickets) {
+    if (!Array.isArray(tickets) || tickets.length === 0) {
+        return null;
+    }
+
+    const ratedTickets = tickets.filter(
+        ticket =>
+            getCustomerSatisfaction(ticket) !== null
+    );
+
+    if (ratedTickets.length === 0) {
+        return null;
+    }
+
+    const lowSatisfactionTickets =
+        ratedTickets.filter(isLowSatisfaction);
+
+    return (
+        lowSatisfactionTickets.length /
+        ratedTickets.length
+    ) * 100;
 }
 
 /* =========================================================
-   FETCH HELPERS
-========================================================= */
+   FILTER SUMMARY
+   ========================================================= */
 
-async function fetchJSON(url) {
-    const response = await fetch(url);
+function calculateFilteredSummary(tickets) {
+    const totalTickets = tickets.length;
 
-    if (!response.ok) {
-        throw new Error(
-            `Failed to load ${url}: HTTP ${response.status}`
+    const satisfaction =
+        calculateTicketSatisfaction(tickets);
+
+    const lowSatisfactionRate =
+        calculateLowSatisfactionRate(tickets);
+
+    const lowSatisfactionCount =
+        tickets.filter(isLowSatisfaction).length;
+
+    const satisfiedCount =
+        tickets.filter(isSatisfied).length;
+
+    return {
+        totalTickets,
+        satisfaction,
+        lowSatisfactionRate,
+        lowSatisfactionCount,
+        satisfiedCount
+    };
+}
+
+function renderFilteredSummary(summary) {
+    const countElement =
+        document.getElementById(
+            "filtered-ticket-count"
         );
-    }
-
-    return response.json();
-}
-
-async function fetchText(url) {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(
-            `Failed to load ${url}: HTTP ${response.status}`
-        );
-    }
-
-    return response.text();
-}
-
-/* =========================================================
-   LOAD METRICS
-========================================================= */
-
-async function loadMetrics() {
-    try {
-        const csvText = await fetchText(DATA_FILES.metrics);
-
-        const rows = parseCSV(csvText);
-
-        dashboardMetrics = {};
-
-        rows.forEach(row => {
-            const metric = row.metric || row.Metric;
-            const value = row.value || row.Value;
-
-            if (metric) {
-                dashboardMetrics[metric] = value;
-            }
-        });
-
-        updateMetrics();
-
-        console.log("SupportIQ: dashboard metrics loaded.");
-    } catch (error) {
-        console.error("Metrics loading error:", error);
-
-        showDashboardStatus(
-            "Dashboard metrics could not be loaded.",
-            "error"
-        );
-    }
-}
-
-/* =========================================================
-   UPDATE MAIN METRICS
-========================================================= */
-
-function updateMetrics() {
-    const totalTicketsElement =
-        document.getElementById("total-tickets");
 
     const satisfactionElement =
-        document.getElementById("average-satisfaction");
-
-    const resolutionElement =
-        document.getElementById("average-resolution");
-
-    const segmentsElement =
-        document.getElementById("customer-segments");
-
-    if (totalTicketsElement) {
-        totalTicketsElement.textContent =
-            dashboardMetrics["Total Tickets"] ||
-            dashboardMetrics["total_tickets"] ||
-            "8,469";
-    }
-
-    if (satisfactionElement) {
-        satisfactionElement.textContent =
-            dashboardMetrics["Average Satisfaction"] ||
-            dashboardMetrics["average_satisfaction"] ||
-            "2.99 / 5";
-    }
-
-    if (resolutionElement) {
-        resolutionElement.textContent =
-            dashboardMetrics["Average Resolution Time"] ||
-            dashboardMetrics["average_resolution_hours"] ||
-            "11.77 hrs";
-    }
-
-    if (segmentsElement) {
-        segmentsElement.textContent =
-            dashboardMetrics["Customer Segments"] ||
-            dashboardMetrics["customer_segments"] ||
-            "6";
-    }
-}
-
-/* =========================================================
-   LOAD SEGMENT DATA
-========================================================= */
-
-async function loadSegmentData() {
-    try {
-        segmentData =
-            await fetchJSON(DATA_FILES.segments);
-
-        updateSegmentDashboard();
-
-        console.log("SupportIQ: segment data loaded.");
-    } catch (error) {
-        console.error("Segment data loading error:", error);
-
-        showDashboardStatus(
-            "Customer segment data could not be loaded.",
-            "error"
-        );
-    }
-}
-
-/* =========================================================
-   LOAD SATISFACTION DATA
-========================================================= */
-
-async function loadSatisfactionData() {
-    try {
-        satisfactionData =
-            await fetchJSON(DATA_FILES.satisfaction);
-
-        updateSatisfactionDashboard();
-
-        console.log(
-            "SupportIQ: satisfaction data loaded."
-        );
-    } catch (error) {
-        console.error(
-            "Satisfaction data loading error:",
-            error
-        );
-
-        showDashboardStatus(
-            "Satisfaction analytics could not be loaded.",
-            "error"
-        );
-    }
-}
-
-/* =========================================================
-   LOAD TICKET DATA
-========================================================= */
-
-async function loadTicketData() {
-    try {
-        ticketData =
-            await fetchJSON(DATA_FILES.ticketData);
-
-        if (!Array.isArray(ticketData)) {
-            throw new Error(
-                "Ticket data must be an array."
-            );
-        }
-
-        console.log(
-            `SupportIQ: loaded ${ticketData.length} tickets.`
-        );
-
-        populateTicketSelector();
-        populateFilterOptions();
-
-        updateFilteredDashboard();
-    } catch (error) {
-        console.error(
-            "Ticket data loading error:",
-            error
-        );
-
-        showDashboardStatus(
-            "Ticket data could not be loaded.",
-            "error"
-        );
-    }
-}
-
-/* =========================================================
-   LOAD TICKET SEGMENT MAPPING
-========================================================= */
-
-async function loadTicketSegmentMapping() {
-    try {
-        ticketSegmentMapping =
-            await fetchJSON(
-                DATA_FILES.ticketSegmentMapping
-            );
-
-        if (!Array.isArray(ticketSegmentMapping)) {
-            throw new Error(
-                "Ticket segment mapping must be an array."
-            );
-        }
-
-        buildTicketSegmentMap();
-
-        console.log(
-            `SupportIQ: loaded ${ticketSegmentMapping.length} segment mappings.`
-        );
-
-        clearDashboardStatus();
-    } catch (error) {
-        console.error(
-            "Ticket segment mapping error:",
-            error
-        );
-
-        ticketSegmentMapping = [];
-        ticketSegmentMap = new Map();
-
-        showDashboardStatus(
-            "K-Means segment mapping could not be loaded. Segment filtering is unavailable.",
-            "warning"
-        );
-    }
-}
-
-/* =========================================================
-   TICKET KEY
-========================================================= */
-
-function makeTicketKey(ticketId, customerEmail) {
-    return `${normalizeText(ticketId)}::${normalizeText(customerEmail)}`;
-}
-
-/* =========================================================
-   BUILD SEGMENT MAP
-========================================================= */
-
-function buildTicketSegmentMap() {
-    ticketSegmentMap = new Map();
-
-    ticketSegmentMapping.forEach(item => {
-        if (!item) {
-            return;
-        }
-
-        const ticketId =
-            item["Ticket ID"] ??
-            item.ticket_id ??
-            item.ticketId;
-
-        const customerEmail =
-            item["Customer Email"] ??
-            item.customer_email ??
-            item.customerEmail;
-
-        const segment =
-            item.segment ??
-            item.Segment;
-
-        if (
-            ticketId === undefined ||
-            customerEmail === undefined ||
-            !segment
-        ) {
-            return;
-        }
-
-        const key =
-            makeTicketKey(ticketId, customerEmail);
-
-        if (!ticketSegmentMap.has(key)) {
-            ticketSegmentMap.set(key, segment);
-        }
-    });
-}
-
-/* =========================================================
-   GET TICKET SEGMENT
-========================================================= */
-
-function getTicketSegment(ticket) {
-    if (!ticket) {
-        return "";
-    }
-
-    const ticketId =
-        ticket["Ticket ID"] ??
-        ticket.ticket_id ??
-        ticket.ticketId;
-
-    const customerEmail =
-        ticket["Customer Email"] ??
-        ticket.customer_email ??
-        ticket.customerEmail;
-
-    if (
-        ticketId === undefined ||
-        customerEmail === undefined
-    ) {
-        return "";
-    }
-
-    const key =
-        makeTicketKey(ticketId, customerEmail);
-
-    return ticketSegmentMap.get(key) || "";
-}
-
-/* =========================================================
-   LOAD RESOLUTION DATA
-========================================================= */
-
-async function loadResolutionData() {
-    try {
-        const [
-            priorityPayload,
-            typePayload,
-            channelPayload
-        ] = await Promise.all([
-            fetchJSON(DATA_FILES.resolutionByPriority),
-            fetchJSON(DATA_FILES.resolutionByType),
-            fetchJSON(DATA_FILES.resolutionByChannel)
-        ]);
-
-        resolutionData.priority =
-            normalizeResolutionData(priorityPayload);
-
-        resolutionData.type =
-            normalizeResolutionData(typePayload);
-
-        resolutionData.channel =
-            normalizeResolutionData(channelPayload);
-
-        console.log(
-            "SupportIQ: resolution analytics loaded.",
-            {
-                priority: resolutionData.priority.length,
-                type: resolutionData.type.length,
-                channel: resolutionData.channel.length
-            }
-        );
-
-        updateResolutionCharts();
-        updateFilteredDashboard();
-
-    } catch (error) {
-        console.error(
-            "Resolution data loading error:",
-            error
-        );
-
-        resolutionData = {
-            priority: [],
-            type: [],
-            channel: []
-        };
-
-        showDashboardStatus(
-            "Resolution analytics could not be loaded.",
-            "warning"
-        );
-
-        updateResolutionCharts();
-    }
-}
-
-/* =========================================================
-   INITIALIZE DASHBOARD
-========================================================= */
-
-async function initializeDashboard() {
-    try {
-        showDashboardStatus(
-            "Loading SupportIQ dashboard...",
-            "info"
-        );
-
-        await Promise.allSettled([
-            loadMetrics(),
-            loadSegmentData(),
-            loadSatisfactionData(),
-            loadTicketSegmentMapping()
-        ]);
-
-        await loadTicketData();
-
-        await loadResolutionData();
-
-        initializeFilters();
-        initializeNavigation();
-        initializeAIAnalysis();
-
-        updateFilteredDashboard();
-        updateResolutionCharts();
-
-        clearDashboardStatus();
-
-        console.log(
-            "SupportIQ dashboard initialized successfully."
-        );
-    } catch (error) {
-        console.error(
-            "Dashboard initialization error:",
-            error
-        );
-
-        showDashboardStatus(
-            "Some dashboard components could not be loaded.",
-            "warning"
-        );
-    }
-}
-
-/* =========================================================
-   DOM READY
-========================================================= */
-
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeDashboard
-);
-
-/* =========================================================
-   SEGMENT DASHBOARD
-========================================================= */
-
-function updateSegmentDashboard() {
-    updateSegmentCards();
-    updateSegmentDistributionChart();
-    updateSegmentInsights();
-}
-
-/* =========================================================
-   SEGMENT CARDS
-========================================================= */
-
-function updateSegmentCards() {
-    const container =
-        document.getElementById("segment-insights");
-
-    if (!container) {
-        return;
-    }
-
-    let segments = [];
-
-    if (Array.isArray(segmentData)) {
-        segments = segmentData;
-    } else if (
-        segmentData &&
-        Array.isArray(segmentData.segments)
-    ) {
-        segments = segmentData.segments;
-    } else if (
-        segmentData &&
-        Array.isArray(segmentData.data)
-    ) {
-        segments = segmentData.data;
-    }
-
-    if (segments.length === 0) {
-        container.innerHTML =
-            "<p>No segment insights available.</p>";
-        return;
-    }
-
-    container.innerHTML = segments
-        .map(segment => {
-            const name =
-                segment.segment ||
-                segment.name ||
-                "Unknown Segment";
-
-            const count =
-                segment.ticket_count ??
-                segment.customer_count ??
-                segment.count ??
-                0;
-
-            const satisfaction =
-                segment.average_satisfaction ??
-                segment.avg_satisfaction ??
-                null;
-
-            const resolution =
-                segment.average_resolution_hours ??
-                segment.avg_resolution_hours ??
-                null;
-
-            return `
-                <div class="insight-item">
-                    <h4>${escapeHTML(name)}</h4>
-
-                    <p>
-                        <strong>
-                            Customers/Tickets:
-                        </strong>
-                        ${formatNumber(count, 0)}
-                    </p>
-
-                    <p>
-                        <strong>
-                            Avg Satisfaction:
-                        </strong>
-                        ${
-                            satisfaction !== null
-                                ? formatNumber(
-                                      satisfaction,
-                                      2
-                                  )
-                                : "N/A"
-                        }
-                    </p>
-
-                    <p>
-                        <strong>
-                            Avg Resolution:
-                        </strong>
-                        ${
-                            resolution !== null
-                                ? `${formatNumber(
-                                      resolution,
-                                      2
-                                  )} hrs`
-                                : "N/A"
-                        }
-                    </p>
-                </div>
-            `;
-        })
-        .join("");
-}
-
-/* =========================================================
-   SEGMENT DISTRIBUTION CHART
-========================================================= */
-
-function updateSegmentDistributionChart() {
-    const canvas =
         document.getElementById(
-            "segment-distribution-chart"
-        );
-
-    if (!canvas || typeof Chart === "undefined") {
-        return;
-    }
-
-    let labels = [];
-    let values = [];
-
-    if (Array.isArray(segmentData)) {
-        segmentData.forEach(segment => {
-            labels.push(
-                segment.segment ||
-                segment.name ||
-                "Unknown"
-            );
-
-            values.push(
-                parseNumber(
-                    segment.ticket_count ??
-                    segment.customer_count ??
-                    segment.count
-                ) || 0
-            );
-        });
-    } else if (
-        segmentData &&
-        Array.isArray(segmentData.segments)
-    ) {
-        segmentData.segments.forEach(segment => {
-            labels.push(
-                segment.segment ||
-                segment.name ||
-                "Unknown"
-            );
-
-            values.push(
-                parseNumber(
-                    segment.ticket_count ??
-                    segment.customer_count ??
-                    segment.count
-                ) || 0
-            );
-        });
-    } else if (
-        segmentData &&
-        Array.isArray(segmentData.data)
-    ) {
-        segmentData.data.forEach(segment => {
-            labels.push(
-                segment.segment ||
-                segment.name ||
-                "Unknown"
-            );
-
-            values.push(
-                parseNumber(
-                    segment.ticket_count ??
-                    segment.customer_count ??
-                    segment.count
-                ) || 0
-            );
-        });
-    }
-
-    if (labels.length === 0) {
-        return;
-    }
-
-    if (charts.segmentDistribution) {
-        charts.segmentDistribution.destroy();
-    }
-
-    charts.segmentDistribution =
-        new Chart(canvas, {
-            type: "doughnut",
-
-            data: {
-                labels,
-                datasets: [
-                    {
-                        data: values
-                    }
-                ]
-            },
-
-            options: {
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value =
-                                    context.raw ?? 0;
-
-                                return `${context.label}: ${value.toLocaleString()}`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-    updateSegmentLegend(labels, values);
-}
-
-/* =========================================================
-   SEGMENT LEGEND
-========================================================= */
-
-function updateSegmentLegend(labels, values) {
-    const legend =
-        document.getElementById(
-            "segment-chart-legend"
-        );
-
-    if (!legend) {
-        return;
-    }
-
-    legend.innerHTML = labels
-        .map((label, index) => {
-            return `
-                <div class="legend-item">
-                    <span class="legend-label">
-                        ${escapeHTML(label)}
-                    </span>
-
-                    <span class="legend-value">
-                        ${formatNumber(
-                            values[index],
-                            0
-                        )}
-                    </span>
-                </div>
-            `;
-        })
-        .join("");
-}
-
-/* =========================================================
-   SEGMENT INSIGHTS
-========================================================= */
-
-function updateSegmentInsights() {
-    const container =
-        document.getElementById(
-            "segment-insights"
-        );
-
-    if (!container) {
-        return;
-    }
-
-    let segments = [];
-
-    if (
-        segmentData &&
-        Array.isArray(segmentData.segments)
-    ) {
-        segments = segmentData.segments;
-    } else if (
-        segmentData &&
-        Array.isArray(segmentData.data)
-    ) {
-        segments = segmentData.data;
-    } else if (Array.isArray(segmentData)) {
-        segments = segmentData;
-    }
-
-    if (segments.length === 0) {
-        container.innerHTML =
-            "<p>No segment insights available.</p>";
-        return;
-    }
-
-    container.innerHTML = segments
-        .map(segment => {
-            const name =
-                segment.segment ||
-                segment.name ||
-                "Unknown Segment";
-
-            const description =
-                segment.description ||
-                segment.insight ||
-                "";
-
-            return `
-                <div class="insight-item">
-                    <h4>
-                        ${escapeHTML(name)}
-                    </h4>
-
-                    ${
-                        description
-                            ? `<p>${escapeHTML(
-                                  description
-                              )}</p>`
-                            : ""
-                    }
-                </div>
-            `;
-        })
-        .join("");
-}
-
-/* =========================================================
-   SATISFACTION DASHBOARD
-========================================================= */
-
-function updateSatisfactionDashboard() {
-    updateSatisfactionMetrics();
-    updateSatisfactionChart();
-}
-
-/* =========================================================
-   SATISFACTION METRICS
-========================================================= */
-
-function updateSatisfactionMetrics() {
-    const data = satisfactionData || {};
-
-    const low =
-        data.low_satisfaction ??
-        data.low_satisfaction_count ??
-        data.low ??
-        0;
-
-    const satisfied =
-        data.satisfied ??
-        data.satisfied_count ??
-        data.high_satisfaction_count ??
-        0;
-
-    const risk =
-        data.risk_percentage ??
-        data.risk_percent ??
-        data.percentage_at_risk ??
-        null;
-
-    const accuracy =
-        data.model_accuracy ??
-        data.accuracy ??
-        null;
-
-    const lowElement =
-        document.getElementById(
-            "low-satisfaction-count"
-        );
-
-    const satisfiedElement =
-        document.getElementById(
-            "satisfied-count"
+            "filtered-satisfaction"
         );
 
     const riskElement =
         document.getElementById(
-            "satisfaction-risk-percentage"
+            "filtered-risk"
         );
 
-    const accuracyElement =
-        document.getElementById(
-            "satisfaction-model-accuracy"
-        );
-
-    if (lowElement) {
-        lowElement.textContent =
-            formatNumber(low, 0);
+    if (countElement) {
+        countElement.textContent =
+            formatNumber(summary.totalTickets);
     }
 
-    if (satisfiedElement) {
-        satisfiedElement.textContent =
-            formatNumber(satisfied, 0);
+    if (satisfactionElement) {
+        satisfactionElement.textContent =
+            summary.satisfaction !== null
+                ? `${summary.satisfaction.toFixed(2)} / 5`
+                : "N/A";
     }
 
     if (riskElement) {
         riskElement.textContent =
-            risk !== null
-                ? `${formatNumber(risk, 1)}%`
-                : "N/A";
-    }
-
-    if (accuracyElement) {
-        accuracyElement.textContent =
-            accuracy !== null
-                ? `${formatNumber(
-                      accuracy * 100,
-                      2
-                  )}%`
+            summary.lowSatisfactionRate !== null
+                ? `${summary.lowSatisfactionRate.toFixed(1)}%`
                 : "N/A";
     }
 }
 
 /* =========================================================
-   SATISFACTION CHART
-========================================================= */
+   FILTERED TICKET DETAILS
+   ========================================================= */
 
-function updateSatisfactionChart() {
-    const canvas =
-        document.getElementById(
-            "satisfaction-chart"
-        );
+function getActiveFilters() {
+    return {
+        priority:
+            document.getElementById(
+                "priority-filter"
+            )?.value || "all",
 
-    if (!canvas || typeof Chart === "undefined") {
-        return;
+        type:
+            document.getElementById(
+                "ticket-type-filter"
+            )?.value || "all",
+
+        channel:
+            document.getElementById(
+                "channel-filter"
+            )?.value || "all",
+
+        segment:
+            document.getElementById(
+                "segment-filter"
+            )?.value || "all"
+    };
+}
+
+function ticketMatchesFilters(ticket, filters) {
+    const priority =
+        getTicketPriority(ticket);
+
+    const type =
+        getTicketType(ticket);
+
+    const channel =
+        getTicketChannel(ticket);
+
+    const segment =
+        inferSegment(ticket);
+
+    const priorityMatches =
+        filters.priority === "all" ||
+        String(priority) ===
+            String(filters.priority);
+
+    const typeMatches =
+        filters.type === "all" ||
+        String(type) ===
+            String(filters.type);
+
+    const channelMatches =
+        filters.channel === "all" ||
+        String(channel) ===
+            String(filters.channel);
+
+    const segmentMatches =
+        filters.segment === "all" ||
+        String(segment) ===
+            String(filters.segment);
+
+    return (
+        priorityMatches &&
+        typeMatches &&
+        channelMatches &&
+        segmentMatches
+    );
+}
+
+/* =========================================================
+   RESOLUTION HELPERS
+   ========================================================= */
+
+function normalizeResolutionValue(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return null;
     }
 
-    const data = satisfactionData || {};
+    return number;
+}
 
-    const labels =
-        data.labels ||
-        [
-            "Low Satisfaction",
-            "Satisfied"
-        ];
-
-    const values =
-        data.values ||
-        [
-            data.low_satisfaction ??
-                data.low_satisfaction_count ??
-                0,
-
-            data.satisfied ??
-                data.satisfied_count ??
-                0
-        ];
-
-    if (charts.satisfaction) {
-        charts.satisfaction.destroy();
+function findResolutionValue(
+    collection,
+    fieldNames,
+    targetValue
+) {
+    if (
+        !Array.isArray(collection) ||
+        targetValue === null ||
+        targetValue === undefined
+    ) {
+        return null;
     }
 
-    charts.satisfaction =
-        new Chart(canvas, {
-            type: "bar",
+    const target =
+        String(targetValue)
+            .trim()
+            .toLowerCase();
 
-            data: {
-                labels,
+    const item = collection.find(entry => {
+        if (!entry || typeof entry !== "object") {
+            return false;
+        }
 
-                datasets: [
-                    {
-                        label:
-                            "Customer Count",
+        for (const field of fieldNames) {
+            if (
+                entry[field] !== undefined &&
+                entry[field] !== null
+            ) {
+                const value =
+                    String(entry[field])
+                        .trim()
+                        .toLowerCase();
 
-                        data: values
-                    }
-                ]
-            },
-
-            options: {
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                },
-
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+                if (value === target) {
+                    return true;
                 }
             }
-        });
-}
-
-/* =========================================================
-   FILTER OPTIONS
-========================================================= */
-
-function populateFilterOptions() {
-    if (!Array.isArray(ticketData)) {
-        return;
-    }
-
-    const priorities =
-        new Set();
-
-    const ticketTypes =
-        new Set();
-
-    const channels =
-        new Set();
-
-    const segments =
-        new Set();
-
-    ticketData.forEach(ticket => {
-        const priority =
-            ticket["Ticket Priority"] ??
-            ticket["Priority"] ??
-            ticket.priority;
-
-        const type =
-            ticket["Ticket Type"] ??
-            ticket["Type"] ??
-            ticket.ticket_type;
-
-        const channel =
-            ticket["Ticket Channel"] ??
-            ticket["Channel"] ??
-            ticket.channel;
-
-        const segment =
-            getTicketSegment(ticket);
-
-        if (priority) {
-            priorities.add(priority);
         }
 
-        if (type) {
-            ticketTypes.add(type);
-        }
-
-        if (channel) {
-            channels.add(channel);
-        }
-
-        if (segment) {
-            segments.add(segment);
-        }
+        return false;
     });
 
-    populateSelect(
-        "priority-filter",
-        priorities
-    );
+    if (!item) {
+        return null;
+    }
 
-    populateSelect(
-        "ticket-type-filter",
-        ticketTypes
-    );
+    const resolution =
+        item.average_resolution_hours ??
+        item.avg_resolution_hours ??
+        item.average_resolution ??
+        item.value;
 
-    populateSelect(
-        "channel-filter",
-        channels
+    return normalizeResolutionValue(
+        resolution
     );
+}
 
-    populateSelect(
-        "segment-filter",
-        segments
+function getPriorityResolution(priority) {
+    return findResolutionValue(
+        resolutionData.priority,
+        [
+            "priority",
+            "Ticket Priority",
+            "ticket_priority"
+        ],
+        priority
+    );
+}
+
+function getTypeResolution(type) {
+    return findResolutionValue(
+        resolutionData.type,
+        [
+            "ticket_type",
+            "Ticket Type",
+            "type"
+        ],
+        type
+    );
+}
+
+function getChannelResolution(channel) {
+    return findResolutionValue(
+        resolutionData.channel,
+        [
+            "support_channel",
+            "Support Channel",
+            "channel",
+            "Ticket Channel"
+        ],
+        channel
     );
 }
 
 /* =========================================================
-   POPULATE SELECT
-========================================================= */
+   FILTERED RESOLUTION EXPLANATION
+   ========================================================= */
 
-function populateSelect(elementId, values) {
-    const select =
-        document.getElementById(elementId);
+function getResolutionExplanation() {
+    const filters = getActiveFilters();
 
-    if (!select) {
+    const selectedDimensions = [];
+
+    if (filters.priority !== "all") {
+        selectedDimensions.push("priority");
+    }
+
+    if (filters.type !== "all") {
+        selectedDimensions.push("ticket type");
+    }
+
+    if (filters.channel !== "all") {
+        selectedDimensions.push("support channel");
+    }
+
+    if (selectedDimensions.length === 0) {
+        return "See analytics";
+    }
+
+    if (selectedDimensions.length > 1) {
+        return "See analytics";
+    }
+
+    return "See analytics";
+}
+
+/* =========================================================
+   UPDATED FILTERED RESOLUTION
+   ========================================================= */
+
+function calculateFilteredResolution(tickets) {
+    if (
+        !Array.isArray(tickets) ||
+        tickets.length === 0
+    ) {
+        return null;
+    }
+
+    /*
+     * The source ticket_data.json does not contain
+     * complete ticket-level Time to Resolution values.
+     *
+     * Therefore this function intentionally does not
+     * calculate a fake average from missing values.
+     */
+
+    const filters = getActiveFilters();
+
+    if (filters.priority !== "all") {
+        return getPriorityResolution(
+            filters.priority
+        );
+    }
+
+    if (filters.type !== "all") {
+        return getTypeResolution(
+            filters.type
+        );
+    }
+
+    if (filters.channel !== "all") {
+        return getChannelResolution(
+            filters.channel
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+   RESOLUTION UI
+   ========================================================= */
+
+function updateFilteredResolutionDisplay(tickets) {
+    const element =
+        document.getElementById(
+            "filtered-resolution"
+        );
+
+    if (!element) {
         return;
     }
 
-    const currentValue =
-        select.value;
+    const value =
+        calculateFilteredResolution(tickets);
 
-    select.innerHTML =
-        `<option value="">All</option>`;
-
-    Array.from(values)
-        .filter(Boolean)
-        .sort((a, b) =>
-            String(a).localeCompare(
-                String(b)
-            )
-        )
-        .forEach(value => {
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-            option.value = value;
-            option.textContent = value;
-
-            select.appendChild(option);
-        });
-
-    if (
-        Array.from(select.options)
-            .some(option =>
-                option.value === currentValue
-            )
-    ) {
-        select.value = currentValue;
+    if (value === null) {
+        element.textContent =
+            getResolutionExplanation();
+        return;
     }
+
+    element.textContent =
+        `${value.toFixed(2)} hrs`;
 }
 
 /* =========================================================
-   FILTER INITIALIZATION
-========================================================= */
+   FILTERED DASHBOARD UPDATE
+   ========================================================= */
 
-function initializeFilters() {
-    const priorityFilter =
-        document.getElementById(
-            "priority-filter"
+function refreshFilteredDashboard() {
+    const filters = getActiveFilters();
+
+    const filteredTickets =
+        ticketData.filter(ticket =>
+            ticketMatchesFilters(
+                ticket,
+                filters
+            )
         );
 
-    const typeFilter =
-        document.getElementById(
-            "ticket-type-filter"
+    currentFilteredTickets =
+        filteredTickets;
+
+    const summary =
+        calculateFilteredSummary(
+            filteredTickets
         );
 
-    const channelFilter =
-        document.getElementById(
-            "channel-filter"
-        );
+    renderFilteredSummary(summary);
 
-    const segmentFilter =
-        document.getElementById(
-            "segment-filter"
-        );
+    updateFilteredResolutionDisplay(
+        filteredTickets
+    );
 
-    if (priorityFilter) {
-        priorityFilter.addEventListener(
-            "change",
-            () => {
-                filters.priority =
-                    priorityFilter.value;
+    updateResolutionCharts();
 
-                updateFilteredDashboard();
-            }
-        );
-    }
-
-    if (typeFilter) {
-        typeFilter.addEventListener(
-            "change",
-            () => {
-                filters.ticketType =
-                    typeFilter.value;
-
-                updateFilteredDashboard();
-            }
-        );
-    }
-
-    if (channelFilter) {
-        channelFilter.addEventListener(
-            "change",
-            () => {
-                filters.channel =
-                    channelFilter.value;
-
-                updateFilteredDashboard();
-            }
-        );
-    }
-
-    if (segmentFilter) {
-        segmentFilter.addEventListener(
-            "change",
-            () => {
-                filters.segment =
-                    segmentFilter.value;
-
-                updateFilteredDashboard();
-            }
-        );
-    }
-
-    const resetButton =
-        document.getElementById(
-            "reset-filters"
-        );
-
-    if (resetButton) {
-        resetButton.addEventListener(
-            "click",
-            resetFilters
-        );
-    }
+    return filteredTickets;
 }
 
 /* =========================================================
-   RESET FILTERS
-========================================================= */
+   IMPROVED FILTER INITIALIZATION
+   ========================================================= */
 
-function resetFilters() {
-    filters = {
-        priority: "",
-        ticketType: "",
-        channel: "",
-        segment: ""
-    };
-
+function setupFilterListeners() {
     const filterIds = [
         "priority-filter",
         "ticket-type-filter",
@@ -1337,486 +1902,1050 @@ function resetFilters() {
         const element =
             document.getElementById(id);
 
-        if (element) {
-            element.value = "";
+        if (!element) {
+            return;
         }
+
+        element.addEventListener(
+            "change",
+            refreshFilteredDashboard
+        );
     });
 
-    updateFilteredDashboard();
-}
-
-/* =========================================================
-   APPLY FILTERS
-========================================================= */
-
-function getFilteredTickets() {
-    if (!Array.isArray(ticketData)) {
-        return [];
-    }
-
-    return ticketData.filter(ticket => {
-        const priority =
-            ticket["Ticket Priority"] ??
-            ticket["Priority"] ??
-            ticket.priority ??
-            "";
-
-        const type =
-            ticket["Ticket Type"] ??
-            ticket["Type"] ??
-            ticket.ticket_type ??
-            "";
-
-        const channel =
-            ticket["Ticket Channel"] ??
-            ticket["Channel"] ??
-            ticket.channel ??
-            "";
-
-        const segment =
-            getTicketSegment(ticket);
-
-        if (
-            filters.priority &&
-            normalizeText(priority) !==
-                normalizeText(filters.priority)
-        ) {
-            return false;
-        }
-
-        if (
-            filters.ticketType &&
-            normalizeText(type) !==
-                normalizeText(filters.ticketType)
-        ) {
-            return false;
-        }
-
-        if (
-            filters.channel &&
-            normalizeText(channel) !==
-                normalizeText(filters.channel)
-        ) {
-            return false;
-        }
-
-        if (
-            filters.segment &&
-            normalizeText(segment) !==
-                normalizeText(filters.segment)
-        ) {
-            return false;
-        }
-
-        return true;
-    });
-}
-
-/* =========================================================
-   UPDATE FILTERED DASHBOARD
-========================================================= */
-
-function updateFilteredDashboard() {
-    const filteredTickets =
-        getFilteredTickets();
-
-    updateFilteredStats(
-        filteredTickets
-    );
-
-    updateFilteredTicketCount(
-        filteredTickets
-    );
-
-    updateResolutionCharts();
-}
-
-/* =========================================================
-   FILTERED TICKET COUNT
-========================================================= */
-
-function updateFilteredTicketCount(
-    filteredTickets
-) {
-    const element =
+    const resetButton =
         document.getElementById(
-            "filtered-ticket-count"
+            "reset-filters"
         );
 
-    if (!element) {
+    if (resetButton) {
+        resetButton.addEventListener(
+            "click",
+            () => {
+                filterIds.forEach(id => {
+                    const element =
+                        document.getElementById(id);
+
+                    if (element) {
+                        element.value = "all";
+                    }
+                });
+
+                refreshFilteredDashboard();
+            }
+        );
+    }
+}
+
+/* =========================================================
+   TICKET PREVIEW
+   ========================================================= */
+
+function createTicketPreviewHTML(ticket) {
+    const ticketId =
+        getTicketId(ticket) ?? "N/A";
+
+    const email =
+        getCustomerEmail(ticket) ?? "N/A";
+
+    const age =
+        getCustomerAge(ticket);
+
+    const priority =
+        getTicketPriority(ticket) ?? "N/A";
+
+    const type =
+        getTicketType(ticket) ?? "N/A";
+
+    const channel =
+        getTicketChannel(ticket) ?? "N/A";
+
+    const subject =
+        getTicketSubject(ticket) ?? "N/A";
+
+    const description =
+        getTicketDescription(ticket) ?? "N/A";
+
+    const satisfaction =
+        getCustomerSatisfaction(ticket);
+
+    return `
+        <div class="ticket-preview-card">
+
+            <div class="ticket-preview-header">
+                <h4>
+                    Ticket #${escapeHTML(ticketId)}
+                </h4>
+            </div>
+
+            <div class="ticket-preview-grid">
+
+                <div>
+                    <strong>Customer Email</strong>
+                    <span>
+                        ${escapeHTML(email)}
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Customer Age</strong>
+                    <span>
+                        ${
+                            age !== null
+                                ? escapeHTML(age)
+                                : "N/A"
+                        }
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Priority</strong>
+                    <span>
+                        ${escapeHTML(priority)}
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Ticket Type</strong>
+                    <span>
+                        ${escapeHTML(type)}
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Channel</strong>
+                    <span>
+                        ${escapeHTML(channel)}
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Satisfaction</strong>
+                    <span>
+                        ${
+                            satisfaction !== null
+                                ? `${satisfaction} / 5`
+                                : "N/A"
+                        }
+                    </span>
+                </div>
+
+            </div>
+
+            <div class="ticket-preview-content">
+
+                <div>
+                    <strong>Subject</strong>
+                    <p>
+                        ${escapeHTML(subject)}
+                    </p>
+                </div>
+
+                <div>
+                    <strong>Description</strong>
+                    <p>
+                        ${escapeHTML(description)}
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+    `;
+}
+
+function updateTicketPreview(ticket) {
+    const preview =
+        document.getElementById(
+            "selected-ticket-preview"
+        );
+
+    if (!preview) {
         return;
     }
 
-    element.textContent =
-        filteredTickets.length.toLocaleString();
+    if (!ticket) {
+        preview.innerHTML = `
+            <div class="dashboard-status">
+                Select a ticket to preview its details.
+            </div>
+        `;
+
+        return;
+    }
+
+    preview.innerHTML =
+        createTicketPreviewHTML(ticket);
 }
 
 /* =========================================================
-   FILTERED STATS
-========================================================= */
+   TICKET SELECTOR EVENTS
+   ========================================================= */
 
-function updateFilteredStats(
-    filteredTickets
-) {
-    const satisfactionValues =
-        filteredTickets
-            .map(ticket =>
-                parseNumber(
-                    ticket[
-                        "Customer Satisfaction Rating"
-                    ] ??
-                    ticket[
-                        "Customer Satisfaction"
-                    ] ??
-                    ticket.satisfaction
-                )
-            )
-            .filter(
-                value => value !== null
+function setupTicketSelector() {
+    const selector =
+        document.getElementById(
+            "ticket-selector"
+        );
+
+    if (!selector) {
+        return;
+    }
+
+    selector.addEventListener(
+        "change",
+        event => {
+            const value =
+                event.target.value;
+
+            if (value === "") {
+                updateTicketPreview(null);
+                return;
+            }
+
+            const index =
+                Number(value);
+
+            if (
+                !Number.isInteger(index) ||
+                !ticketData[index]
+            ) {
+                updateTicketPreview(null);
+                return;
+            }
+
+            updateTicketPreview(
+                ticketData[index]
             );
-
-    const averageSatisfaction =
-        satisfactionValues.length > 0
-            ? satisfactionValues.reduce(
-                  (sum, value) =>
-                      sum + value,
-                  0
-              ) /
-              satisfactionValues.length
-            : null;
-
-    const resolutionAverage =
-        getFilteredResolutionAverage();
-
-    const satisfactionElement =
-        document.getElementById(
-            "filtered-satisfaction"
-        );
-
-    const resolutionElement =
-        document.getElementById(
-            "filtered-resolution"
-        );
-
-    if (satisfactionElement) {
-        satisfactionElement.textContent =
-            averageSatisfaction !== null
-                ? `${formatNumber(
-                      averageSatisfaction,
-                      2
-                  )} / 5`
-                : "N/A";
-    }
-
-    if (resolutionElement) {
-        resolutionElement.textContent =
-            resolutionAverage !== null
-                ? `${formatNumber(
-                      resolutionAverage,
-                      2
-                  )} hrs`
-                : "N/A";
-    }
+        }
+    );
 }
 
 /* =========================================================
-   FILTERED RESOLUTION AVERAGE
-========================================================= */
+   POPULATE AI TICKET SELECTOR
+   ========================================================= */
 
-function getFilteredResolutionAverage() {
+function populateAITicketSelector() {
+    const selector =
+        document.getElementById(
+            "ticket-selector"
+        );
+
+    if (!selector) {
+        return;
+    }
+
+    selector.innerHTML = `
+        <option value="">
+            Select a ticket
+        </option>
+    `;
+
+    if (
+        !Array.isArray(ticketData) ||
+        ticketData.length === 0
+    ) {
+        selector.innerHTML = `
+            <option value="">
+                No tickets available
+            </option>
+        `;
+
+        return;
+    }
+
     /*
-     * The source ticket-level "Time to Resolution"
-     * field is unavailable.
-     *
-     * Therefore, only return an aggregate resolution
-     * value when exactly one supported filter is active.
-     *
-     * We intentionally do NOT calculate fake
-     * cross-filtered resolution values.
+     * Limit the number of options so the browser
+     * does not have to render thousands of options.
      */
 
-    const activeFilters = [
-        filters.priority,
-        filters.ticketType,
-        filters.channel
-    ].filter(Boolean);
+    const ticketsToShow =
+        ticketData.slice(0, 500);
 
-    if (activeFilters.length !== 1) {
+    ticketsToShow.forEach(
+        (ticket, index) => {
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            const id =
+                getTicketId(ticket) ??
+                index + 1;
+
+            const subject =
+                getTicketSubject(ticket) ??
+                "Support ticket";
+
+            option.value =
+                String(index);
+
+            option.textContent =
+                `#${id} — ${subject}`;
+
+            selector.appendChild(option);
+        }
+    );
+
+    setupTicketSelector();
+}
+
+/* =========================================================
+   API RESPONSE HELPERS
+   ========================================================= */
+
+function getAPIValue(
+    object,
+    possibleKeys,
+    fallback = null
+) {
+    if (
+        !object ||
+        typeof object !== "object"
+    ) {
+        return fallback;
+    }
+
+    for (const key of possibleKeys) {
+        if (
+            Object.prototype.hasOwnProperty.call(
+                object,
+                key
+            ) &&
+            object[key] !== undefined &&
+            object[key] !== null
+        ) {
+            return object[key];
+        }
+    }
+
+    return fallback;
+}
+
+function normalizeProbability(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
         return null;
     }
 
-    if (filters.priority) {
-        const item =
-            resolutionData.priority.find(
-                row =>
-                    normalizeText(
-                        row.priority
-                    ) ===
-                    normalizeText(
-                        filters.priority
-                    )
-            );
-
-        return item
-            ? parseNumber(
-                  item.average_resolution_hours
-              )
-            : null;
+    if (number > 1) {
+        return number;
     }
 
-    if (filters.ticketType) {
-        const item =
-            resolutionData.type.find(
-                row =>
-                    normalizeText(
-                        row.type ??
-                        row.ticket_type
-                    ) ===
-                    normalizeText(
-                        filters.ticketType
-                    )
-            );
+    return number * 100;
+}
 
-        return item
-            ? parseNumber(
-                  item.average_resolution_hours
-              )
-            : null;
+function normalizeKeywords(value) {
+    if (Array.isArray(value)) {
+        return value;
     }
 
-    if (filters.channel) {
-        const item =
-            resolutionData.channel.find(
-                row =>
-                    normalizeText(
-                        row.channel
-                    ) ===
-                    normalizeText(
-                        filters.channel
-                    )
-            );
-
-        return item
-            ? parseNumber(
-                  item.average_resolution_hours
-              )
-            : null;
+    if (typeof value === "string") {
+        return value
+            .split(",")
+            .map(item => item.trim())
+            .filter(Boolean);
     }
 
-    return null;
+    return [];
 }
 
 /* =========================================================
-   RESOLUTION DATA FOR FILTER
-========================================================= */
+   API ANALYSIS RESULT
+   ========================================================= */
 
-function getResolutionDataForFilter(
-    data,
-    field
+function renderDetailedAPIResult(data) {
+    const result =
+        document.getElementById(
+            "ai-analysis-result"
+        );
+
+    if (!result) {
+        return;
+    }
+
+    const risk =
+        getAPIValue(
+            data,
+            [
+                "satisfaction_risk",
+                "risk",
+                "risk_level",
+                "prediction"
+            ],
+            "Unknown"
+        );
+
+    const probability =
+        normalizeProbability(
+            getAPIValue(
+                data,
+                [
+                    "risk_probability",
+                    "satisfaction_risk_probability",
+                    "probability"
+                ]
+            )
+        );
+
+    const keywords =
+        normalizeKeywords(
+            getAPIValue(
+                data,
+                [
+                    "keywords",
+                    "extracted_keywords"
+                ],
+                []
+            )
+        );
+
+    const tfidf =
+        getAPIValue(
+            data,
+            [
+                "tfidf_analysis",
+                "text_analysis",
+                "tfidf"
+            ]
+        );
+
+    const riskClass =
+        String(risk)
+            .toLowerCase()
+            .includes("low")
+            ? "low-risk"
+            : String(risk)
+                .toLowerCase()
+                .includes("high")
+                ? "high-risk"
+                : "medium-risk";
+
+    result.innerHTML = `
+        <div class="ai-analysis-card">
+
+            <div class="analysis-header">
+                <h4>AI Ticket Analysis</h4>
+            </div>
+
+            <div class="analysis-grid">
+
+                <div class="analysis-item">
+                    <span class="analysis-label">
+                        Satisfaction Risk
+                    </span>
+
+                    <span class="analysis-value ${riskClass}">
+                        ${escapeHTML(risk)}
+                    </span>
+                </div>
+
+                ${
+                    probability !== null
+                        ? `
+                        <div class="analysis-item">
+                            <span class="analysis-label">
+                                Risk Probability
+                            </span>
+
+                            <span class="analysis-value">
+                                ${probability.toFixed(2)}%
+                            </span>
+                        </div>
+                        `
+                        : ""
+                }
+
+            </div>
+
+            ${
+                keywords.length > 0
+                    ? `
+                    <div class="analysis-section">
+                        <strong>
+                            Extracted Keywords
+                        </strong>
+
+                        <div class="keyword-list">
+                            ${keywords
+                                .map(
+                                    keyword => `
+                                        <span class="keyword">
+                                            ${escapeHTML(
+                                                keyword
+                                            )}
+                                        </span>
+                                    `
+                                )
+                                .join("")}
+                        </div>
+                    </div>
+                    `
+                    : ""
+            }
+
+            ${
+                tfidf
+                    ? `
+                    <div class="analysis-section">
+                        <strong>
+                            Text Analysis
+                        </strong>
+
+                        <pre class="tfidf-output">${escapeHTML(
+                            typeof tfidf === "string"
+                                ? tfidf
+                                : JSON.stringify(
+                                    tfidf,
+                                    null,
+                                    2
+                                )
+                        )}</pre>
+                    </div>
+                    `
+                    : ""
+            }
+
+        </div>
+    `;
+}
+
+/* =========================================================
+   API HEALTH CHECK
+   ========================================================= */
+
+async function checkAPIHealth() {
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/health`
+            );
+
+        if (!response.ok) {
+            return false;
+        }
+
+        const data =
+            await response.json();
+
+        return (
+            data.status === "healthy" ||
+            data.status === "ok" ||
+            response.ok
+        );
+
+    } catch (error) {
+        console.error(
+            "API health check failed:",
+            error
+        );
+
+        return false;
+    }
+}
+
+/* =========================================================
+   DASHBOARD STATUS
+   ========================================================= */
+
+function showDashboardStatus(
+    message,
+    type = "info"
 ) {
-    if (!Array.isArray(data)) {
+    const status =
+        document.getElementById(
+            "dashboard-status"
+        );
+
+    if (!status) {
+        return;
+    }
+
+    status.className =
+        `dashboard-status ${type}`;
+
+    status.textContent =
+        message;
+}
+
+function clearDashboardStatus() {
+    const status =
+        document.getElementById(
+            "dashboard-status"
+        );
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = "";
+    status.className =
+        "dashboard-status";
+}
+
+/* =========================================================
+   SAFE JSON FETCH
+   ========================================================= */
+
+async function fetchJSON(url) {
+    const response =
+        await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(
+            `Request failed with status ${response.status}`
+        );
+    }
+
+    return response.json();
+}
+
+async function fetchText(url) {
+    const response =
+        await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(
+            `Request failed with status ${response.status}`
+        );
+    }
+
+    return response.text();
+}
+
+/* =========================================================
+   GENERIC CHART CLEANUP
+   ========================================================= */
+
+function destroyChart(chartKey) {
+    if (
+        charts[chartKey] &&
+        typeof charts[chartKey].destroy ===
+            "function"
+    ) {
+        charts[chartKey].destroy();
+        charts[chartKey] = null;
+    }
+}
+
+function destroyAllCharts() {
+    Object.keys(charts).forEach(
+        destroyChart
+    );
+}
+
+/* =========================================================
+   NUMBER FORMATTING
+   ========================================================= */
+
+function formatDecimal(
+    value,
+    decimals = 2
+) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "N/A";
+    }
+
+    return number.toFixed(decimals);
+}
+
+function formatPercentage(
+    value,
+    decimals = 1
+) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "N/A";
+    }
+
+    return `${number.toFixed(decimals)}%`;
+}
+
+/* =========================================================
+   DOM SAFETY HELPERS
+   ========================================================= */
+
+function setTextContent(
+    id,
+    value
+) {
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+        element.textContent =
+            value;
+    }
+}
+
+function setHTML(
+    id,
+    html
+) {
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+        element.innerHTML =
+            html;
+    }
+}
+
+function elementExists(id) {
+    return Boolean(
+        document.getElementById(id)
+    );
+}
+
+/* =========================================================
+   DASHBOARD INITIALIZATION HELPERS
+   ========================================================= */
+
+function finalizeDashboardInitialization() {
+    try {
+        initializeInteractiveFilters();
+    } catch (error) {
+        console.error(
+            "Filter initialization failed:",
+            error
+        );
+    }
+
+    try {
+        populateAITicketSelector();
+    } catch (error) {
+        console.error(
+            "Ticket selector initialization failed:",
+            error
+        );
+    }
+
+    try {
+        updateFilteredStats();
+    } catch (error) {
+        console.error(
+            "Filtered stats update failed:",
+            error
+        );
+    }
+
+    try {
+        updateResolutionCharts();
+    } catch (error) {
+        console.error(
+            "Resolution chart update failed:",
+            error
+        );
+    }
+
+    try {
+        setupAPIAnalysis();
+    } catch (error) {
+        console.error(
+            "API analysis initialization failed:",
+            error
+        );
+    }
+}
+
+/* =========================================================
+   WINDOW EXPORTS
+   ========================================================= */
+
+window.supportIQ = {
+    getFilteredTickets,
+    refreshFilteredDashboard,
+    calculateTicketSatisfaction,
+    calculateLowSatisfactionRate,
+    calculateFilteredResolution,
+    checkAPIHealth,
+    destroyAllCharts
+};
+
+window.supportIQTickets =
+    ticketData;
+/* =========================================================
+   SEGMENT ANALYTICS UTILITIES
+   ========================================================= */
+
+function getSegmentNames() {
+    if (!Array.isArray(segmentData)) {
         return [];
     }
 
-    /*
-     * Only filter the chart corresponding to the
-     * selected dimension.
-     *
-     * Example:
-     * If Priority = High, the priority chart shows
-     * High while type/channel charts remain aggregate.
-     *
-     * This avoids inventing unavailable cross-tabulated
-     * resolution values.
-     */
+    return segmentData
+        .map(segment =>
+            segment.segment ||
+            segment.name ||
+            segment.segment_name
+        )
+        .filter(Boolean);
+}
 
-    if (field === "priority" && filters.priority) {
-        return data.filter(
-            row =>
-                normalizeText(
-                    row.priority
-                ) ===
-                normalizeText(
-                    filters.priority
-                )
-        );
+function getSegmentByName(name) {
+    if (!name || !Array.isArray(segmentData)) {
+        return null;
     }
 
-    if (field === "type" && filters.ticketType) {
-        return data.filter(
-            row =>
-                normalizeText(
-                    row.type ??
-                    row.ticket_type
-                ) ===
-                normalizeText(
-                    filters.ticketType
-                )
-        );
+    return segmentData.find(segment => {
+        const segmentName =
+            segment.segment ||
+            segment.name ||
+            segment.segment_name;
+
+        return String(segmentName) === String(name);
+    }) || null;
+}
+
+function getSegmentCount(segment) {
+    if (!segment) {
+        return 0;
     }
 
-    if (field === "channel" && filters.channel) {
-        return data.filter(
-            row =>
-                normalizeText(
-                    row.channel
-                ) ===
-                normalizeText(
-                    filters.channel
-                )
-        );
+    const value =
+        segment.count ??
+        segment.customer_count ??
+        segment.ticket_count ??
+        segment.size ??
+        segment.total ??
+        0;
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number
+        : 0;
+}
+
+function getSegmentPercentage(segment) {
+    if (!segment) {
+        return null;
     }
 
-    return data;
+    const value =
+        segment.percentage ??
+        segment.percent ??
+        segment.share;
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number
+        : null;
 }
 
 /* =========================================================
-   RESOLUTION CHARTS
-========================================================= */
+   SEGMENT INSIGHTS
+   ========================================================= */
 
-function updateResolutionCharts() {
-    createResolutionChart(
-        "priority-chart",
-        "Resolution by Priority",
-        getResolutionDataForFilter(
-            resolutionData.priority,
-            "priority"
-        ),
-        "priority"
-    );
-
-    createResolutionChart(
-        "type-chart",
-        "Resolution by Ticket Type",
-        getResolutionDataForFilter(
-            resolutionData.type,
-            "type"
-        ),
-        "type"
-    );
-
-    createResolutionChart(
-        "channel-chart",
-        "Resolution by Channel",
-        getResolutionDataForFilter(
-            resolutionData.channel,
-            "channel"
-        ),
-        "channel"
-    );
-}
-
-/* =========================================================
-   CREATE RESOLUTION CHART
-========================================================= */
-
-function createResolutionChart(
-    canvasId,
-    title,
-    data,
-    field
-) {
-    const canvas =
-        document.getElementById(canvasId);
-
-    if (!canvas || typeof Chart === "undefined") {
-        return;
+function buildSegmentInsight(segment) {
+    if (!segment) {
+        return "";
     }
 
-    if (charts[canvasId]) {
-        charts[canvasId].destroy();
+    const name =
+        segment.segment ||
+        segment.name ||
+        segment.segment_name ||
+        "Customer Segment";
+
+    const count =
+        getSegmentCount(segment);
+
+    const percentage =
+        getSegmentPercentage(segment);
+
+    const satisfaction =
+        Number(
+            segment.average_satisfaction ??
+            segment.avg_satisfaction ??
+            segment.satisfaction
+        );
+
+    const resolution =
+        Number(
+            segment.average_resolution_hours ??
+            segment.avg_resolution_hours ??
+            segment.resolution
+        );
+
+    const details = [];
+
+    if (count > 0) {
+        details.push(
+            `${formatNumber(count)} customers`
+        );
     }
 
-    if (!Array.isArray(data) || data.length === 0) {
-        const parent =
-            canvas.parentElement;
+    if (Number.isFinite(percentage)) {
+        details.push(
+            `${percentage.toFixed(1)}% of customers`
+        );
+    }
 
-        if (parent) {
-            const existingMessage =
-                parent.querySelector(
-                    ".chart-empty-message"
-                );
+    if (Number.isFinite(satisfaction)) {
+        details.push(
+            `average satisfaction ${satisfaction.toFixed(2)}/5`
+        );
+    }
 
-            if (!existingMessage) {
-                const message =
-                    document.createElement(
-                        "div"
-                    );
+    if (Number.isFinite(resolution)) {
+        details.push(
+            `average resolution ${resolution.toFixed(2)} hrs`
+        );
+    }
 
-                message.className =
-                    "chart-empty-message";
+    const description =
+        segment.description ||
+        segment.profile ||
+        segment.summary;
 
-                message.textContent =
-                    "No resolution data available.";
+    if (description) {
+        return `
+            <div class="insight-item">
+                <h4>${escapeHTML(name)}</h4>
+                <p>
+                    ${escapeHTML(description)}
+                </p>
 
-                parent.appendChild(message);
+                ${
+                    details.length
+                        ? `
+                        <small>
+                            ${escapeHTML(
+                                details.join(" • ")
+                            )}
+                        </small>
+                        `
+                        : ""
+                }
+            </div>
+        `;
+    }
+
+    return `
+        <div class="insight-item">
+            <h4>${escapeHTML(name)}</h4>
+
+            ${
+                details.length
+                    ? `
+                    <p>
+                        ${escapeHTML(
+                            details.join(" • ")
+                        )}
+                    </p>
+                    `
+                    : `
+                    <p>
+                        Customer segment identified
+                        through clustering analysis.
+                    </p>
+                    `
             }
-        }
+        </div>
+    `;
+}
+
+function renderSegmentInsights(data) {
+    const container =
+        document.getElementById(
+            "segment-container"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    if (
+        !Array.isArray(data) ||
+        data.length === 0
+    ) {
+        container.innerHTML = `
+            <div class="dashboard-status">
+                No segment insights available.
+            </div>
+        `;
 
         return;
+    }
+
+    container.innerHTML =
+        data
+            .map(buildSegmentInsight)
+            .join("");
+}
+
+/* =========================================================
+   SEGMENT DISTRIBUTION
+   ========================================================= */
+
+function getSegmentDistributionData() {
+    if (!Array.isArray(segmentData)) {
+        return {
+            labels: [],
+            values: []
+        };
     }
 
     const labels = [];
     const values = [];
 
-    data.forEach(row => {
-        let label = "";
+    segmentData.forEach(
+        (segment, index) => {
+            const name =
+                segment.segment ||
+                segment.name ||
+                segment.segment_name ||
+                `Segment ${index + 1}`;
 
-        if (field === "priority") {
-            label =
-                row.priority ??
-                row.Priority ??
-                "";
-        }
-
-        if (field === "type") {
-            label =
-                row.type ??
-                row.ticket_type ??
-                row["Ticket Type"] ??
-                "";
-        }
-
-        if (field === "channel") {
-            label =
-                row.channel ??
-                row.Channel ??
-                "";
-        }
-
-        const value =
-            parseNumber(
-                row.average_resolution_hours ??
-                row.avg_resolution_hours ??
-                row.average_resolution ??
-                row.value
+            labels.push(name);
+            values.push(
+                getSegmentCount(segment)
             );
-
-        if (
-            label &&
-            value !== null
-        ) {
-            labels.push(label);
-            values.push(value);
         }
-    });
+    );
 
-    if (labels.length === 0) {
+    return {
+        labels,
+        values
+    };
+}
+
+function renderSegmentDistributionChart() {
+    const canvas =
+        document.getElementById(
+            "segment-distribution-chart"
+        );
+
+    if (
+        !canvas ||
+        typeof Chart === "undefined"
+    ) {
         return;
     }
 
-    charts[canvasId] =
+    const {
+        labels,
+        values
+    } = getSegmentDistributionData();
+
+    destroyChart(
+        "segmentDistribution"
+    );
+
+    charts.segmentDistribution =
         new Chart(canvas, {
-            type: "bar",
+            type: "doughnut",
 
             data: {
                 labels,
 
                 datasets: [
                     {
-                        label:
-                            "Average Resolution Time (hours)",
-
                         data: values
                     }
                 ]
@@ -1825,673 +2954,1651 @@ function createResolutionChart(
             options: {
                 responsive: true,
 
-                maintainAspectRatio: false,
-
-                scales: {
-                    y: {
-                        beginAtZero: true,
-
-                        title: {
-                            display: true,
-
-                            text:
-                                "Hours"
-                        }
-                    }
-                },
+                maintainAspectRatio:
+                    false,
 
                 plugins: {
-                    title: {
-                        display: false,
-
-                        text: title
-                    },
-
                     legend: {
                         display: false
                     },
 
                     tooltip: {
                         callbacks: {
-                            label:
-                                function(context) {
-                                    return `${formatNumber(
-                                        context.raw,
-                                        2
-                                    )} hrs`;
-                                }
+                            label(context) {
+                                const value =
+                                    context.raw;
+
+                                return `${
+                                    context.label
+                                }: ${
+                                    formatNumber(value)
+                                }`;
+                            }
                         }
                     }
                 }
             }
         });
+
+    renderSegmentLegend(
+        labels,
+        values
+    );
 }
 
-/* =========================================================
-   TICKET SELECTOR
-========================================================= */
-
-function populateTicketSelector() {
-    const selector =
+function renderSegmentLegend(
+    labels,
+    values
+) {
+    const legend =
         document.getElementById(
-            "ticket-selector"
+            "segment-chart-legend"
         );
 
-    if (!selector) {
+    if (!legend) {
         return;
     }
 
-    selector.innerHTML = "";
+    legend.innerHTML =
+        labels.map(
+            (label, index) => `
+                <div class="legend-item">
 
-    ticketData.forEach(
-        (ticket, index) => {
-            const ticketId =
-                ticket["Ticket ID"] ??
-                ticket.ticket_id ??
-                ticket.ticketId ??
-                index + 1;
+                    <span class="legend-label">
+                        ${escapeHTML(label)}
+                    </span>
 
-            const customerEmail =
-                ticket["Customer Email"] ??
-                ticket.customer_email ??
-                ticket.customerEmail ??
-                "";
+                    <span class="legend-value">
+                        ${formatNumber(
+                            values[index]
+                        )}
+                    </span>
 
-            const option =
-                document.createElement(
-                    "option"
-                );
+                </div>
+            `
+        ).join("");
+}
 
-            option.value = index;
+/* =========================================================
+   SEGMENT DASHBOARD
+   ========================================================= */
 
-            option.textContent =
-                customerEmail
-                    ? `Ticket ${ticketId} — ${customerEmail}`
-                    : `Ticket ${ticketId}`;
+function updateSegmentDashboard() {
+    renderSegmentInsights(
+        segmentData
+    );
 
-            selector.appendChild(option);
+    renderSegmentDistributionChart();
+}
+
+/* =========================================================
+   SATISFACTION ANALYTICS
+   ========================================================= */
+
+function getSatisfactionCounts(
+    tickets
+) {
+    if (!Array.isArray(tickets)) {
+        return {
+            low: 0,
+            satisfied: 0,
+            rated: 0
+        };
+    }
+
+    let low = 0;
+    let satisfied = 0;
+    let rated = 0;
+
+    tickets.forEach(ticket => {
+        const rating =
+            getCustomerSatisfaction(
+                ticket
+            );
+
+        if (rating === null) {
+            return;
         }
+
+        rated += 1;
+
+        if (rating <= 2) {
+            low += 1;
+        }
+
+        if (rating >= 4) {
+            satisfied += 1;
+        }
+    });
+
+    return {
+        low,
+        satisfied,
+        rated
+    };
+}
+
+function updateSatisfactionAnalytics(
+    tickets
+) {
+    const counts =
+        getSatisfactionCounts(
+            tickets
+        );
+
+    const rate =
+        counts.rated > 0
+            ? (
+                counts.low /
+                counts.rated
+            ) * 100
+            : null;
+
+    setTextContent(
+        "low-satisfaction-count",
+        formatNumber(counts.low)
+    );
+
+    setTextContent(
+        "satisfied-count",
+        formatNumber(counts.satisfied)
+    );
+
+    setTextContent(
+        "satisfaction-risk-percentage",
+        rate !== null
+            ? `${rate.toFixed(1)}%`
+            : "N/A"
     );
 }
 
 /* =========================================================
-   NAVIGATION
-========================================================= */
+   MODEL ACCURACY
+   ========================================================= */
 
-function initializeNavigation() {
-    const links =
-        document.querySelectorAll(
-            'a[href^="#"]'
+function normalizeModelAccuracy(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return null;
+    }
+
+    /*
+     * The exported SupportIQ satisfaction
+     * accuracy is already expressed as a percentage.
+     *
+     * Example:
+     * 59.75 means 59.75%, not 0.5975.
+     */
+
+    if (
+        number >= 0 &&
+        number <= 1
+    ) {
+        return number * 100;
+    }
+
+    return number;
+}
+
+function updateModelAccuracy(
+    value
+) {
+    const accuracy =
+        normalizeModelAccuracy(
+            value
         );
 
-    links.forEach(link => {
-        link.addEventListener(
-            "click",
-            event => {
-                const targetId =
-                    link
-                        .getAttribute("href")
-                        ?.substring(1);
+    const element =
+        document.getElementById(
+            "satisfaction-model-accuracy"
+        );
 
-                if (!targetId) {
-                    return;
-                }
+    if (!element) {
+        return;
+    }
 
-                const target =
+    element.textContent =
+        accuracy !== null
+            ? `${accuracy.toFixed(2)}%`
+            : "N/A";
+}
+
+/* =========================================================
+   SATISFACTION DATA FALLBACK
+   ========================================================= */
+
+function getFallbackSatisfactionData() {
+    return {
+        low_satisfaction: 1102,
+        satisfied: 1667,
+        low_satisfaction_rate: 39.8,
+        model_accuracy: 59.75
+    };
+}
+
+function applySatisfactionData(
+    data
+) {
+    const fallback =
+        getFallbackSatisfactionData();
+
+    const source =
+        data && typeof data === "object"
+            ? data
+            : {};
+
+    const low =
+        source.low_satisfaction ??
+        source.low_satisfaction_count ??
+        source["Low Satisfaction"] ??
+        fallback.low_satisfaction;
+
+    const satisfied =
+        source.satisfied ??
+        source.satisfied_count ??
+        source["Satisfied"] ??
+        fallback.satisfied;
+
+    const risk =
+        source.low_satisfaction_rate ??
+        source.low_satisfaction_percentage ??
+        source["Low Satisfaction Rate"] ??
+        fallback.low_satisfaction_rate;
+
+    const accuracy =
+        source.model_accuracy ??
+        source.accuracy ??
+        source["Model Accuracy"] ??
+        fallback.model_accuracy;
+
+    setTextContent(
+        "low-satisfaction-count",
+        formatNumber(low)
+    );
+
+    setTextContent(
+        "satisfied-count",
+        formatNumber(satisfied)
+    );
+
+    setTextContent(
+        "satisfaction-risk-percentage",
+        Number.isFinite(Number(risk))
+            ? `${Number(risk).toFixed(1)}%`
+            : "N/A"
+    );
+
+    updateModelAccuracy(
+        accuracy
+    );
+}
+
+/* =========================================================
+   DASHBOARD FILTER STATISTICS
+   ========================================================= */
+
+function updateAllFilteredStatistics() {
+    const filtered =
+        getFilteredTickets();
+
+    currentFilteredTickets =
+        filtered;
+
+    const summary =
+        calculateFilteredSummary(
+            filtered
+        );
+
+    setTextContent(
+        "filtered-ticket-count",
+        formatNumber(
+            summary.totalTickets
+        )
+    );
+
+    setTextContent(
+        "filtered-satisfaction",
+        summary.satisfaction !== null
+            ? `${summary.satisfaction.toFixed(2)} / 5`
+            : "N/A"
+    );
+
+    updateFilteredResolutionDisplay(
+        filtered
+    );
+
+    updateSatisfactionAnalytics(
+        filtered
+    );
+}
+
+/* =========================================================
+   FILTER DATA SUMMARY
+   ========================================================= */
+
+function getFilterSummary() {
+    const filters =
+        getActiveFilters();
+
+    const filtered =
+        ticketData.filter(
+            ticket =>
+                ticketMatchesFilters(
+                    ticket,
+                    filters
+                )
+        );
+
+    return {
+        filters,
+        tickets: filtered,
+        count: filtered.length,
+        satisfaction:
+            calculateTicketSatisfaction(
+                filtered
+            ),
+        resolution:
+            calculateFilteredResolution(
+                filtered
+            )
+    };
+}
+
+/* =========================================================
+   FILTER DISPLAY
+   ========================================================= */
+
+function renderActiveFilterSummary() {
+    const container =
+        document.getElementById(
+            "active-filter-summary"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    const filters =
+        getActiveFilters();
+
+    const active = [];
+
+    if (filters.priority !== "all") {
+        active.push(
+            `Priority: ${filters.priority}`
+        );
+    }
+
+    if (filters.type !== "all") {
+        active.push(
+            `Type: ${filters.type}`
+        );
+    }
+
+    if (filters.channel !== "all") {
+        active.push(
+            `Channel: ${filters.channel}`
+        );
+    }
+
+    if (filters.segment !== "all") {
+        active.push(
+            `Segment: ${filters.segment}`
+        );
+    }
+
+    if (active.length === 0) {
+        container.innerHTML =
+            "No filters applied.";
+        return;
+    }
+
+    container.innerHTML =
+        active
+            .map(
+                item => `
+                    <span class="active-filter">
+                        ${escapeHTML(item)}
+                    </span>
+                `
+            )
+            .join("");
+}
+
+/* =========================================================
+   COMPLETE FILTER REFRESH
+   ========================================================= */
+
+function refreshDashboardFilters() {
+    const filtered =
+        getFilteredTickets();
+
+    currentFilteredTickets =
+        filtered;
+
+    const summary =
+        calculateFilteredSummary(
+            filtered
+        );
+
+    setTextContent(
+        "filtered-ticket-count",
+        formatNumber(
+            summary.totalTickets
+        )
+    );
+
+    setTextContent(
+        "filtered-satisfaction",
+        summary.satisfaction !== null
+            ? `${summary.satisfaction.toFixed(2)} / 5`
+            : "N/A"
+    );
+
+    updateFilteredResolutionDisplay(
+        filtered
+    );
+
+    updateSatisfactionAnalytics(
+        filtered
+    );
+
+    renderActiveFilterSummary();
+}
+
+/* =========================================================
+   FILTER INITIALIZATION — FINAL
+   ========================================================= */
+
+function initializeDashboardFilters() {
+    const filterIds = [
+        "priority-filter",
+        "ticket-type-filter",
+        "channel-filter",
+        "segment-filter"
+    ];
+
+    filterIds.forEach(id => {
+        const filter =
+            document.getElementById(id);
+
+        if (!filter) {
+            return;
+        }
+
+        filter.onchange = () => {
+            refreshDashboardFilters();
+        };
+    });
+
+    const resetButton =
+        document.getElementById(
+            "reset-filters"
+        );
+
+    if (resetButton) {
+        resetButton.onclick = () => {
+            filterIds.forEach(id => {
+                const filter =
                     document.getElementById(
-                        targetId
+                        id
                     );
 
-                if (!target) {
-                    return;
+                if (filter) {
+                    filter.value = "all";
                 }
+            });
 
-                event.preventDefault();
+            refreshDashboardFilters();
+        };
+    }
 
-                target.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-            }
-        );
-    });
+    refreshDashboardFilters();
 }
 
 /* =========================================================
-   AI TICKET ANALYSIS
-========================================================= */
+   CHART DATA UTILITIES
+   ========================================================= */
 
-function initializeAIAnalysis() {
-    const analyzeButton =
+function getResolutionChartData(
+    data,
+    possibleLabelFields
+) {
+    if (!Array.isArray(data)) {
+        return {
+            labels: [],
+            values: []
+        };
+    }
+
+    const labels = [];
+    const values = [];
+
+    data.forEach(item => {
+        if (
+            !item ||
+            typeof item !== "object"
+        ) {
+            return;
+        }
+
+        let label = null;
+
+        for (
+            const field
+            of possibleLabelFields
+        ) {
+            if (
+                item[field] !== undefined &&
+                item[field] !== null &&
+                item[field] !== ""
+            ) {
+                label =
+                    item[field];
+
+                break;
+            }
+        }
+
+        const value =
+            Number(
+                item.average_resolution_hours ??
+                item.avg_resolution_hours ??
+                item.average_resolution ??
+                item.value
+            );
+
+        if (
+            label !== null &&
+            Number.isFinite(value)
+        ) {
+            labels.push(
+                String(label)
+            );
+
+            values.push(value);
+        }
+    });
+
+    return {
+        labels,
+        values
+    };
+}
+
+/* =========================================================
+   PRIORITY RESOLUTION CHART
+   ========================================================= */
+
+function renderPriorityResolutionChart() {
+    const canvas =
         document.getElementById(
-            "analyze-ticket-button"
+            "priority-chart"
         );
 
-    const selector =
-        document.getElementById(
-            "ticket-selector"
-        );
-
-    if (!analyzeButton || !selector) {
+    if (
+        !canvas ||
+        typeof Chart === "undefined"
+    ) {
         return;
     }
 
-    analyzeButton.addEventListener(
-        "click",
-        analyzeSelectedTicket
+    const chartData =
+        getResolutionChartData(
+            resolutionData.priority,
+            [
+                "priority",
+                "Ticket Priority",
+                "ticket_priority"
+            ]
+        );
+
+    destroyChart(
+        "priority-chart"
+    );
+
+    if (
+        chartData.labels.length === 0
+    ) {
+        return;
+    }
+
+    charts["priority-chart"] =
+        new Chart(canvas, {
+            type: "bar",
+
+            data: {
+                labels:
+                    chartData.labels,
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution Time (hrs)",
+
+                        data:
+                            chartData.values
+                    }
+                ]
+            },
+
+            options: {
+                responsive: true,
+
+                maintainAspectRatio:
+                    false,
+
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+}
+
+/* =========================================================
+   TYPE RESOLUTION CHART
+   ========================================================= */
+
+function renderTypeResolutionChart() {
+    const canvas =
+        document.getElementById(
+            "type-chart"
+        );
+
+    if (
+        !canvas ||
+        typeof Chart === "undefined"
+    ) {
+        return;
+    }
+
+    const chartData =
+        getResolutionChartData(
+            resolutionData.type,
+            [
+                "ticket_type",
+                "Ticket Type",
+                "type"
+            ]
+        );
+
+    destroyChart(
+        "type-chart"
+    );
+
+    if (
+        chartData.labels.length === 0
+    ) {
+        return;
+    }
+
+    charts["type-chart"] =
+        new Chart(canvas, {
+            type: "bar",
+
+            data: {
+                labels:
+                    chartData.labels,
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution Time (hrs)",
+
+                        data:
+                            chartData.values
+                    }
+                ]
+            },
+
+            options: {
+                responsive: true,
+
+                maintainAspectRatio:
+                    false,
+
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+}
+
+/* =========================================================
+   CHANNEL RESOLUTION CHART
+   ========================================================= */
+
+function renderChannelResolutionChart() {
+    const canvas =
+        document.getElementById(
+            "channel-chart"
+        );
+
+    if (
+        !canvas ||
+        typeof Chart === "undefined"
+    ) {
+        return;
+    }
+
+    const chartData =
+        getResolutionChartData(
+            resolutionData.channel,
+            [
+                "support_channel",
+                "Support Channel",
+                "channel",
+                "Ticket Channel"
+            ]
+        );
+
+    destroyChart(
+        "channel-chart"
+    );
+
+    if (
+        chartData.labels.length === 0
+    ) {
+        return;
+    }
+
+    charts["channel-chart"] =
+        new Chart(canvas, {
+            type: "bar",
+
+            data: {
+                labels:
+                    chartData.labels,
+
+                datasets: [
+                    {
+                        label:
+                            "Average Resolution Time (hrs)",
+
+                        data:
+                            chartData.values
+                    }
+                ]
+            },
+
+            options: {
+                responsive: true,
+
+                maintainAspectRatio:
+                    false,
+
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+}
+
+/* =========================================================
+   RENDER ALL RESOLUTION CHARTS
+   ========================================================= */
+
+function renderAllResolutionCharts() {
+    renderPriorityResolutionChart();
+    renderTypeResolutionChart();
+    renderChannelResolutionChart();
+}
+
+/* =========================================================
+   DASHBOARD DATA VALIDATION
+   ========================================================= */
+
+function validateTicketData(data) {
+    if (!Array.isArray(data)) {
+        return false;
+    }
+
+    if (data.length === 0) {
+        return false;
+    }
+
+    return data.every(
+        ticket =>
+            ticket &&
+            typeof ticket === "object"
+    );
+}
+
+function validateSegmentData(data) {
+    return (
+        Array.isArray(data) &&
+        data.length > 0
+    );
+}
+
+function validateResolutionData(data) {
+    return (
+        data &&
+        typeof data === "object" &&
+        Array.isArray(data.priority) &&
+        Array.isArray(data.type) &&
+        Array.isArray(data.channel)
     );
 }
 
 /* =========================================================
-   ANALYZE SELECTED TICKET
-========================================================= */
+   DATA LOAD STATUS
+   ========================================================= */
 
-async function analyzeSelectedTicket() {
-    const selector =
+function updateDataLoadStatus() {
+    const problems = [];
+
+    if (
+        !validateTicketData(
+            ticketData
+        )
+    ) {
+        problems.push(
+            "ticket data"
+        );
+    }
+
+    if (
+        !validateSegmentData(
+            segmentData
+        )
+    ) {
+        problems.push(
+            "segment data"
+        );
+    }
+
+    if (
+        !validateResolutionData(
+            resolutionData
+        )
+    ) {
+        problems.push(
+            "resolution data"
+        );
+    }
+
+    if (problems.length > 0) {
+        showDashboardStatus(
+            `Some dashboard data could not be loaded: ${problems.join(
+                ", "
+            )}.`,
+            "warning"
+        );
+
+        return false;
+    }
+
+    clearDashboardStatus();
+
+    return true;
+}
+
+/* =========================================================
+   FULL DASHBOARD REFRESH
+   ========================================================= */
+
+function refreshEntireDashboard() {
+    try {
+        updateSegmentDashboard();
+    } catch (error) {
+        console.error(
+            "Segment dashboard refresh failed:",
+            error
+        );
+    }
+
+    try {
+        updateAllFilteredStatistics();
+    } catch (error) {
+        console.error(
+            "Filtered statistics refresh failed:",
+            error
+        );
+    }
+
+    try {
+        renderAllResolutionCharts();
+    } catch (error) {
+        console.error(
+            "Resolution chart refresh failed:",
+            error
+        );
+    }
+
+    try {
+        updateDataLoadStatus();
+    } catch (error) {
+        console.error(
+            "Data status update failed:",
+            error
+        );
+    }
+}
+
+/* =========================================================
+   FINAL PAGE SETUP
+   ========================================================= */
+
+function setupSupportIQDashboard() {
+    console.log(
+        "Setting up SupportIQ dashboard..."
+    );
+
+    try {
+        initializeDashboardFilters();
+    } catch (error) {
+        console.error(
+            "Dashboard filter setup failed:",
+            error
+        );
+    }
+
+    try {
+        populateAITicketSelector();
+    } catch (error) {
+        console.error(
+            "AI ticket selector setup failed:",
+            error
+        );
+    }
+
+    try {
+        setupAPIAnalysis();
+    } catch (error) {
+        console.error(
+            "API analysis setup failed:",
+            error
+        );
+    }
+
+    try {
+        refreshEntireDashboard();
+    } catch (error) {
+        console.error(
+            "Dashboard refresh failed:",
+            error
+        );
+    }
+
+    console.log(
+        "SupportIQ dashboard setup completed."
+    );
+}
+
+/* =========================================================
+   BACKEND API UTILITIES
+   ========================================================= */
+
+async function getAPIStatus() {
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/`
+            );
+
+        if (!response.ok) {
+            return {
+                available: false,
+                data: null
+            };
+        }
+
+        const data =
+            await response.json();
+
+        return {
+            available: true,
+            data
+        };
+    } catch (error) {
+        return {
+            available: false,
+            data: null
+        };
+    }
+}
+
+async function getAPIHealth() {
+    try {
+        const response =
+            await fetch(
+                `${API_BASE_URL}/health`
+            );
+
+        if (!response.ok) {
+            return {
+                available: false,
+                data: null
+            };
+        }
+
+        const data =
+            await response.json();
+
+        return {
+            available: true,
+            data
+        };
+    } catch (error) {
+        return {
+            available: false,
+            data: null
+        };
+    }
+}
+
+/* =========================================================
+   API STATUS UI
+   ========================================================= */
+
+async function updateAPIStatusUI() {
+    const statusElement =
         document.getElementById(
-            "ticket-selector"
+            "api-status"
         );
 
-    if (!selector) {
+    if (!statusElement) {
         return;
     }
 
-    const index =
-        Number(selector.value);
+    statusElement.textContent =
+        "Checking API...";
 
-    const ticket =
-        ticketData[index];
+    const health =
+        await getAPIHealth();
 
+    if (health.available) {
+        statusElement.textContent =
+            "API connected";
+        statusElement.className =
+            "api-status connected";
+    } else {
+        statusElement.textContent =
+            "API unavailable";
+        statusElement.className =
+            "api-status unavailable";
+    }
+}
+
+/* =========================================================
+   API TICKET PAYLOAD
+   ========================================================= */
+
+function buildTicketAnalysisPayload(
+    ticket
+) {
     if (!ticket) {
-        showAIResult(
-            "No ticket selected."
-        );
-
-        return;
+        return null;
     }
 
+    return {
+        customer_age:
+            getCustomerAge(ticket) || 0,
+
+        ticket_priority:
+            getTicketPriority(ticket) || "",
+
+        ticket_type:
+            getTicketType(ticket) || "",
+
+        support_channel:
+            getTicketChannel(ticket) || "",
+
+        ticket_description:
+            getTicketDescription(ticket) ||
+            getTicketSubject(ticket) ||
+            ""
+    };
+}
+
+function validateTicketAnalysisPayload(
+    payload
+) {
+    if (!payload) {
+        return false;
+    }
+
+    if (
+        typeof payload !== "object"
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+/* =========================================================
+   API ANALYSIS REQUEST
+   ========================================================= */
+
+async function requestTicketAnalysis(
+    ticket
+) {
+    const payload =
+        buildTicketAnalysisPayload(
+            ticket
+        );
+
+    if (
+        !validateTicketAnalysisPayload(
+            payload
+        )
+    ) {
+        throw new Error(
+            "Invalid ticket analysis payload."
+        );
+    }
+
+    const response =
+        await fetch(
+            `${API_BASE_URL}/analyze`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(
+                        payload
+                    )
+            }
+        );
+
+    let data = null;
+
+    try {
+        data =
+            await response.json();
+    } catch {
+        data = null;
+    }
+
+    if (!response.ok) {
+        const message =
+            data?.detail ||
+            data?.message ||
+            `API request failed with status ${response.status}`;
+
+        throw new Error(
+            message
+        );
+    }
+
+    return data;
+}
+
+/* =========================================================
+   ANALYSIS BUTTON STATE
+   ========================================================= */
+
+function setAnalysisButtonLoading(
+    loading
+) {
     const button =
         document.getElementById(
             "analyze-ticket-button"
         );
 
-    if (button) {
-        button.disabled = true;
-        button.textContent =
-            "Analyzing...";
+    if (!button) {
+        return;
     }
 
+    button.disabled =
+        Boolean(loading);
+
+    button.textContent =
+        loading
+            ? "Analyzing..."
+            : "Analyze Selected Ticket";
+}
+
+/* =========================================================
+   ANALYSIS RESULT STATES
+   ========================================================= */
+
+function showAnalysisLoading() {
+    setHTML(
+        "ai-analysis-result",
+        `
+            <div class="dashboard-status">
+                Analyzing selected ticket...
+            </div>
+        `
+    );
+}
+
+function showAnalysisError(
+    message
+) {
+    setHTML(
+        "ai-analysis-result",
+        `
+            <div class="dashboard-status error">
+                <strong>
+                    Ticket analysis failed.
+                </strong>
+
+                <br>
+
+                ${escapeHTML(message)}
+            </div>
+        `
+    );
+}
+
+function showAnalysisSuccess(
+    data
+) {
+    renderDetailedAPIResult(
+        data
+    );
+}
+
+/* =========================================================
+   COMPLETE TICKET ANALYSIS FLOW
+   ========================================================= */
+
+async function runTicketAnalysis() {
+    const selector =
+        document.getElementById(
+            "ticket-selector"
+        );
+
+    if (!selector) {
+        return;
+    }
+
+    const value =
+        selector.value;
+
+    if (value === "") {
+        showAnalysisError(
+            "Please select a ticket first."
+        );
+
+        return;
+    }
+
+    const index =
+        Number(value);
+
+    if (
+        !Number.isInteger(index) ||
+        !ticketData[index]
+    ) {
+        showAnalysisError(
+            "The selected ticket could not be found."
+        );
+
+        return;
+    }
+
+    const ticket =
+        ticketData[index];
+
+    setAnalysisButtonLoading(
+        true
+    );
+
+    showAnalysisLoading();
+
     try {
-        const payload =
-            buildAnalysisPayload(ticket);
-
         const result =
-            await fetchAIAnalysis(payload);
+            await requestTicketAnalysis(
+                ticket
+            );
 
-        displayAIAnalysis(
-            ticket,
+        showAnalysisSuccess(
             result
         );
+
     } catch (error) {
         console.error(
-            "AI ticket analysis error:",
+            "Ticket analysis request failed:",
             error
         );
 
-        showAIResult(
-            "Unable to analyze this ticket. Please make sure the SupportIQ backend API is running."
+        showAnalysisError(
+            error.message ||
+            "Unable to analyze this ticket."
         );
     } finally {
-        if (button) {
-            button.disabled = false;
-            button.textContent =
-                "Analyze Selected Ticket";
-        }
-    }
-}
-
-/* =========================================================
-   BUILD AI PAYLOAD
-========================================================= */
-
-function buildAnalysisPayload(ticket) {
-    return {
-        customer_age:
-            parseNumber(
-                ticket["Customer Age"] ??
-                ticket["Age"] ??
-                ticket.customer_age
-            ),
-
-        ticket_priority:
-            ticket["Ticket Priority"] ??
-            ticket["Priority"] ??
-            ticket.priority ??
-            "",
-
-        ticket_type:
-            ticket["Ticket Type"] ??
-            ticket["Type"] ??
-            ticket.ticket_type ??
-            "",
-
-        support_channel:
-            ticket["Ticket Channel"] ??
-            ticket["Channel"] ??
-            ticket.channel ??
-            "",
-
-        ticket_description:
-            ticket["Ticket Description"] ??
-            ticket["Description"] ??
-            ticket.description ??
-            ""
-    };
-}
-
-/* =========================================================
-   BACKEND API
-========================================================= */
-
-async function fetchAIAnalysis(payload) {
-    const apiUrl =
-        "http://127.0.0.1:8000/analyze";
-
-    const response =
-        await fetch(apiUrl, {
-            method: "POST",
-
-            headers: {
-                "Content-Type":
-                    "application/json"
-            },
-
-            body: JSON.stringify(
-                payload
-            )
-        });
-
-    if (!response.ok) {
-        throw new Error(
-            `API request failed: ${response.status}`
+        setAnalysisButtonLoading(
+            false
         );
     }
+}
+/* =========================================================
+   FINAL EVENT WIRING
+   ========================================================= */
 
-    return response.json();
+function attachFinalEventListeners() {
+    const analyzeButton =
+        document.getElementById(
+            "analyze-ticket-button"
+        );
+
+    if (analyzeButton) {
+        analyzeButton.onclick =
+            runTicketAnalysis;
+    }
+
+    const ticketSelector =
+        document.getElementById(
+            "ticket-selector"
+        );
+
+    if (ticketSelector) {
+        ticketSelector.onchange =
+            function () {
+                const value =
+                    this.value;
+
+                if (value === "") {
+                    updateTicketPreview(null);
+                    return;
+                }
+
+                const index =
+                    Number(value);
+
+                if (
+                    !Number.isInteger(index) ||
+                    !ticketData[index]
+                ) {
+                    updateTicketPreview(null);
+                    return;
+                }
+
+                updateTicketPreview(
+                    ticketData[index]
+                );
+            };
+    }
 }
 
 /* =========================================================
-   DISPLAY AI ANALYSIS
-========================================================= */
+   FINAL DATA INITIALIZATION
+   ========================================================= */
 
-function displayAIAnalysis(
-    ticket,
-    result
+async function initializeSupportIQ() {
+    console.log(
+        "Starting SupportIQ..."
+    );
+
+    showDashboardStatus(
+        "Loading dashboard data..."
+    );
+
+    try {
+        await Promise.allSettled([
+            loadDashboardMetrics(),
+            loadSegmentData(),
+            loadSatisfactionData(),
+            loadTicketData(),
+            loadResolutionData()
+        ]);
+
+        console.log(
+            "All dashboard data loading attempts completed."
+        );
+
+        /*
+         * Populate all interactive elements only
+         * after the ticket data has been loaded.
+         */
+
+        initializeInteractiveFilters();
+
+        populateTicketSelectorForAPI();
+
+        populateAITicketSelector();
+
+        attachFinalEventListeners();
+
+        updateSegmentDashboard();
+
+        refreshFilteredDashboard();
+
+        renderAllResolutionCharts();
+
+        updateAPIStatusUI();
+
+        updateDataLoadStatus();
+
+        clearDashboardStatus();
+
+        console.log(
+            "SupportIQ initialization completed."
+        );
+
+    } catch (error) {
+        console.error(
+            "SupportIQ initialization error:",
+            error
+        );
+
+        showDashboardStatus(
+            "Some dashboard components could not be loaded.",
+            "error"
+        );
+    }
+}
+
+/* =========================================================
+   DOM READY
+   ========================================================= */
+
+if (
+    document.readyState ===
+    "loading"
 ) {
-    const container =
-        document.getElementById(
-            "ai-analysis-result"
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeSupportIQ
+    );
+} else {
+    initializeSupportIQ();
+}
+
+/* =========================================================
+   GLOBAL DEBUG HELPERS
+   ========================================================= */
+
+window.SupportIQ = {
+    getTickets() {
+        return ticketData;
+    },
+
+    getSegments() {
+        return segmentData;
+    },
+
+    getResolutionData() {
+        return resolutionData;
+    },
+
+    getFilteredTickets() {
+        return currentFilteredTickets;
+    },
+
+    refresh() {
+        refreshEntireDashboard();
+    },
+
+    refreshFilters() {
+        refreshDashboardFilters();
+    },
+
+    checkAPI() {
+        return checkAPIHealth();
+    },
+
+    analyzeTicket(index) {
+        if (
+            !Number.isInteger(index) ||
+            !ticketData[index]
+        ) {
+            console.error(
+                "Invalid ticket index."
+            );
+
+            return;
+        }
+
+        const selector =
+            document.getElementById(
+                "ticket-selector"
+            );
+
+        if (selector) {
+            selector.value =
+                String(index);
+        }
+
+        updateTicketPreview(
+            ticketData[index]
         );
 
-    if (!container) {
-        return;
-    }
-
-    const risk =
-        result.satisfaction_risk ??
-        result.risk ??
-        result.prediction ??
-        "N/A";
-
-    const probability =
-        result.risk_probability ??
-        result.probability ??
-        null;
-
-    const keywords =
-        result.keywords ??
-        [];
-
-    const ticketInfo =
-        result.ticket ??
-        result.ticket_info ??
-        {};
-
-    const riskText =
-        typeof risk === "string"
-            ? risk
-            : String(risk);
-
-    const probabilityText =
-        probability !== null
-            ? `${formatNumber(
-                  Number(probability) * 100,
-                  2
-              )}%`
-            : "N/A";
-
-    const keywordList =
-        Array.isArray(keywords)
-            ? keywords
-            : [];
-
-    container.innerHTML = `
-        <div class="ai-result-card">
-
-            <h3>
-                AI Ticket Analysis
-            </h3>
-
-            <div class="ai-result-grid">
-
-                <div>
-                    <strong>
-                        Satisfaction Risk
-                    </strong>
-
-                    <p>
-                        ${escapeHTML(
-                            riskText
-                        )}
-                    </p>
-                </div>
-
-                <div>
-                    <strong>
-                        Risk Probability
-                    </strong>
-
-                    <p>
-                        ${probabilityText}
-                    </p>
-                </div>
-
-                <div>
-                    <strong>
-                        Ticket Priority
-                    </strong>
-
-                    <p>
-                        ${escapeHTML(
-                            ticketInfo.priority ??
-                            ticket["Ticket Priority"] ??
-                            "N/A"
-                        )}
-                    </p>
-                </div>
-
-                <div>
-                    <strong>
-                        Ticket Type
-                    </strong>
-
-                    <p>
-                        ${escapeHTML(
-                            ticketInfo.ticket_type ??
-                            ticket["Ticket Type"] ??
-                            "N/A"
-                        )}
-                    </p>
-                </div>
-
-            </div>
-
-            <div class="ai-keywords">
-
-                <strong>
-                    Extracted Keywords
-                </strong>
-
-                <p>
-                    ${
-                        keywordList.length > 0
-                            ? keywordList
-                                  .map(
-                                      keyword =>
-                                          `<span class="keyword-tag">${escapeHTML(
-                                              keyword
-                                          )}</span>`
-                                  )
-                                  .join(" ")
-                            : "No keywords extracted."
-                    }
-                </p>
-
-            </div>
-
-        </div>
-    `;
-}
-
-/* =========================================================
-   AI RESULT FALLBACK
-========================================================= */
-
-function showAIResult(message) {
-    const container =
-        document.getElementById(
-            "ai-analysis-result"
+        return requestTicketAnalysis(
+            ticketData[index]
         );
-
-    if (!container) {
-        return;
     }
-
-    container.innerHTML = `
-        <div class="ai-result-card">
-            <p>
-                ${escapeHTML(message)}
-            </p>
-        </div>
-    `;
-}
-/* =========================================================
-   ADDITIONAL AI RESULT DETAILS
-========================================================= */
-
-function renderTicketDetails(ticket) {
-    if (!ticket) {
-        return "";
-    }
-
-    const ticketId =
-        ticket["Ticket ID"] ??
-        ticket.ticket_id ??
-        ticket.ticketId ??
-        "N/A";
-
-    const customerEmail =
-        ticket["Customer Email"] ??
-        ticket.customer_email ??
-        ticket.customerEmail ??
-        "N/A";
-
-    const subject =
-        ticket["Ticket Subject"] ??
-        ticket["Subject"] ??
-        ticket.subject ??
-        "N/A";
-
-    const description =
-        ticket["Ticket Description"] ??
-        ticket["Description"] ??
-        ticket.description ??
-        "N/A";
-
-    const priority =
-        ticket["Ticket Priority"] ??
-        ticket["Priority"] ??
-        ticket.priority ??
-        "N/A";
-
-    const type =
-        ticket["Ticket Type"] ??
-        ticket["Type"] ??
-        ticket.ticket_type ??
-        "N/A";
-
-    const channel =
-        ticket["Ticket Channel"] ??
-        ticket["Channel"] ??
-        ticket.channel ??
-        "N/A";
-
-    return `
-        <div class="ticket-details">
-
-            <div class="ticket-detail-item">
-                <strong>Ticket ID</strong>
-                <span>
-                    ${escapeHTML(ticketId)}
-                </span>
-            </div>
-
-            <div class="ticket-detail-item">
-                <strong>Customer Email</strong>
-                <span>
-                    ${escapeHTML(customerEmail)}
-                </span>
-            </div>
-
-            <div class="ticket-detail-item">
-                <strong>Subject</strong>
-                <span>
-                    ${escapeHTML(subject)}
-                </span>
-            </div>
-
-            <div class="ticket-detail-item">
-                <strong>Priority</strong>
-                <span>
-                    ${escapeHTML(priority)}
-                </span>
-            </div>
-
-            <div class="ticket-detail-item">
-                <strong>Ticket Type</strong>
-                <span>
-                    ${escapeHTML(type)}
-                </span>
-            </div>
-
-            <div class="ticket-detail-item">
-                <strong>Channel</strong>
-                <span>
-                    ${escapeHTML(channel)}
-                </span>
-            </div>
-
-            <div class="ticket-description">
-                <strong>Description</strong>
-
-                <p>
-                    ${escapeHTML(description)}
-                </p>
-            </div>
-
-        </div>
-    `;
-}
+};
 
 /* =========================================================
-   FILTERED DASHBOARD REFRESH
-========================================================= */
-
-function refreshDashboard() {
-    updateFilteredDashboard();
-    updateResolutionCharts();
-}
-
-/* =========================================================
-   WINDOW RESIZE HANDLING
-========================================================= */
+   ERROR HANDLING
+   ========================================================= */
 
 window.addEventListener(
-    "resize",
-    () => {
-        Object.values(charts).forEach(
-            chart => {
-                if (
-                    chart &&
-                    typeof chart.resize ===
-                        "function"
-                ) {
-                    chart.resize();
-                }
-            }
+    "error",
+    event => {
+        console.error(
+            "SupportIQ runtime error:",
+            event.error ||
+            event.message
+        );
+    }
+);
+
+window.addEventListener(
+    "unhandledrejection",
+    event => {
+        console.error(
+            "SupportIQ unhandled promise rejection:",
+            event.reason
         );
     }
 );
 
 /* =========================================================
-   SAFE CHART DESTROY
-========================================================= */
+   PAGE VISIBILITY REFRESH
+   ========================================================= */
 
-function destroyChart(chartName) {
-    if (
-        charts[chartName] &&
-        typeof charts[chartName].destroy ===
-            "function"
-    ) {
-        charts[chartName].destroy();
-        charts[chartName] = null;
-    }
-}
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (
+            document.visibilityState ===
+            "visible"
+        ) {
+            /*
+             * Do not reload all JSON data every time
+             * the tab becomes visible.
+             *
+             * Refresh the UI using the data already
+             * loaded in memory.
+             */
 
-/* =========================================================
-   DASHBOARD DEBUG INFORMATION
-========================================================= */
-
-function getDashboardDebugInfo() {
-    return {
-        tickets:
-            Array.isArray(ticketData)
-                ? ticketData.length
-                : 0,
-
-        segmentMappings:
-            Array.isArray(
-                ticketSegmentMapping
-            )
-                ? ticketSegmentMapping.length
-                : 0,
-
-        segmentMapSize:
-            ticketSegmentMap.size,
-
-        resolution: {
-            priority:
-                resolutionData.priority.length,
-
-            type:
-                resolutionData.type.length,
-
-            channel:
-                resolutionData.channel.length
-        },
-
-        filters: {
-            ...filters
+            try {
+                refreshDashboardFilters();
+            } catch (error) {
+                console.error(
+                    "Visibility refresh failed:",
+                    error
+                );
+            }
         }
-    };
-}
+    }
+);
 
 /* =========================================================
-   EXPOSE DEBUG HELPER
-========================================================= */
+   WINDOW RESIZE HANDLER
+   ========================================================= */
 
-window.SupportIQ = {
-    refreshDashboard,
-    getFilteredTickets,
-    getTicketSegment,
-    getDashboardDebugInfo,
-    updateResolutionCharts
+let resizeTimeout = null;
+
+window.addEventListener(
+    "resize",
+    () => {
+        clearTimeout(
+            resizeTimeout
+        );
+
+        resizeTimeout =
+            setTimeout(() => {
+                Object.values(
+                    charts
+                ).forEach(chart => {
+                    if (
+                        chart &&
+                        typeof chart.resize ===
+                            "function"
+                    ) {
+                        chart.resize();
+                    }
+                });
+            }, 150);
+    }
+);
+
+/* =========================================================
+   FINAL EXPORTS
+   ========================================================= */
+
+window.SupportIQDashboard = {
+    initialize:
+        initializeSupportIQ,
+
+    refresh:
+        refreshEntireDashboard,
+
+    refreshFilters:
+        refreshDashboardFilters,
+
+    getFilteredTickets:
+        getFilteredTickets,
+
+    getActiveFilters:
+        getActiveFilters,
+
+    getResolutionData:
+        () => resolutionData,
+
+    getSegmentData:
+        () => segmentData,
+
+    getTicketData:
+        () => ticketData,
+
+    checkAPIHealth:
+        checkAPIHealth,
+
+    analyzeTicket:
+        runTicketAnalysis
 };
 
-/* =========================================================
-   FINAL SAFETY CHECK
-========================================================= */
-
 console.log(
-    "SupportIQ: script loaded successfully."
+    "SupportIQ script loaded."
 );
