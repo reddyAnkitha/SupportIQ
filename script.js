@@ -93,6 +93,7 @@ function clearDashboardStatus() {
     }
 
     el.textContent = "";
+
     el.className =
         "dashboard-status";
 }
@@ -357,9 +358,10 @@ function getCustomerAge(ticket) {
 /*
  * IMPORTANT:
  *
- * null satisfaction values must remain
- * null. They must NOT become 0.
+ * null satisfaction values remain null.
+ * They are never treated as zero.
  */
+
 function getSatisfaction(ticket) {
     const raw =
         getFirst(
@@ -870,6 +872,7 @@ function renderSegmentSection() {
 
                     return `
                         <div class="insight-item">
+
                             <h4>
                                 ${escapeHTML(
                                     name
@@ -881,6 +884,7 @@ function renderSegmentSection() {
                                     description
                                 )}
                             </p>
+
                         </div>
                     `;
                 }
@@ -926,14 +930,12 @@ function renderSegmentDistribution() {
         );
 
     /*
-     * Some exported segment files contain
-     * profile metrics but not a directly
-     * usable customer-count field.
-     *
-     * If every count is zero, use the
-     * ticket-to-segment mapping as a
-     * non-zero fallback.
+     * If the segment file contains
+     * profile data but no counts,
+     * calculate counts from the
+     * ticket-to-segment mapping.
      */
+
     if (
         values.length &&
         values.every(
@@ -1020,6 +1022,7 @@ function renderSegmentDistribution() {
                         index
                     ) => `
                         <div class="legend-item">
+
                             <span class="legend-label">
                                 ${escapeHTML(
                                     label
@@ -1033,6 +1036,7 @@ function renderSegmentDistribution() {
                                     ]
                                 )}
                             </span>
+
                         </div>
                     `
                 )
@@ -1075,8 +1079,6 @@ async function loadSatisfactionData() {
 
         let low = null;
         let satisfied = null;
-        let risk = null;
-        let accuracy = null;
 
         rows.forEach(
             row => {
@@ -1205,7 +1207,7 @@ async function loadSatisfactionData() {
             low +
             satisfied;
 
-        risk =
+        const risk =
             total > 0
                 ? (
                     low /
@@ -1223,7 +1225,7 @@ async function loadSatisfactionData() {
                 ]
             );
 
-        accuracy =
+        let accuracy =
             rawAccuracy === null
                 ? fallback.accuracy
                 : Number(
@@ -1241,7 +1243,9 @@ async function loadSatisfactionData() {
 
         setText(
             "low-satisfaction-count",
-            formatNumber(low)
+            formatNumber(
+                low
+            )
         );
 
         setText(
@@ -1869,8 +1873,6 @@ function calculateFilteredSummary(
 ) {
 
     /*
-     * IMPORTANT:
-     *
      * null ratings are excluded.
      * They are not treated as zero.
      */
@@ -1936,6 +1938,16 @@ function updateFilteredStats() {
             filtered
         );
 
+    setText(
+        "filtered-tickets",
+        formatNumber(
+            summary.total
+        )
+    );
+
+    /*
+     * Support the older HTML ID too.
+     */
     setText(
         "filtered-ticket-count",
         formatNumber(
@@ -2109,6 +2121,7 @@ function getFilteredResolutionAverage(
      * usable ticket-level resolution
      * duration values.
      */
+
     return null;
 }
 
@@ -2261,14 +2274,15 @@ function renderResolutionChart(
     }
 
     /*
-     * Support both:
+     * Supports both:
      *
      * <canvas id="priority-chart">
      *
-     * and older:
+     * and:
      *
      * <div id="priority-chart">
      */
+
     let canvas =
         element;
 
@@ -2758,7 +2772,7 @@ function renderAPIAnalysisResult(
     }
 
     /*
-     * Backend response structure:
+     * Expected backend response:
      *
      * {
      *   ticket: ...,
@@ -2953,17 +2967,16 @@ function renderAPIAnalysisResult(
                                 Text Analysis
                             </strong>
 
-                            <pre
-                                class="tfidf-output">${escapeHTML(
-                                    typeof tfidf ===
-                                        "string"
-                                        ? tfidf
-                                        : JSON.stringify(
-                                            tfidf,
-                                            null,
-                                            2
-                                        )
-                                )}</pre>
+                            <pre class="tfidf-output">${escapeHTML(
+                                typeof tfidf ===
+                                    "string"
+                                    ? tfidf
+                                    : JSON.stringify(
+                                        tfidf,
+                                        null,
+                                        2
+                                    )
+                            )}</pre>
 
                         </div>
                     `
@@ -3098,14 +3111,17 @@ async function analyzeTicket(
 ) {
 
     /*
-     * This matches the SupportIQ
-     * /analyze request contract:
+     * IMPORTANT:
+     *
+     * These field names match the
+     * current backend /analyze schema
+     * indicated by the validation error:
      *
      * customer_age
-     * ticket_priority
+     * priority
      * ticket_type
-     * support_channel
-     * ticket_description
+     * channel
+     * description
      */
 
     const payload = {
@@ -3117,7 +3133,7 @@ async function analyzeTicket(
                 )
             ) || 0,
 
-        ticket_priority:
+        priority:
             String(
                 getPriority(
                     ticket
@@ -3131,14 +3147,14 @@ async function analyzeTicket(
                 ) || ""
             ),
 
-        support_channel:
+        channel:
             String(
                 getChannel(
                     ticket
                 ) || ""
             ),
 
-        ticket_description:
+        description:
             String(
                 getDescription(
                     ticket
@@ -3149,6 +3165,11 @@ async function analyzeTicket(
                 ""
             )
     };
+
+    console.log(
+        "SupportIQ /analyze payload:",
+        payload
+    );
 
     const response =
         await fetch(
@@ -3466,9 +3487,10 @@ async function initializeDashboard() {
     );
 
     /*
-     * Re-render after ALL asynchronous
+     * Re-render after all asynchronous
      * data sources have finished.
      */
+
     renderSegmentSection();
 
     renderSegmentDistribution();
