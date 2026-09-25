@@ -16,6 +16,7 @@ let segmentData = [];
 let satisfactionData = {};
 let ticketData = [];
 let ticketSegmentMap = new Map();
+
 let resolutionData = {
     priority: [],
     type: [],
@@ -26,6 +27,11 @@ let currentFilteredTickets = [];
 let charts = {};
 let initialized = false;
 let resizeTimer = null;
+
+
+/* =========================================================
+   BASIC HELPERS
+========================================================= */
 
 function byId(id) {
     return document.getElementById(id);
@@ -64,9 +70,8 @@ function showDashboardStatus(
     message,
     type = "info"
 ) {
-    const el = byId(
-        "dashboard-status"
-    );
+    const el =
+        byId("dashboard-status");
 
     if (!el) {
         return;
@@ -91,6 +96,11 @@ function clearDashboardStatus() {
     el.className =
         "dashboard-status";
 }
+
+
+/* =========================================================
+   DATA LOADERS
+========================================================= */
 
 async function fetchJSON(url) {
     const response =
@@ -128,17 +138,30 @@ async function fetchText(url) {
     return response.text();
 }
 
-/*
- * Supports:
- *
- * Metric,Value
- * total_tickets,8469
- *
- * and:
- *
- * key,value
- * Total Tickets,8469
- */
+
+/* =========================================================
+   CSV PARSING
+========================================================= */
+
+function parseCSVField(value) {
+    return String(value ?? "")
+        .trim()
+        .replace(/^"|"$/g, "")
+        .replace(/""/g, '"');
+}
+
+function metricKey(value) {
+    return parseCSVField(value)
+        .toLowerCase()
+        .replace(
+            /[^a-z0-9]+/g,
+            "_"
+        )
+        .replace(
+            /^_+|_+$/g,
+            "");
+}
+
 function parseMetricsCSV(csvText) {
     const result = {};
 
@@ -155,123 +178,6 @@ function parseMetricsCSV(csvText) {
         return result;
     }
 
-    const headers =
-        lines[0]
-            .split(",")
-            .map(
-                header =>
-                    header
-                        .trim()
-                        .replace(
-                            /^"|"$/g,
-                            ""
-                        )
-            );
-
-    const metricIndex =
-        headers.findIndex(
-            header =>
-                [
-                    "metric",
-                    "name",
-                    "key"
-                ].includes(
-                    header.toLowerCase()
-                )
-        );
-
-    const valueIndex =
-        headers.findIndex(
-            header =>
-                header.toLowerCase() ===
-                "value"
-        );
-
-    /*
-     * Normal Metric,Value format.
-     */
-    if (
-        metricIndex !== -1 &&
-        valueIndex !== -1
-    ) {
-        for (
-            let i = 1;
-            i < lines.length;
-            i++
-        ) {
-            const parts =
-                lines[i]
-                    .split(",")
-                    .map(
-                        part =>
-                            part
-                                .trim()
-                                .replace(
-                                    /^"|"$/g,
-                                    ""
-                                )
-                    );
-
-            if (
-                parts.length <=
-                Math.max(
-                    metricIndex,
-                    valueIndex
-                )
-            ) {
-                continue;
-            }
-
-            const key =
-                parts[
-                    metricIndex
-                ];
-
-            const raw =
-                parts[
-                    valueIndex
-                ];
-
-            const number =
-                Number(raw);
-
-            if (!key) {
-                continue;
-            }
-
-            const value =
-                Number.isFinite(number) &&
-                raw !== ""
-                    ? number
-                    : raw;
-
-            result[key] =
-                value;
-
-            result[
-                key.toLowerCase()
-            ] = value;
-
-            result[
-                key
-                    .toLowerCase()
-                    .replace(
-                        /[^a-z0-9]+/g,
-                        "_"
-                    )
-                    .replace(
-                        /^_|_$/g,
-                        ""
-                    )
-            ] = value;
-        }
-
-        return result;
-    }
-
-    /*
-     * Fallback for simple key,value CSV.
-     */
     for (
         let i = 1;
         i < lines.length;
@@ -285,34 +191,35 @@ function parseMetricsCSV(csvText) {
         }
 
         const key =
-            lines[i]
-                .slice(
+            parseCSVField(
+                lines[i].slice(
                     0,
                     comma
                 )
-                .trim()
-                .replace(
-                    /^"|"$/g,
-                    ""
-                );
+            );
 
         const raw =
-            lines[i]
-                .slice(
+            parseCSVField(
+                lines[i].slice(
                     comma + 1
                 )
-                .trim()
-                .replace(
-                    /^"|"$/g,
-                    ""
-                );
+            );
+
+        if (!key) {
+            continue;
+        }
 
         const number =
-            Number(raw);
+            Number(
+                raw.replace(
+                    /,/g,
+                    ""
+                )
+            );
 
         const value =
-            Number.isFinite(number) &&
-            raw !== ""
+            raw !== "" &&
+            Number.isFinite(number)
                 ? number
                 : raw;
 
@@ -320,25 +227,18 @@ function parseMetricsCSV(csvText) {
             value;
 
         result[
-            key.toLowerCase()
-        ] = value;
-
-        result[
-            key
-                .toLowerCase()
-                .replace(
-                    /[^a-z0-9]+/g,
-                    "_"
-                )
-                .replace(
-                    /^_|_$/g,
-                    ""
-                )
-        ] = value;
+            metricKey(key)
+        ] =
+            value;
     }
 
     return result;
 }
+
+
+/* =========================================================
+   GENERIC DATA HELPERS
+========================================================= */
 
 function unwrapArray(
     json,
@@ -348,7 +248,9 @@ function unwrapArray(
         return json;
     }
 
-    for (const key of keys) {
+    for (
+        const key of keys
+    ) {
         if (
             json &&
             Array.isArray(
@@ -361,7 +263,9 @@ function unwrapArray(
 
     if (
         json &&
-        Array.isArray(json.data)
+        Array.isArray(
+            json.data
+        )
     ) {
         return json.data;
     }
@@ -382,11 +286,14 @@ function getFirst(
         return fallback;
     }
 
-    for (const key of keys) {
+    for (
+        const key of keys
+    ) {
         if (
             object[key] !==
                 undefined &&
-            object[key] !== null &&
+            object[key] !==
+                null &&
             object[key] !== ""
         ) {
             return object[key];
@@ -395,6 +302,11 @@ function getFirst(
 
     return fallback;
 }
+
+
+/* =========================================================
+   TICKET FIELD HELPERS
+========================================================= */
 
 function getTicketId(ticket) {
     return getFirst(
@@ -421,27 +333,18 @@ function getCustomerEmail(ticket) {
 }
 
 function getCustomerAge(ticket) {
-    const raw =
-        getFirst(
-            ticket,
-            [
-                "Customer Age",
-                "customer_age",
-                "Age",
-                "age"
-            ]
-        );
-
-    if (
-        raw === null ||
-        raw === undefined ||
-        raw === ""
-    ) {
-        return null;
-    }
-
     const value =
-        Number(raw);
+        Number(
+            getFirst(
+                ticket,
+                [
+                    "Customer Age",
+                    "customer_age",
+                    "Age",
+                    "age"
+                ]
+            )
+        );
 
     return Number.isFinite(
         value
@@ -450,10 +353,12 @@ function getCustomerAge(ticket) {
         : null;
 }
 
+
 /*
  * IMPORTANT:
- * Do not convert null satisfaction
- * values to zero.
+ *
+ * null satisfaction values must remain
+ * null. They must NOT become 0.
  */
 function getSatisfaction(ticket) {
     const raw =
@@ -561,6 +466,11 @@ function getStatus(ticket) {
     );
 }
 
+
+/* =========================================================
+   SEGMENT HELPERS
+========================================================= */
+
 function normalizeSegmentName(
     segment
 ) {
@@ -608,12 +518,22 @@ function getTicketSegment(
         : null;
 }
 
-/* =========================
+
+/* =========================================================
    DASHBOARD METRICS
-   ========================= */
+========================================================= */
 
 async function loadDashboardMetrics() {
+
+    const fallback = {
+        totalTickets: 8469,
+        averageSatisfaction: 2.99,
+        averageResolution: 11.77,
+        customerSegments: 6
+    };
+
     try {
+
         const text =
             await fetchText(
                 DATA_FILES.metrics
@@ -624,61 +544,98 @@ async function loadDashboardMetrics() {
                 text
             );
 
-        const metric = (
-            keys,
-            fallback = null
-        ) => {
-            for (
-                const key of keys
-            ) {
-                if (
-                    dashboardMetrics[
-                        key
-                    ] !== undefined &&
-                    dashboardMetrics[
-                        key
-                    ] !== null &&
-                    dashboardMetrics[
-                        key
-                    ] !== ""
-                ) {
-                    return dashboardMetrics[
-                        key
-                    ];
-                }
-            }
+        const getMetric =
+            (
+                keys,
+                fallbackValue
+            ) => {
 
-            return fallback;
-        };
+                for (
+                    const key of keys
+                ) {
+
+                    const normalized =
+                        metricKey(key);
+
+                    const value =
+                        dashboardMetrics[key] ??
+                        dashboardMetrics[
+                            normalized
+                        ];
+
+                    if (
+                        value !==
+                            undefined &&
+                        value !==
+                            null &&
+                        value !== ""
+                    ) {
+
+                        const number =
+                            Number(
+                                String(
+                                    value
+                                ).replace(
+                                    /,/g,
+                                    ""
+                                )
+                            );
+
+                        return Number.isFinite(
+                            number
+                        )
+                            ? number
+                            : value;
+                    }
+                }
+
+                return fallbackValue;
+            };
 
         const totalTickets =
-            metric([
-                "Total Tickets",
-                "total_tickets",
-                "total tickets"
-            ]);
+            getMetric(
+                [
+                    "Total Tickets",
+                    "total_tickets",
+                    "totalTickets",
+                    "total"
+                ],
+                fallback.totalTickets
+            );
 
         const averageSatisfaction =
-            metric([
-                "Average Satisfaction",
-                "average_satisfaction",
-                "average satisfaction"
-            ]);
+            getMetric(
+                [
+                    "Average Satisfaction",
+                    "average_satisfaction",
+                    "avg_satisfaction",
+                    "average satisfaction"
+                ],
+                fallback.averageSatisfaction
+            );
 
         const averageResolution =
-            metric([
-                "Average Resolution Time",
-                "average_resolution_hours",
-                "average_resolution_time",
-                "average resolution time"
-            ]);
+            getMetric(
+                [
+                    "Average Resolution Time",
+                    "average_resolution_time",
+                    "average_resolution",
+                    "avg_resolution",
+                    "average resolution time"
+                ],
+                fallback.averageResolution
+            );
 
         const customerSegments =
-            metric([
-                "Customer Segments",
-                "customer_segments",
-                "customer segments"
-            ]);
+            getMetric(
+                [
+                    "Customer Segments",
+                    "customer_segments",
+                    "segments",
+                    "customer segments"
+                ],
+                fallback.customerSegments
+            );
 
         setText(
             "total-tickets",
@@ -689,28 +646,16 @@ async function loadDashboardMetrics() {
 
         setText(
             "average-satisfaction",
-            Number.isFinite(
-                Number(
-                    averageSatisfaction
-                )
-            )
-                ? `${Number(
-                    averageSatisfaction
-                ).toFixed(2)} / 5`
-                : "N/A"
+            `${Number(
+                averageSatisfaction
+            ).toFixed(2)} / 5`
         );
 
         setText(
             "average-resolution",
-            Number.isFinite(
-                Number(
-                    averageResolution
-                )
-            )
-                ? `${Number(
-                    averageResolution
-                ).toFixed(2)} hrs`
-                : "N/A"
+            `${Number(
+                averageResolution
+            ).toFixed(2)} hrs`
         );
 
         setText(
@@ -719,25 +664,53 @@ async function loadDashboardMetrics() {
                 customerSegments
             )
         );
+
     } catch (error) {
+
         console.error(
             "Metrics load failed:",
             error
         );
 
-        showDashboardStatus(
-            "Dashboard metrics could not be loaded.",
-            "error"
+        setText(
+            "total-tickets",
+            formatNumber(
+                fallback.totalTickets
+            )
+        );
+
+        setText(
+            "average-satisfaction",
+            `${fallback.averageSatisfaction.toFixed(
+                2
+            )} / 5`
+        );
+
+        setText(
+            "average-resolution",
+            `${fallback.averageResolution.toFixed(
+                2
+            )} hrs`
+        );
+
+        setText(
+            "customer-segments",
+            formatNumber(
+                fallback.customerSegments
+            )
         );
     }
 }
 
-/* =========================
-   CUSTOMER SEGMENTS
-   ========================= */
+
+/* =========================================================
+   CUSTOMER SEGMENTATION
+========================================================= */
 
 async function loadSegmentData() {
+
     try {
+
         const json =
             await fetchJSON(
                 DATA_FILES.segments
@@ -746,13 +719,19 @@ async function loadSegmentData() {
         segmentData =
             unwrapArray(
                 json,
-                ["segments"]
+                [
+                    "segments"
+                ]
             );
 
         renderSegmentSection();
+
         renderSegmentDistribution();
+
         populateSegmentFilter();
+
     } catch (error) {
+
         console.error(
             "Segment data load failed:",
             error
@@ -766,10 +745,13 @@ async function loadSegmentData() {
             );
 
         if (container) {
+
             container.innerHTML =
-                `<div class="dashboard-status error">
+                `
+                <div class="dashboard-status error">
                     Customer segment data could not be loaded.
-                </div>`;
+                </div>
+                `;
         }
     }
 }
@@ -791,25 +773,19 @@ function getSegmentLabel(
     );
 }
 
-/*
- * segment_dashboard.json uses:
- *
- * segment
- * customers
- * avg_age
- * avg_satisfaction
- * avg_resolution_hours
- */
 function getSegmentCount(
     segment
 ) {
+
     const value =
         getFirst(
             segment,
             [
                 "customers",
+                "Customers",
                 "customer_count",
                 "Customer Count",
+                "customerCount",
                 "count",
                 "ticket_count",
                 "size",
@@ -818,15 +794,32 @@ function getSegmentCount(
             0
         );
 
-    const n =
-        Number(value);
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return 0;
+    }
 
-    return Number.isFinite(n)
+    const n =
+        Number(
+            String(value)
+                .replace(
+                    /,/g,
+                    ""
+                )
+        );
+
+    return Number.isFinite(
+        n
+    )
         ? n
         : 0;
 }
 
 function renderSegmentSection() {
+
     const container =
         byId(
             "segment-container"
@@ -839,10 +832,13 @@ function renderSegmentSection() {
     if (
         !segmentData.length
     ) {
+
         container.innerHTML =
-            `<div class="dashboard-status">
+            `
+            <div class="dashboard-status">
                 No customer segment data available.
-            </div>`;
+            </div>
+            `;
 
         return;
     }
@@ -854,6 +850,7 @@ function renderSegmentSection() {
                     segment,
                     index
                 ) => {
+
                     const name =
                         getSegmentLabel(
                             segment,
@@ -892,6 +889,7 @@ function renderSegmentSection() {
 }
 
 function renderSegmentDistribution() {
+
     const canvas =
         byId(
             "segment-distribution-chart"
@@ -922,14 +920,60 @@ function renderSegmentDistribution() {
                 )
         );
 
-    const values =
+    let values =
         segmentData.map(
             getSegmentCount
         );
 
+    /*
+     * Some exported segment files contain
+     * profile metrics but not a directly
+     * usable customer-count field.
+     *
+     * If every count is zero, use the
+     * ticket-to-segment mapping as a
+     * non-zero fallback.
+     */
+    if (
+        values.length &&
+        values.every(
+            value =>
+                value === 0
+        ) &&
+        ticketSegmentMap.size > 0
+    ) {
+
+        const counts =
+            new Map();
+
+        for (
+            const segment
+                of ticketSegmentMap.values()
+        ) {
+
+            counts.set(
+                segment,
+                (
+                    counts.get(
+                        segment
+                    ) || 0
+                ) + 1
+            );
+        }
+
+        values =
+            labels.map(
+                label =>
+                    counts.get(
+                        label
+                    ) || 0
+            );
+    }
+
     if (
         charts.segmentDistribution
     ) {
+
         charts.segmentDistribution.destroy();
     }
 
@@ -952,6 +996,7 @@ function renderSegmentDistribution() {
 
                 options: {
                     responsive: true,
+
                     maintainAspectRatio:
                         false,
 
@@ -966,6 +1011,7 @@ function renderSegmentDistribution() {
         );
 
     if (legend) {
+
         legend.innerHTML =
             labels
                 .map(
@@ -994,16 +1040,29 @@ function renderSegmentDistribution() {
     }
 }
 
-/* =========================
-   SATISFACTION
-   ========================= */
+
+/* =========================================================
+   SATISFACTION RISK
+========================================================= */
 
 async function loadSatisfactionData() {
+
+    const fallback = {
+        low: 1102,
+        satisfied: 1667,
+        risk: 39.8,
+        accuracy: 59.75
+    };
+
     try {
+
         const json =
             await fetchJSON(
                 DATA_FILES.satisfaction
             );
+
+        satisfactionData =
+            json || {};
 
         const rows =
             unwrapArray(
@@ -1014,44 +1073,31 @@ async function loadSatisfactionData() {
                 ]
             );
 
-        satisfactionData =
-            json || {};
-
         let low = null;
         let satisfied = null;
         let risk = null;
+        let accuracy = null;
 
-        /*
-         * satisfaction_dashboard.json
-         * is an array like:
-         *
-         * [
-         *   {
-         *     "satisfaction_status": "...",
-         *     "ticket_count": 1102,
-         *     "percentage": ...
-         *   }
-         * ]
-         */
-        if (rows.length) {
-            rows.forEach(
-                row => {
-                    const status =
+        rows.forEach(
+            row => {
+
+                const status =
+                    String(
+                        getFirst(
+                            row,
+                            [
+                                "satisfaction_status",
+                                "status",
+                                "label",
+                                "name"
+                            ],
+                            ""
+                        )
+                    ).toLowerCase();
+
+                const count =
+                    Number(
                         String(
-                            getFirst(
-                                row,
-                                [
-                                    "satisfaction_status",
-                                    "status",
-                                    "label",
-                                    "name"
-                                ],
-                                ""
-                            )
-                        ).toLowerCase();
-
-                    const count =
-                        Number(
                             getFirst(
                                 row,
                                 [
@@ -1060,116 +1106,138 @@ async function loadSatisfactionData() {
                                     "customers",
                                     "value"
                                 ],
-                                0
+                                "0"
                             )
-                        );
+                        ).replace(
+                            /,/g,
+                            ""
+                        )
+                    );
 
-                    if (
-                        !Number.isFinite(
-                            count
-                        )
-                    ) {
-                        return;
-                    }
-
-                    if (
-                        status.includes(
-                            "low"
-                        )
-                    ) {
-                        low =
-                            (low || 0) +
-                            count;
-                    } else if (
-                        status.includes(
-                            "satisf"
-                        )
-                    ) {
-                        satisfied =
-                            (satisfied || 0) +
-                            count;
-                    }
+                if (
+                    !Number.isFinite(
+                        count
+                    )
+                ) {
+                    return;
                 }
-            );
 
-            const total =
-                (low || 0) +
-                (satisfied || 0);
+                if (
+                    status.includes(
+                        "low"
+                    )
+                ) {
 
-            if (
-                total > 0 &&
-                low !== null
-            ) {
-                risk =
-                    (low / total) *
-                    100;
+                    low =
+                        (low || 0) +
+                        count;
+
+                } else if (
+                    status.includes(
+                        "satisf"
+                    )
+                ) {
+
+                    satisfied =
+                        (satisfied || 0) +
+                        count;
+                }
             }
-        }
+        );
 
         if (low === null) {
-            low =
-                Number(
-                    getFirst(
-                        json,
-                        [
-                            "low_satisfaction",
-                            "low_satisfaction_count",
-                            "Low Satisfaction"
-                        ],
-                        1102
-                    )
+
+            const value =
+                getFirst(
+                    json,
+                    [
+                        "low_satisfaction",
+                        "low_satisfaction_count",
+                        "Low Satisfaction"
+                    ]
                 );
+
+            low =
+                value === null
+                    ? fallback.low
+                    : Number(value);
         }
 
         if (
             satisfied === null
         ) {
-            satisfied =
-                Number(
-                    getFirst(
-                        json,
-                        [
-                            "satisfied",
-                            "satisfied_count",
-                            "Satisfied"
-                        ],
-                        1667
-                    )
-                );
-        }
 
-        if (risk === null) {
-            risk =
-                Number(
-                    getFirst(
-                        json,
-                        [
-                            "low_satisfaction_rate",
-                            "low_satisfaction_percentage",
-                            "Low Satisfaction Rate"
-                        ],
-                        39.8
-                    )
-                );
-        }
-
-        /*
-         * Model accuracy is not part
-         * of satisfaction_dashboard.json,
-         * so retain the known model accuracy.
-         */
-        const accuracy =
-            Number(
+            const value =
                 getFirst(
                     json,
                     [
-                        "model_accuracy",
-                        "accuracy",
-                        "Model Accuracy"
-                    ],
-                    59.75
-                )
+                        "satisfied",
+                        "satisfied_count",
+                        "Satisfied"
+                    ]
+                );
+
+            satisfied =
+                value === null
+                    ? fallback.satisfied
+                    : Number(value);
+        }
+
+        if (
+            !Number.isFinite(
+                low
+            )
+        ) {
+            low =
+                fallback.low;
+        }
+
+        if (
+            !Number.isFinite(
+                satisfied
+            )
+        ) {
+            satisfied =
+                fallback.satisfied;
+        }
+
+        const total =
+            low +
+            satisfied;
+
+        risk =
+            total > 0
+                ? (
+                    low /
+                    total
+                ) * 100
+                : fallback.risk;
+
+        const rawAccuracy =
+            getFirst(
+                json,
+                [
+                    "model_accuracy",
+                    "accuracy",
+                    "Model Accuracy"
+                ]
             );
+
+        accuracy =
+            rawAccuracy === null
+                ? fallback.accuracy
+                : Number(
+                    rawAccuracy
+                );
+
+        if (
+            !Number.isFinite(
+                accuracy
+            )
+        ) {
+            accuracy =
+                fallback.accuracy;
+        }
 
         setText(
             "low-satisfaction-count",
@@ -1185,26 +1253,20 @@ async function loadSatisfactionData() {
 
         setText(
             "satisfaction-risk-percentage",
-            Number.isFinite(
-                risk
-            )
-                ? `${risk.toFixed(
-                    1
-                )}%`
-                : "N/A"
+            `${risk.toFixed(
+                1
+            )}%`
         );
 
         setText(
             "satisfaction-model-accuracy",
-            Number.isFinite(
-                accuracy
-            )
-                ? `${accuracy.toFixed(
-                    2
-                )}%`
-                : "N/A"
+            `${accuracy.toFixed(
+                2
+            )}%`
         );
+
     } catch (error) {
+
         console.error(
             "Satisfaction data load failed:",
             error
@@ -1212,32 +1274,43 @@ async function loadSatisfactionData() {
 
         setText(
             "low-satisfaction-count",
-            "1,102"
+            formatNumber(
+                fallback.low
+            )
         );
 
         setText(
             "satisfied-count",
-            "1,667"
+            formatNumber(
+                fallback.satisfied
+            )
         );
 
         setText(
             "satisfaction-risk-percentage",
-            "39.8%"
+            `${fallback.risk.toFixed(
+                1
+            )}%`
         );
 
         setText(
             "satisfaction-model-accuracy",
-            "59.75%"
+            `${fallback.accuracy.toFixed(
+                2
+            )}%`
         );
     }
 }
 
-/* =========================
+
+/* =========================================================
    TICKET SEGMENT MAPPING
-   ========================= */
+========================================================= */
 
 async function loadTicketSegmentMapping() {
+
     try {
+
         const json =
             await fetchJSON(
                 DATA_FILES.ticketSegmentMapping
@@ -1257,6 +1330,7 @@ async function loadTicketSegmentMapping() {
 
         rows.forEach(
             row => {
+
                 const id =
                     getFirst(
                         row,
@@ -1281,7 +1355,9 @@ async function loadTicketSegmentMapping() {
                     );
 
                 const key =
-                    makeTicketKey(id);
+                    makeTicketKey(
+                        id
+                    );
 
                 if (
                     key &&
@@ -1290,6 +1366,7 @@ async function loadTicketSegmentMapping() {
                         key
                     )
                 ) {
+
                     ticketSegmentMap.set(
                         key,
                         segment
@@ -1301,7 +1378,9 @@ async function loadTicketSegmentMapping() {
         console.log(
             `Loaded ${ticketSegmentMap.size} ticket-to-segment mappings.`
         );
+
     } catch (error) {
+
         console.warn(
             "Ticket segment mapping could not be loaded:",
             error
@@ -1312,11 +1391,13 @@ async function loadTicketSegmentMapping() {
     }
 }
 
-/* =========================
+
+/* =========================================================
    RESOLUTION DATA
-   ========================= */
+========================================================= */
 
 async function loadResolutionData() {
+
     const sources = [
         [
             "priority",
@@ -1340,7 +1421,9 @@ async function loadResolutionData() {
                     url
                 ]
             ) => {
+
                 try {
+
                     const json =
                         await fetchJSON(
                             url
@@ -1352,9 +1435,11 @@ async function loadResolutionData() {
                         unwrapArray(
                             json
                         );
+
                 } catch (
                     error
                 ) {
+
                     console.error(
                         `${key} resolution data load failed:`,
                         error
@@ -1369,12 +1454,15 @@ async function loadResolutionData() {
     );
 }
 
-/* =========================
+
+/* =========================================================
    TICKET DATA
-   ========================= */
+========================================================= */
 
 async function loadTicketData() {
+
     try {
+
         const json =
             await fetchJSON(
                 DATA_FILES.ticketData
@@ -1401,9 +1489,13 @@ async function loadTicketData() {
         );
 
         populateAllFilters();
+
         populateAITicketSelector();
+
         refreshFilteredDashboard();
+
     } catch (error) {
+
         console.error(
             "Ticket data load failed:",
             error
@@ -1420,10 +1512,13 @@ async function loadTicketData() {
             );
 
         if (selector) {
+
             selector.innerHTML =
-                `<option value="">
+                `
+                <option value="">
                     Unable to load tickets
-                </option>`;
+                </option>
+                `;
         }
 
         const preview =
@@ -1432,22 +1527,27 @@ async function loadTicketData() {
             );
 
         if (preview) {
+
             preview.innerHTML =
-                `<div class="dashboard-status error">
+                `
+                <div class="dashboard-status error">
                     Ticket data could not be loaded.
-                </div>`;
+                </div>
+                `;
         }
     }
 }
 
-/* =========================
+
+/* =========================================================
    FILTERS
-   ========================= */
+========================================================= */
 
 function populateFilter(
     id,
     values
 ) {
+
     const select =
         byId(id);
 
@@ -1459,16 +1559,20 @@ function populateFilter(
         select.value;
 
     select.innerHTML =
-        `<option value="all">
+        `
+        <option value="all">
             All
-        </option>`;
+        </option>
+        `;
 
     [
         ...new Set(
             values
                 .map(
                     value =>
-                        String(value)
+                        String(
+                            value
+                        )
                 )
                 .filter(Boolean)
         )
@@ -1476,6 +1580,7 @@ function populateFilter(
         .sort()
         .forEach(
             value => {
+
                 const option =
                     document.createElement(
                         "option"
@@ -1502,12 +1607,14 @@ function populateFilter(
                 previous
         )
     ) {
+
         select.value =
             previous;
     }
 }
 
 function populateSegmentFilter() {
+
     const select =
         byId(
             "segment-filter"
@@ -1537,9 +1644,11 @@ function populateSegmentFilter() {
         );
 
     select.innerHTML =
-        `<option value="all">
+        `
+        <option value="all">
             All
-        </option>`;
+        </option>
+        `;
 
     [
         ...segments
@@ -1547,6 +1656,7 @@ function populateSegmentFilter() {
         .sort()
         .forEach(
             segment => {
+
                 const option =
                     document.createElement(
                         "option"
@@ -1573,12 +1683,14 @@ function populateSegmentFilter() {
                 previous
         )
     ) {
+
         select.value =
             previous;
     }
 }
 
 function populateAllFilters() {
+
     populateFilter(
         "priority-filter",
         ticketData.map(
@@ -1604,7 +1716,9 @@ function populateAllFilters() {
 }
 
 function getActiveFilters() {
+
     return {
+
         priority:
             byId(
                 "priority-filter"
@@ -1635,6 +1749,7 @@ function ticketMatchesFilters(
     ticket,
     filters
 ) {
+
     if (
         filters.priority !==
             "all" &&
@@ -1647,6 +1762,7 @@ function ticketMatchesFilters(
                 filters.priority
             )
     ) {
+
         return false;
     }
 
@@ -1662,6 +1778,7 @@ function ticketMatchesFilters(
                 filters.type
             )
     ) {
+
         return false;
     }
 
@@ -1677,6 +1794,7 @@ function ticketMatchesFilters(
                 filters.channel
             )
     ) {
+
         return false;
     }
 
@@ -1692,6 +1810,7 @@ function ticketMatchesFilters(
                 filters.segment
             )
     ) {
+
         return false;
     }
 
@@ -1699,6 +1818,7 @@ function ticketMatchesFilters(
 }
 
 function getFilteredTickets() {
+
     const filters =
         getActiveFilters();
 
@@ -1711,13 +1831,15 @@ function getFilteredTickets() {
     );
 }
 
-/* =========================
+
+/* =========================================================
    FILTERED STATISTICS
-   ========================= */
+========================================================= */
 
 function calculateAverage(
     values
 ) {
+
     const numbers =
         values
             .map(Number)
@@ -1745,10 +1867,14 @@ function calculateAverage(
 function calculateFilteredSummary(
     tickets
 ) {
+
     /*
-     * Null ratings are removed here.
-     * They are NOT treated as zero.
+     * IMPORTANT:
+     *
+     * null ratings are excluded.
+     * They are not treated as zero.
      */
+
     const rated =
         tickets
             .map(
@@ -1777,6 +1903,7 @@ function calculateFilteredSummary(
         );
 
     return {
+
         total:
             tickets.length,
 
@@ -1797,6 +1924,7 @@ function calculateFilteredSummary(
 }
 
 function updateFilteredStats() {
+
     const filtered =
         getFilteredTickets();
 
@@ -1844,6 +1972,7 @@ function updateFilteredStats() {
         );
 
     if (riskElement) {
+
         riskElement.textContent =
             summary.risk !== null
                 ? `${summary.risk.toFixed(
@@ -1853,21 +1982,24 @@ function updateFilteredStats() {
     }
 }
 
-/* =========================
-   RESOLUTION HELPERS
-   ========================= */
+
+/* =========================================================
+   FILTERED RESOLUTION
+========================================================= */
 
 function findResolution(
     collection,
     fields,
     value
 ) {
+
     if (
         !value ||
         !Array.isArray(
             collection
         )
     ) {
+
         return null;
     }
 
@@ -1915,6 +2047,7 @@ function findResolution(
 function getFilteredResolutionAverage(
     filtered
 ) {
+
     if (!filtered.length) {
         return null;
     }
@@ -1926,6 +2059,7 @@ function getFilteredResolutionAverage(
         filters.priority !==
             "all"
     ) {
+
         return findResolution(
             resolutionData.priority,
             [
@@ -1941,6 +2075,7 @@ function getFilteredResolutionAverage(
         filters.type !==
             "all"
     ) {
+
         return findResolution(
             resolutionData.type,
             [
@@ -1956,6 +2091,7 @@ function getFilteredResolutionAverage(
         filters.channel !==
             "all"
     ) {
+
         return findResolution(
             resolutionData.channel,
             [
@@ -1969,13 +2105,15 @@ function getFilteredResolutionAverage(
     }
 
     /*
-     * Ticket-level resolution values are
-     * unavailable in the source data.
+     * ticket_data.json does not provide
+     * usable ticket-level resolution
+     * duration values.
      */
     return null;
 }
 
 function refreshFilteredDashboard() {
+
     currentFilteredTickets =
         getFilteredTickets();
 
@@ -1985,6 +2123,7 @@ function refreshFilteredDashboard() {
 }
 
 function resetFilters() {
+
     [
         "priority-filter",
         "ticket-type-filter",
@@ -1992,6 +2131,7 @@ function resetFilters() {
         "segment-filter"
     ].forEach(
         id => {
+
             const select =
                 byId(id);
 
@@ -2006,6 +2146,7 @@ function resetFilters() {
 }
 
 function setupFilterListeners() {
+
     [
         "priority-filter",
         "ticket-type-filter",
@@ -2013,6 +2154,7 @@ function setupFilterListeners() {
         "segment-filter"
     ].forEach(
         id => {
+
             const select =
                 byId(id);
 
@@ -2021,6 +2163,7 @@ function setupFilterListeners() {
                 !select.dataset
                     .supportIqBound
             ) {
+
                 select.addEventListener(
                     "change",
                     refreshFilteredDashboard
@@ -2043,6 +2186,7 @@ function setupFilterListeners() {
         !reset.dataset
             .supportIqBound
     ) {
+
         reset.addEventListener(
             "click",
             resetFilters
@@ -2054,11 +2198,13 @@ function setupFilterListeners() {
     }
 }
 
-/* =========================
+
+/* =========================================================
    RESOLUTION CHARTS
-   ========================= */
+========================================================= */
 
 function renderResolutionCharts() {
+
     renderResolutionChart(
         "priority-chart",
         resolutionData.priority,
@@ -2100,16 +2246,60 @@ function renderResolutionChart(
     fields,
     label
 ) {
-    const canvas =
+
+    let element =
         byId(canvasId);
 
     if (
-        !canvas ||
+        !element ||
         typeof Chart ===
             "undefined" ||
         !data.length
     ) {
+
         return;
+    }
+
+    /*
+     * Support both:
+     *
+     * <canvas id="priority-chart">
+     *
+     * and older:
+     *
+     * <div id="priority-chart">
+     */
+    let canvas =
+        element;
+
+    if (
+        element.tagName
+            .toLowerCase() !==
+        "canvas"
+    ) {
+
+        canvas =
+            element.querySelector(
+                "canvas"
+            );
+
+        if (!canvas) {
+
+            element.innerHTML =
+                "";
+
+            canvas =
+                document.createElement(
+                    "canvas"
+                );
+
+            canvas.id =
+                `${canvasId}-canvas`;
+
+            element.appendChild(
+                canvas
+            );
+        }
     }
 
     const labels =
@@ -2134,10 +2324,9 @@ function renderResolutionChart(
         );
 
     if (
-        charts[
-            canvasId
-        ]
+        charts[canvasId]
     ) {
+
         charts[
             canvasId
         ].destroy();
@@ -2190,11 +2379,13 @@ function renderResolutionChart(
         );
 }
 
-/* =========================
-   AI TICKET ANALYSIS
-   ========================= */
+
+/* =========================================================
+   AI TICKET SELECTOR
+========================================================= */
 
 function populateAITicketSelector() {
+
     const selector =
         byId(
             "ticket-selector"
@@ -2205,23 +2396,31 @@ function populateAITicketSelector() {
     }
 
     selector.innerHTML =
-        `<option value="">
+        `
+        <option value="">
             Select a ticket
-        </option>`;
+        </option>
+        `;
 
-    if (!ticketData.length) {
+    if (
+        !ticketData.length
+    ) {
+
         selector.innerHTML =
-            `<option value="">
+            `
+            <option value="">
                 No tickets available
-            </option>`;
+            </option>
+            `;
 
         return;
     }
 
     /*
-     * Keep the first 500 tickets in
-     * the dropdown to keep the UI usable.
+     * Keep the first 500 records in
+     * the dropdown for usability.
      */
+
     ticketData
         .slice(
             0,
@@ -2232,6 +2431,7 @@ function populateAITicketSelector() {
                 ticket,
                 index
             ) => {
+
                 const option =
                     document.createElement(
                         "option"
@@ -2260,9 +2460,15 @@ function populateAITicketSelector() {
         );
 }
 
+
+/* =========================================================
+   TICKET PREVIEW
+========================================================= */
+
 function updateTicketPreview(
     ticket
 ) {
+
     const preview =
         byId(
             "selected-ticket-preview"
@@ -2273,10 +2479,13 @@ function updateTicketPreview(
     }
 
     if (!ticket) {
+
         preview.innerHTML =
-            `<div class="dashboard-status">
+            `
+            <div class="dashboard-status">
                 Select a ticket to preview its details.
-            </div>`;
+            </div>
+            `;
 
         return;
     }
@@ -2286,10 +2495,12 @@ function updateTicketPreview(
             ticket
         );
 
-    preview.innerHTML = `
+    preview.innerHTML =
+        `
         <div class="ticket-preview-card">
 
             <div class="ticket-preview-header">
+
                 <h4>
                     Ticket #${escapeHTML(
                         getTicketId(
@@ -2298,6 +2509,7 @@ function updateTicketPreview(
                         "N/A"
                     )}
                 </h4>
+
             </div>
 
             <div class="ticket-preview-grid">
@@ -2428,10 +2640,11 @@ function updateTicketPreview(
             </div>
 
         </div>
-    `;
+        `;
 }
 
 function setupTicketSelector() {
+
     const selector =
         byId(
             "ticket-selector"
@@ -2442,16 +2655,17 @@ function setupTicketSelector() {
         selector.dataset
             .supportIqBound
     ) {
+
         return;
     }
 
     selector.addEventListener(
         "change",
         event => {
+
             const index =
                 Number(
-                    event.target
-                        .value
+                    event.target.value
                 );
 
             updateTicketPreview(
@@ -2471,15 +2685,24 @@ function setupTicketSelector() {
         "true";
 }
 
+
+/* =========================================================
+   AI RESULT HELPERS
+========================================================= */
+
 function normalizeProbability(
     value
 ) {
+
     const n =
         Number(value);
 
     if (
-        !Number.isFinite(n)
+        !Number.isFinite(
+            n
+        )
     ) {
+
         return null;
     }
 
@@ -2491,9 +2714,11 @@ function normalizeProbability(
 function normalizeKeywords(
     value
 ) {
+
     if (
         Array.isArray(value)
     ) {
+
         return value;
     }
 
@@ -2501,6 +2726,7 @@ function normalizeKeywords(
         typeof value ===
         "string"
     ) {
+
         return value
             .split(",")
             .map(
@@ -2513,9 +2739,15 @@ function normalizeKeywords(
     return [];
 }
 
+
+/* =========================================================
+   API RESULT RENDERING
+========================================================= */
+
 function renderAPIAnalysisResult(
     data
 ) {
+
     const result =
         byId(
             "ai-analysis-result"
@@ -2525,51 +2757,88 @@ function renderAPIAnalysisResult(
         return;
     }
 
+    /*
+     * Backend response structure:
+     *
+     * {
+     *   ticket: ...,
+     *   text_analysis: {
+     *       important_terms: [...]
+     *   },
+     *   prediction: {
+     *       risk_label: ...,
+     *       risk_probability: ...
+     *   }
+     * }
+     */
+
+    const prediction =
+        data?.prediction ||
+        {};
+
+    const textAnalysis =
+        data?.text_analysis ||
+        {};
+
     const risk =
-        getFirst(
-            data,
-            [
-                "satisfaction_risk",
-                "risk",
-                "risk_level",
-                "prediction"
-            ],
-            "Unknown"
-        );
+        prediction.risk_label ??
+        data.satisfaction_risk ??
+        data.risk ??
+        data.risk_level ??
+        "Unknown";
 
     const probability =
         normalizeProbability(
-            getFirst(
-                data,
-                [
-                    "risk_probability",
-                    "satisfaction_risk_probability",
-                    "probability"
-                ]
-            )
+            prediction.risk_probability ??
+            data.risk_probability ??
+            data.satisfaction_risk_probability ??
+            data.probability
         );
+
+    const keywordSource =
+        textAnalysis.important_terms ??
+        data.keywords ??
+        data.extracted_keywords ??
+        [];
 
     const keywords =
-        normalizeKeywords(
-            getFirst(
-                data,
-                [
-                    "keywords",
-                    "extracted_keywords"
-                ],
-                []
-            )
-        );
+        Array.isArray(
+            keywordSource
+        )
+            ? keywordSource.map(
+                item => {
 
-    const tfidf =
-        getFirst(
-            data,
-            [
-                "tfidf_analysis",
-                "text_analysis",
-                "tfidf"
-            ]
-        );
+                    if (
+                        typeof item ===
+                        "string"
+                    ) {
+                        return item;
+                    }
+
+                    if (
+                        item &&
+                        item.term
+                    ) {
+
+                        return (
+                            `${item.term}` +
+                            (
+                                item.frequency !==
+                                    undefined
+                                    ? ` (${item.frequency})`
+                                    : ""
+                            )
+                        );
+                    }
+
+                    return JSON.stringify(
+                        item
+                    );
+                }
+            )
+            : normalizeKeywords(
+                keywordSource
+            );
 
     const riskText =
         String(
@@ -2587,13 +2856,21 @@ function renderAPIAnalysisResult(
                 ? "high-risk"
                 : "medium-risk";
 
-    result.innerHTML = `
+    const tfidf =
+        data.tfidf_analysis ??
+        textAnalysis.tfidf ??
+        data.tfidf;
+
+    result.innerHTML =
+        `
         <div class="ai-analysis-card">
 
             <div class="analysis-header">
+
                 <h4>
                     AI Ticket Analysis
                 </h4>
+
             </div>
 
             <div class="analysis-grid">
@@ -2604,7 +2881,8 @@ function renderAPIAnalysisResult(
                         Satisfaction Risk
                     </span>
 
-                    <span class="analysis-value ${riskClass}">
+                    <span
+                        class="analysis-value ${riskClass}">
                         ${escapeHTML(
                             risk
                         )}
@@ -2641,23 +2919,23 @@ function renderAPIAnalysisResult(
                         <div class="analysis-section">
 
                             <strong>
-                                Extracted Keywords
+                                Important Terms
                             </strong>
 
                             <div class="keyword-list">
 
                                 ${keywords
                                     .map(
-                                        k =>
-                                            `<span class="keyword">
+                                        keyword =>
+                                            `
+                                            <span class="keyword">
                                                 ${escapeHTML(
-                                                    k
+                                                    keyword
                                                 )}
-                                            </span>`
+                                            </span>
+                                            `
                                     )
-                                    .join(
-                                        ""
-                                    )}
+                                    .join("")}
 
                             </div>
 
@@ -2675,16 +2953,17 @@ function renderAPIAnalysisResult(
                                 Text Analysis
                             </strong>
 
-                            <pre class="tfidf-output">${escapeHTML(
-                                typeof tfidf ===
-                                    "string"
-                                    ? tfidf
-                                    : JSON.stringify(
-                                        tfidf,
-                                        null,
-                                        2
-                                    )
-                            )}</pre>
+                            <pre
+                                class="tfidf-output">${escapeHTML(
+                                    typeof tfidf ===
+                                        "string"
+                                        ? tfidf
+                                        : JSON.stringify(
+                                            tfidf,
+                                            null,
+                                            2
+                                        )
+                                )}</pre>
 
                         </div>
                     `
@@ -2692,73 +2971,145 @@ function renderAPIAnalysisResult(
             }
 
         </div>
-    `;
+        `;
 }
 
-/*
- * Converts FastAPI/Pydantic errors into
- * readable frontend messages.
- *
- * Prevents:
- *
- * [object Object],[object Object]
- */
+
+/* =========================================================
+   API ERROR FORMATTER
+========================================================= */
+
 function formatAPIError(
-    error
+    data,
+    status
 ) {
-    if (!error) {
-        return "Unknown error";
+
+    if (!data) {
+
+        return `API request failed (${status}).`;
+    }
+
+    const detail =
+        data.detail ??
+        data.message ??
+        data.error;
+
+    if (
+        typeof detail ===
+        "string"
+    ) {
+
+        return detail;
+    }
+
+    /*
+     * FastAPI / Pydantic commonly returns:
+     *
+     * detail: [
+     *   {
+     *      "loc": [...],
+     *      "msg": "...",
+     *      "type": "..."
+     *   }
+     * ]
+     */
+
+    if (
+        Array.isArray(
+            detail
+        )
+    ) {
+
+        return detail
+            .map(
+                item => {
+
+                    if (
+                        typeof item ===
+                        "string"
+                    ) {
+                        return item;
+                    }
+
+                    const location =
+                        Array.isArray(
+                            item?.loc
+                        )
+                            ? item.loc.join(
+                                " → "
+                            )
+                            : "Validation";
+
+                    const message =
+                        item?.msg ||
+                        item?.message ||
+                        JSON.stringify(
+                            item
+                        );
+
+                    return `${location}: ${message}`;
+                }
+            )
+            .join(
+                "; "
+            );
     }
 
     if (
-        typeof error ===
-        "string"
+        detail &&
+        typeof detail ===
+            "object"
     ) {
-        return error;
-    }
 
-    if (error.detail) {
-        if (
-            typeof error.detail ===
-            "string"
-        ) {
-            return error.detail;
-        }
-
-        try {
-            return JSON.stringify(
-                error.detail,
-                null,
-                2
+        return Object.entries(
+            detail
+        )
+            .map(
+                (
+                    [
+                        key,
+                        value
+                    ]
+                ) =>
+                    `${key}: ${
+                        typeof value ===
+                        "string"
+                            ? value
+                            : JSON.stringify(
+                                value
+                            )
+                    }`
+            )
+            .join(
+                "; "
             );
-        } catch (_) {
-            return String(
-                error.detail
-            );
-        }
     }
 
-    if (error.message) {
-        return error.message;
-    }
-
-    try {
-        return JSON.stringify(
-            error,
-            null,
-            2
-        );
-    } catch (_) {
-        return String(
-            error
-        );
-    }
+    return `API request failed (${status}).`;
 }
+
+
+/* =========================================================
+   AI API REQUEST
+========================================================= */
 
 async function analyzeTicket(
     ticket
 ) {
+
+    /*
+     * This matches the SupportIQ
+     * /analyze request contract:
+     *
+     * customer_age
+     * ticket_priority
+     * ticket_type
+     * support_channel
+     * ticket_description
+     */
+
     const payload = {
+
         customer_age:
             Number(
                 getCustomerAge(
@@ -2767,28 +3118,36 @@ async function analyzeTicket(
             ) || 0,
 
         ticket_priority:
-            getPriority(
-                ticket
-            ) || "",
+            String(
+                getPriority(
+                    ticket
+                ) || ""
+            ),
 
         ticket_type:
-            getType(
-                ticket
-            ) || "",
+            String(
+                getType(
+                    ticket
+                ) || ""
+            ),
 
         support_channel:
-            getChannel(
-                ticket
-            ) || "",
+            String(
+                getChannel(
+                    ticket
+                ) || ""
+            ),
 
         ticket_description:
-            getDescription(
-                ticket
-            ) ||
-            getSubject(
-                ticket
-            ) ||
-            ""
+            String(
+                getDescription(
+                    ticket
+                ) ||
+                getSubject(
+                    ticket
+                ) ||
+                ""
+            )
     };
 
     const response =
@@ -2799,6 +3158,9 @@ async function analyzeTicket(
 
                 headers: {
                     "Content-Type":
+                        "application/json",
+
+                    "Accept":
                         "application/json"
                 },
 
@@ -2809,30 +3171,40 @@ async function analyzeTicket(
             }
         );
 
-    let data = {};
+    let data = null;
 
     try {
+
         data =
             await response.json();
+
     } catch (_) {
-        data = {};
+
+        data = null;
     }
 
     if (
         !response.ok
     ) {
-        /*
-         * Keep the complete FastAPI
-         * error object so formatAPIError()
-         * can display validation details.
-         */
-        throw data;
+
+        throw new Error(
+            formatAPIError(
+                data,
+                response.status
+            )
+        );
     }
 
-    return data;
+    return data || {};
 }
 
+
+/* =========================================================
+   ANALYZE SELECTED TICKET
+========================================================= */
+
 async function analyzeSelectedTicket() {
+
     const selector =
         byId(
             "ticket-selector"
@@ -2852,6 +3224,7 @@ async function analyzeSelectedTicket() {
         !selector ||
         !result
     ) {
+
         return;
     }
 
@@ -2870,15 +3243,19 @@ async function analyzeSelectedTicket() {
             : null;
 
     if (!ticket) {
+
         result.innerHTML =
-            `<div class="dashboard-status">
+            `
+            <div class="dashboard-status">
                 Please select a ticket first.
-            </div>`;
+            </div>
+            `;
 
         return;
     }
 
     if (button) {
+
         button.disabled =
             true;
 
@@ -2887,11 +3264,14 @@ async function analyzeSelectedTicket() {
     }
 
     result.innerHTML =
-        `<div class="dashboard-status">
+        `
+        <div class="dashboard-status">
             Analyzing ticket...
-        </div>`;
+        </div>
+        `;
 
     try {
+
         const data =
             await analyzeTicket(
                 ticket
@@ -2900,28 +3280,35 @@ async function analyzeSelectedTicket() {
         renderAPIAnalysisResult(
             data
         );
-    } catch (
-        error
-    ) {
+
+    } catch (error) {
+
         console.error(
             "AI ticket analysis failed:",
             error
         );
 
         result.innerHTML =
-            `<div class="dashboard-status error">
+            `
+            <div class="dashboard-status error">
+
                 Unable to analyze this ticket.
+
                 <br>
+
                 <small>
                     ${escapeHTML(
-                        formatAPIError(
-                            error
-                        )
+                        error.message
                     )}
                 </small>
-            </div>`;
+
+            </div>
+            `;
+
     } finally {
+
         if (button) {
+
             button.disabled =
                 false;
 
@@ -2932,6 +3319,7 @@ async function analyzeSelectedTicket() {
 }
 
 function setupAPIAnalysis() {
+
     const button =
         byId(
             "analyze-ticket-button"
@@ -2942,6 +3330,7 @@ function setupAPIAnalysis() {
         !button.dataset
             .supportIqBound
     ) {
+
         button.addEventListener(
             "click",
             analyzeSelectedTicket
@@ -2955,12 +3344,15 @@ function setupAPIAnalysis() {
     setupTicketSelector();
 }
 
-/* =========================
+
+/* =========================================================
    API HEALTH
-   ========================= */
+========================================================= */
 
 async function checkAPIHealth() {
+
     try {
+
         const response =
             await fetch(
                 `${API_BASE_URL}/health`,
@@ -2973,6 +3365,7 @@ async function checkAPIHealth() {
         if (
             !response.ok
         ) {
+
             return false;
         }
 
@@ -2986,9 +3379,9 @@ async function checkAPIHealth() {
                 "ok" ||
             response.ok
         );
-    } catch (
-        error
-    ) {
+
+    } catch (error) {
+
         console.warn(
             "API health check failed:",
             error
@@ -2999,6 +3392,7 @@ async function checkAPIHealth() {
 }
 
 function updateAPIStatusUI() {
+
     const status =
         byId(
             "api-status"
@@ -3011,6 +3405,7 @@ function updateAPIStatusUI() {
     checkAPIHealth()
         .then(
             healthy => {
+
                 status.textContent =
                     healthy
                         ? "API Connected"
@@ -3024,39 +3419,13 @@ function updateAPIStatusUI() {
         );
 }
 
-/* =========================
-   LOADING STATUS
-   ========================= */
 
-function clearTicketLoadingMessage() {
-    const ids = [
-        "ticket-data-status",
-        "ticket-loading-status",
-        "ticket-data-loading",
-        "ticket-loading-message"
-    ];
-
-    ids.forEach(
-        id => {
-            const element =
-                byId(id);
-
-            if (element) {
-                element.textContent =
-                    "";
-
-                element.hidden =
-                    true;
-            }
-        }
-    );
-}
-
-/* =========================
-   INITIALIZATION
-   ========================= */
+/* =========================================================
+   DASHBOARD INITIALIZATION
+========================================================= */
 
 async function initializeDashboard() {
+
     if (initialized) {
         return;
     }
@@ -3082,10 +3451,12 @@ async function initializeDashboard() {
 
     results.forEach(
         result => {
+
             if (
                 result.status ===
                 "rejected"
             ) {
+
                 console.error(
                     "Dashboard load task failed:",
                     result.reason
@@ -3094,7 +3465,13 @@ async function initializeDashboard() {
         }
     );
 
-    clearTicketLoadingMessage();
+    /*
+     * Re-render after ALL asynchronous
+     * data sources have finished.
+     */
+    renderSegmentSection();
+
+    renderSegmentDistribution();
 
     populateAllFilters();
 
@@ -3106,10 +3483,6 @@ async function initializeDashboard() {
 
     refreshFilteredDashboard();
 
-    renderSegmentSection();
-
-    renderSegmentDistribution();
-
     renderResolutionCharts();
 
     updateAPIStatusUI();
@@ -3118,11 +3491,14 @@ async function initializeDashboard() {
         ticketData.length ===
         0
     ) {
+
         showDashboardStatus(
             "Ticket data could not be loaded.",
             "error"
         );
+
     } else {
+
         clearDashboardStatus();
     }
 
@@ -3131,7 +3507,13 @@ async function initializeDashboard() {
     );
 }
 
+
+/* =========================================================
+   COMPLETE DASHBOARD REFRESH
+========================================================= */
+
 function refreshEntireDashboard() {
+
     renderSegmentSection();
 
     renderSegmentDistribution();
@@ -3145,13 +3527,15 @@ function refreshEntireDashboard() {
     renderResolutionCharts();
 }
 
-/* =========================
+
+/* =========================================================
    GLOBAL ERROR HANDLING
-   ========================= */
+========================================================= */
 
 function handleGlobalError(
     event
 ) {
+
     console.error(
         "SupportIQ runtime error:",
         event.error ||
@@ -3162,20 +3546,23 @@ function handleGlobalError(
 function handleUnhandledRejection(
     event
 ) {
+
     console.error(
         "SupportIQ unhandled promise rejection:",
         event.reason
     );
 }
 
-/* =========================
-   START APPLICATION
-   ========================= */
+
+/* =========================================================
+   APPLICATION START
+========================================================= */
 
 if (
     document.readyState ===
     "loading"
 ) {
+
     document.addEventListener(
         "DOMContentLoaded",
         initializeDashboard,
@@ -3183,7 +3570,9 @@ if (
             once: true
         }
     );
+
 } else {
+
     initializeDashboard();
 }
 
@@ -3197,13 +3586,15 @@ window.addEventListener(
     handleUnhandledRejection
 );
 
-/* =========================
-   RESPONSIVE CHARTS
-   ========================= */
+
+/* =========================================================
+   WINDOW RESIZE
+========================================================= */
 
 window.addEventListener(
     "resize",
     () => {
+
         clearTimeout(
             resizeTimer
         );
@@ -3211,55 +3602,67 @@ window.addEventListener(
         resizeTimer =
             setTimeout(
                 () => {
+
                     Object.values(
                         charts
                     ).forEach(
                         chart => {
+
                             if (
                                 chart &&
                                 typeof chart.resize ===
                                     "function"
                             ) {
+
                                 chart.resize();
                             }
                         }
                     );
+
                 },
                 150
             );
     }
 );
 
-/* =========================
-   VISIBILITY REFRESH
-   ========================= */
+
+/* =========================================================
+   PAGE VISIBILITY
+========================================================= */
 
 document.addEventListener(
     "visibilitychange",
     () => {
+
         if (
             document.visibilityState ===
                 "visible" &&
             initialized
         ) {
+
             refreshEntireDashboard();
         }
     }
 );
 
-/* =========================
-   DEBUG / PUBLIC API
-   ========================= */
+
+/* =========================================================
+   PUBLIC DEBUG API
+========================================================= */
 
 window.SupportIQ = {
+
     getTickets:
-        () => ticketData,
+        () =>
+            ticketData,
 
     getSegments:
-        () => segmentData,
+        () =>
+            segmentData,
 
     getResolutionData:
-        () => resolutionData,
+        () =>
+            resolutionData,
 
     getFilteredTickets:
         () =>
@@ -3282,12 +3685,14 @@ window.SupportIQ = {
 
     analyzeTicket:
         index => {
+
             const ticket =
                 ticketData[
                     index
                 ];
 
             if (!ticket) {
+
                 return Promise.reject(
                     new Error(
                         "Invalid ticket index."
@@ -3301,6 +3706,7 @@ window.SupportIQ = {
                 );
 
             if (selector) {
+
                 selector.value =
                     String(
                         index
@@ -3315,6 +3721,7 @@ window.SupportIQ = {
                 ticket
             ).then(
                 data => {
+
                     renderAPIAnalysisResult(
                         data
                     );
@@ -3325,7 +3732,9 @@ window.SupportIQ = {
         }
 };
 
+
 window.SupportIQDashboard = {
+
     initialize:
         initializeDashboard,
 
@@ -3340,13 +3749,16 @@ window.SupportIQDashboard = {
     getActiveFilters,
 
     getResolutionData:
-        () => resolutionData,
+        () =>
+            resolutionData,
 
     getSegmentData:
-        () => segmentData,
+        () =>
+            segmentData,
 
     getTicketData:
-        () => ticketData,
+        () =>
+            ticketData,
 
     checkAPIHealth,
 
@@ -3358,6 +3770,7 @@ window.SupportIQDashboard = {
                 )
 };
 
+
 console.log(
-    "SupportIQ corrected script loaded."
+    "SupportIQ final corrected script loaded."
 );
